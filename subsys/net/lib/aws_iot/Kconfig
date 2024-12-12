@@ -153,6 +153,13 @@ config AWS_IOT_LAST_WILL_TOPIC
 
 endif
 
+config AWS_IOT_LAST_WILL_RUNTIME
+  bool "Last will topic and message provided by application run-time"
+  help
+    If this option is set, the last will topic and message are provided 
+    by the application at run-time.
+
+
 config AWS_IOT_CONNECTION_POLL_THREAD
 	bool "Enable polling on MQTT socket in AWS IoT backend"
 	default y

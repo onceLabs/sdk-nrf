@@ -203,6 +203,14 @@ struct aws_iot_config {
 	char *host_name;
 	/** Length of host_name string. */
 	size_t host_name_len;
+
+#if defined(CONFIG_AWS_IOT_LAST_WILL_RUNTIME)
+  /** Last will topic. */
+  struct mqtt_topic *lwt_topic;
+  /** Last will message. */
+  struct mqtt_utf8 *lwt_msg;
+#endif
+
 };
 
 /** @brief Initialize the module.

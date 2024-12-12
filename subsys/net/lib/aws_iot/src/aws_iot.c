@@ -19,7 +19,7 @@
 
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(aws_iot, CONFIG_AWS_IOT_LOG_LEVEL);
+LOG_MODULE_REGISTER(aws_iot, LOG_LEVEL_DBG);//CONFIG_AWS_IOT_LOG_LEVEL);
 
 /* Check if the static host name is set and if its buffer is larger enough if
  * static host name is used
@@ -117,6 +117,7 @@ static char aws_host_name_buf[CONFIG_AWS_IOT_BROKER_HOST_NAME_MAX_LEN + 1];
 static struct aws_iot_app_topic_data app_topic_data;
 static struct mqtt_client client;
 static struct sockaddr_storage broker;
+static struct aws_iot_config aws_config;
 
 static char rx_buffer[CONFIG_AWS_IOT_MQTT_RX_TX_BUFFER_LEN];
 static char tx_buffer[CONFIG_AWS_IOT_MQTT_RX_TX_BUFFER_LEN];
@@ -850,7 +851,7 @@ static int client_broker_init(struct mqtt_client *const client)
 	client->tx_buf_size		= sizeof(tx_buffer);
 	client->transport.type		= MQTT_TRANSPORT_SECURE;
 
-#if defined(CONFIG_AWS_IOT_LAST_WILL)
+#if defined(CONFIG_AWS_IOT_LAST_WILL) && !defined(CONFIG_AWS_IOT_LAST_WILL_RUNTIME)
 	static struct mqtt_topic last_will_topic = {
 		.topic.utf8 = CONFIG_AWS_IOT_LAST_WILL_TOPIC,
 		.topic.size = sizeof(CONFIG_AWS_IOT_LAST_WILL_TOPIC) - 1,
@@ -897,6 +898,14 @@ static int connect_client(struct aws_iot_config *const config)
 		LOG_ERR("client_broker_init, error: %d", err);
 		return err;
 	}
+
+#if defined(CONFIG_AWS_IOT_LAST_WILL_RUNTIME) && defined(CONFIG_AWS_IOT_LAST_WILL)
+  // Need to allocate memory for the last will topic and message
+  if (aws_config.lwt_topic != NULL && aws_config.lwt_msg != NULL) {
+    client.will_topic = aws_config.lwt_topic;
+    client.will_message = aws_config.lwt_msg;
+  }
+#endif
 
 	err = mqtt_connect(&client);
 	if (err) {
@@ -1087,6 +1096,16 @@ int aws_iot_init(const struct aws_iot_config *const config,
 		 aws_iot_evt_handler_t event_handler)
 {
 	int err;
+
+  /* Initialize local aws_iot_config and populate the data from config */
+  if (config) {
+    aws_config.client_id = config->client_id;
+    aws_config.client_id_len = config->client_id_len;
+  #if defined (CONFIG_AWS_IOT_LAST_WILL_RUNTIME)
+    aws_config.lwt_topic = config->lwt_topic;
+    aws_config.lwt_msg = config->lwt_msg;
+  #endif
+  }
 
 	if ((IS_ENABLED(CONFIG_AWS_IOT_CLIENT_ID_APP) ||
 	     IS_ENABLED(CONFIG_AWS_IOT_BROKER_HOST_NAME_APP)) &&
