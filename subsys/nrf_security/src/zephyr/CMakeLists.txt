@@ -15,7 +15,7 @@ target_link_libraries(zephyr_interface
     psa_interface
 )
 
-if (CONFIG_MBEDTLS_DEBUG)
+if(CONFIG_MBEDTLS_DEBUG)
   zephyr_library_sources(${ZEPHYR_BASE}/modules/mbedtls/debug.c)
   zephyr_library_sources(debug_init.c)
   zephyr_include_directories(${ZEPHYR_BASE}/modules/mbedtls/include)
@@ -31,6 +31,13 @@ endif()
 if(CONFIG_MBEDTLS_ENTROPY_POLL)
   list(APPEND src_zephyr
     ${NRF_SECURITY_ROOT}/src/zephyr/entropy_poll.c
+  )
+endif()
+
+if(CONFIG_PSA_CRYPTO_SYS_INIT)
+  # Include a late initialization of psa_crypto_init just-in-case
+  list(APPEND src_zephyr
+    psa_crypto_init.c
   )
 endif()
 
@@ -80,7 +87,12 @@ if(TARGET mbedx509)
   target_link_libraries(mbedtls_external INTERFACE mbedx509)
 endif()
 
+# Link with legacy include library to get includes for Mbed TLS _ALT files
+if(TARGET mbedcrypto_legacy_includes)
+  zephyr_link_libraries(mbedcrypto_legacy_includes)
+endif()
+
 # Link with mbedcrypto library (in NS build or by default)
 target_link_libraries(mbedtls_external INTERFACE ${mbedcrypto_target})
 
-zephyr_link_libraries(mbedtls_external)
+target_link_libraries(zephyr PRIVATE mbedtls_external)

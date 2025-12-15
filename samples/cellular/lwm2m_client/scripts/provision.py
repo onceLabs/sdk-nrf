@@ -9,13 +9,14 @@
 """
 
 import argparse
+import contextlib
 import logging
-
 from secrets import token_hex
-from coiote import Coiote
-from leshan import Leshan
-from device import Device
+
 from atclient import ATclient
+from coiote import Coiote
+from device import Device
+from leshan import Leshan
 
 if __name__ == "__main__":
     try:
@@ -31,6 +32,8 @@ if __name__ == "__main__":
     parser.add_argument('-d', help='Enable debug logs', action='store_true')
     parser.add_argument('-p', '--purge', dest='purge', help='Wipe the security tags and remove the device from the server', action='store_true')
     parser.add_argument('--leshan', help='Provision to Leshan demo server', action='store_true')
+    parser.add_argument('--sec-tag', type=int, default=35724861, help='Security tag to use (default: 35724861)')
+    parser.add_argument('--bs-sec-tag', type=int, default=35724862, help='Bootstrap security tag to use (default: 35724862)')
     args = parser.parse_args()
 
     if args.d:
@@ -54,20 +57,16 @@ if __name__ == "__main__":
     logging.info('Identity: %s', identity)
 
     # Remove previous keys
-    dev.delete_sec_tag(35724861)
-    dev.delete_sec_tag(35724862)
+    dev.delete_sec_tag(args.sec_tag)
+    dev.delete_sec_tag(args.bs_sec_tag)
 
     if args.leshan:
         leshan = Leshan('https://leshan.eclipseprojects.io/api')
         bserver = Leshan('https://leshan.eclipseprojects.io/bs/api')
-        try:
+        with contextlib.suppress(RuntimeError):
             leshan.delete_device(identity)
-        except RuntimeError:
-            pass
-        try:
+        with contextlib.suppress(RuntimeError):
             leshan.delete_bs_device(identity)
-        except RuntimeError:
-            pass
     else:
         coiote = Coiote()
 
@@ -81,7 +80,7 @@ if __name__ == "__main__":
 
     # Generate and store Bootstrap keys
     psk = token_hex(16)
-    dev.store_psk(35724862, identity, psk)
+    dev.store_psk(args.bs_sec_tag, identity, psk)
 
     if args.leshan:
         leshan.create_psk_device(identity, psk)

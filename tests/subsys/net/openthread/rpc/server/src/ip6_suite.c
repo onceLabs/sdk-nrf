@@ -20,8 +20,6 @@
 /* Fake functions */
 
 DEFINE_FFF_GLOBALS;
-FAKE_VOID_FUNC(otCliInit, otInstance *, otCliOutputCallback, void *);
-FAKE_VOID_FUNC(otCliInputLine, char *);
 FAKE_VALUE_FUNC(const otNetifAddress *, otIp6GetUnicastAddresses, otInstance *);
 FAKE_VALUE_FUNC(const otNetifMulticastAddress *, otIp6GetMulticastAddresses, otInstance *);
 FAKE_VALUE_FUNC(otError, otIp6SubscribeMulticastAddress, otInstance *, const otIp6Address *);
@@ -30,8 +28,6 @@ FAKE_VALUE_FUNC(otError, otIp6SetEnabled, otInstance *, bool);
 FAKE_VALUE_FUNC(bool, otIp6IsEnabled, otInstance *);
 
 #define FOREACH_FAKE(f)                                                                            \
-	f(otCliInit);                                                                              \
-	f(otCliInputLine);                                                                         \
 	f(otIp6GetUnicastAddresses);                                                               \
 	f(otIp6GetMulticastAddresses);                                                             \
 	f(otIp6SubscribeMulticastAddress);                                                         \
@@ -136,76 +132,106 @@ ZTEST(ot_rpc_ip6, test_otIp6IsEnabled_true)
  * Test reception of otIp6SubscribeMulticastAddress(ff02::1) command.
  * Test serialization of the result: OT_ERROR_NONE.
  */
+static otError subscribe_multicast_ff02_1_fake(otInstance *instance, const otIp6Address *addr)
+{
+	const otIp6Address exp_addr = {.mFields.m8 = {MADDR_FF02_1}};
+
+	zassert_mem_equal(addr, &exp_addr, sizeof(exp_addr));
+
+	return OT_ERROR_NONE;
+}
+
 ZTEST(ot_rpc_ip6, test_otIp6SubscribeMulticastAddress)
 {
-	const otIp6Address addr = {.mFields.m8 = {MADDR_FF02_1}};
-
-	otIp6SubscribeMulticastAddress_fake.return_val = OT_ERROR_NONE;
+	otIp6SubscribeMulticastAddress_fake.custom_fake = subscribe_multicast_ff02_1_fake;
 
 	mock_nrf_rpc_tr_expect_add(RPC_RSP(0x00), NO_RSP);
 	mock_nrf_rpc_tr_receive(RPC_CMD(OT_RPC_CMD_IP6_SUBSCRIBE_MADDR, 0x50, MADDR_FF02_1));
 	mock_nrf_rpc_tr_expect_done();
 
 	zassert_equal(otIp6SubscribeMulticastAddress_fake.call_count, 1);
-	zassert_mem_equal(otIp6SubscribeMulticastAddress_fake.arg1_val, &addr, sizeof(addr));
 }
 
 /*
  * Test reception of otIp6SubscribeMulticastAddress(ff02::1) command.
  * Test serialization of the result: OT_ERROR_FAILED.
  */
+static otError subscribe_multicast_ff02_1_failed_fake(otInstance *instance,
+						      const otIp6Address *addr)
+{
+	const otIp6Address exp_addr = {.mFields.m8 = {MADDR_FF02_1}};
+
+	zassert_mem_equal(addr, &exp_addr, sizeof(exp_addr));
+
+	return OT_ERROR_FAILED;
+}
+
 ZTEST(ot_rpc_ip6, test_otIp6SubscribeMulticastAddress_failed)
 {
-	const otIp6Address addr = {.mFields.m8 = {MADDR_FF02_1}};
-
-	otIp6SubscribeMulticastAddress_fake.return_val = OT_ERROR_FAILED;
+	otIp6SubscribeMulticastAddress_fake.custom_fake = subscribe_multicast_ff02_1_failed_fake;
 
 	mock_nrf_rpc_tr_expect_add(RPC_RSP(0x01), NO_RSP);
 	mock_nrf_rpc_tr_receive(RPC_CMD(OT_RPC_CMD_IP6_SUBSCRIBE_MADDR, 0x50, MADDR_FF02_1));
 	mock_nrf_rpc_tr_expect_done();
 
 	zassert_equal(otIp6SubscribeMulticastAddress_fake.call_count, 1);
-	zassert_mem_equal(otIp6SubscribeMulticastAddress_fake.arg1_val, &addr, sizeof(addr));
 }
 
 /*
  * Test reception of otIp6UnubscribeMulticastAddress(ff02::1) command.
  * Test serialization of the result: OT_ERROR_NONE.
  */
+static otError unsubscribe_multicast_ff02_1_fake(otInstance *instance, const otIp6Address *addr)
+{
+	const otIp6Address exp_addr = {.mFields.m8 = {MADDR_FF02_1}};
+
+	zassert_mem_equal(addr, &exp_addr, sizeof(exp_addr));
+
+	return OT_ERROR_NONE;
+}
+
 ZTEST(ot_rpc_ip6, test_otIp6UnsubscribeMulticastAddress)
 {
-	const otIp6Address addr = {.mFields.m8 = {MADDR_FF02_1}};
-
-	otIp6UnsubscribeMulticastAddress_fake.return_val = OT_ERROR_NONE;
+	otIp6UnsubscribeMulticastAddress_fake.custom_fake = unsubscribe_multicast_ff02_1_fake;
 
 	mock_nrf_rpc_tr_expect_add(RPC_RSP(0x00), NO_RSP);
 	mock_nrf_rpc_tr_receive(RPC_CMD(OT_RPC_CMD_IP6_UNSUBSCRIBE_MADDR, 0x50, MADDR_FF02_1));
 	mock_nrf_rpc_tr_expect_done();
 
 	zassert_equal(otIp6UnsubscribeMulticastAddress_fake.call_count, 1);
-	zassert_mem_equal(otIp6UnsubscribeMulticastAddress_fake.arg1_val, &addr, sizeof(addr));
 }
 
 /*
  * Test reception of otIp6UnubscribeMulticastAddress(ff02::1) command.
  * Test serialization of the result: OT_ERROR_FAILED.
  */
+static otError unsubscribe_multicast_ff02_1_failed_fake(otInstance *instance,
+							const otIp6Address *addr)
+{
+	const otIp6Address exp_addr = {.mFields.m8 = {MADDR_FF02_1}};
+
+	zassert_mem_equal(addr, &exp_addr, sizeof(exp_addr));
+
+	return OT_ERROR_FAILED;
+}
+
 ZTEST(ot_rpc_ip6, test_otIp6UnsubscribeMulticastAddress_failed)
 {
-	const otIp6Address addr = {.mFields.m8 = {MADDR_FF02_1}};
-
-	otIp6UnsubscribeMulticastAddress_fake.return_val = OT_ERROR_FAILED;
+	otIp6UnsubscribeMulticastAddress_fake.custom_fake =
+		unsubscribe_multicast_ff02_1_failed_fake;
 
 	mock_nrf_rpc_tr_expect_add(RPC_RSP(0x01), NO_RSP);
 	mock_nrf_rpc_tr_receive(RPC_CMD(OT_RPC_CMD_IP6_UNSUBSCRIBE_MADDR, 0x50, MADDR_FF02_1));
 	mock_nrf_rpc_tr_expect_done();
 
 	zassert_equal(otIp6UnsubscribeMulticastAddress_fake.call_count, 1);
-	zassert_mem_equal(otIp6UnsubscribeMulticastAddress_fake.arg1_val, &addr, sizeof(addr));
 }
 
 /*
  * Test reception of otIp6GetUnicastAddresses() command.
+ * Test serialization of the result:
+ * - fe80:aabb:aabb:aabb:aabb:aabb:aabb:aa01
+ * - fe80:aabb:aabb:aabb:aabb:aabb:aabb:aa02
  */
 ZTEST(ot_rpc_ip6, test_otIp6GetUnicastAddresses)
 {
@@ -251,6 +277,9 @@ ZTEST(ot_rpc_ip6, test_otIp6GetUnicastAddresses)
 
 /*
  * Test reception of otIp6GetMulticastAddresses() command.
+ * Test serialization of the result:
+ * - fe02::1
+ * - fe02::2
  */
 ZTEST(ot_rpc_ip6, test_otIp6GetMulticastAddresses)
 {

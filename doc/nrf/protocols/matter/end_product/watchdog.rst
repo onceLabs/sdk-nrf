@@ -31,7 +31,7 @@ To enable the Matter watchdog feature in a Matter sample, set the :ref:`CONFIG_N
 The feature is enabled by default for the release build type in all Matter samples and applications.
 
 To set the timeout for the watchdog timer, configure the :ref:`CONFIG_NCS_SAMPLE_MATTER_WATCHDOG_TIMEOUT<CONFIG_NCS_SAMPLE_MATTER_WATCHDOG_TIMEOUT>` with a value in milliseconds.
-By default, the timeout is set to 10 seconds.
+By default, the timeout is set to 10 minutes.
 
 .. note::
 
@@ -175,10 +175,10 @@ Feeding manually
 
      .. code-block:: c++
 
-        if(!Nrf::Watchdog::InstallSource(myWatchdog))
-        {
-            LOG_ERR("Watchdog source cannot be installed.");
-        }
+            if(!Nrf::Watchdog::InstallSource(myWatchdog))
+            {
+                LOG_ERR("Watchdog source cannot be installed.");
+            }
 
   3. Enable the Global Watchdog module and check the function result:
 
@@ -193,7 +193,7 @@ Feeding manually
 
      .. code-block:: c++
 
-        myWatchdog.Feed();
+            myWatchdog.Feed();
 
 
 .. note::

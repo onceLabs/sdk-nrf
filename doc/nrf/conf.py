@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024 Nordic Semiconductor
+# Copyright (c) 2025 Nordic Semiconductor
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
@@ -7,10 +7,9 @@
 # nrf documentation build configuration file
 
 import os
-from pathlib import Path
-import sys
 import re
-
+import sys
+from pathlib import Path
 
 # Paths ------------------------------------------------------------------------
 
@@ -26,7 +25,7 @@ MCUBOOT_BASE = utils.get_projdir("mcuboot")
 # General configuration --------------------------------------------------------
 
 project = "nRF Connect SDK"
-copyright = "2019-2024, Nordic Semiconductor"
+copyright = "2019-2025, Nordic Semiconductor"
 author = "Nordic Semiconductor"
 version = release = os.environ.get("DOCSET_VERSION")
 
@@ -56,6 +55,8 @@ extensions = [
     "notfound.extension",
     "ncs_tool_versions",
     "page_filter",
+    "sphinxcontrib.plantuml",
+    "sphinxcontrib.programoutput",
 ]
 
 linkcheck_ignore = [
@@ -122,22 +123,28 @@ if tfm_mapping:
 
 # -- Options for doxyrunner plugin ---------------------------------------------
 
+_doxyrunner_outdir = utils.get_builddir() / "html" / "nrf" / "doxygen"
+
 doxyrunner_doxygen = os.environ.get("DOXYGEN_EXECUTABLE", "doxygen")
-doxyrunner_doxyfile = NRF_BASE / "doc" / "nrf" / "nrf.doxyfile.in"
-doxyrunner_outdir = utils.get_builddir() / "html" / "nrf" / "doxygen"
-doxyrunner_fmt = True
-doxyrunner_fmt_vars = {
-    "NRF_BASE": str(NRF_BASE),
-    "DOCSET_SOURCE_BASE": str(NRF_BASE),
-    "DOCSET_BUILD_DIR": str(doxyrunner_outdir),
-    "DOCSET_VERSION": version,
+doxyrunner_projects = {
+    "nrf": {
+        "doxyfile": NRF_BASE / "doc" / "nrf" / "nrf.doxyfile.in",
+        "outdir": _doxyrunner_outdir,
+        "fmt": True,
+        "fmt_vars": {
+            "NRF_BASE": str(NRF_BASE),
+            "DOCSET_SOURCE_BASE": str(NRF_BASE),
+            "DOCSET_BUILD_DIR": str(_doxyrunner_outdir),
+            "DOCSET_VERSION": version,
+        }
+    }
 }
 
 # create mbedtls config header (needed for Doxygen)
-doxyrunner_outdir.mkdir(exist_ok=True, parents=True)
+_doxyrunner_outdir.mkdir(exist_ok=True, parents=True)
 
 fin_path = NRF_BASE / "subsys" / "nrf_security" / "configs" / "legacy_crypto_config.h.template"
-fout_path = doxyrunner_outdir / "mbedtls_doxygen_config.h"
+fout_path = _doxyrunner_outdir / "mbedtls_doxygen_config.h"
 
 with open(fin_path) as fin, open(fout_path, "w") as fout:
     fout.write(
@@ -150,7 +157,11 @@ with open(fin_path) as fin, open(fout_path, "w") as fout:
 
 # -- Options for doxybridge plugin ---------------------------------------------
 
-doxybridge_dir = doxyrunner_outdir
+doxybridge_projects = {
+    "nrf": _doxyrunner_outdir,
+    "wifi": utils.get_builddir() / "html" / "wifi",
+    "zephyr": utils.get_builddir() / "html" / "zephyr" / "doxygen",
+}
 
 # Options for ncs_include ------------------------------------------------------
 
@@ -218,7 +229,7 @@ notfound_urls_prefix = "/nRF_Connect_SDK/doc/{}/nrf/".format(
 # -- Options for zephyr.gh_utils -----------------------------------------------
 
 gh_link_version = "main" if version.endswith("99") else f"v{version}"
-gh_link_base_url = f"https://github.com/nrfconnect/sdk-nrf"
+gh_link_base_url = "https://github.com/nrfconnect/sdk-nrf"
 gh_link_prefixes = {
     "applications/.*": "",
     "samples/.*": "",

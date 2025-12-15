@@ -72,7 +72,7 @@ static struct k_thread thread;
 /** Ensure that thread is ready for download */
 static K_SEM_DEFINE(update_mutex, 0, 1);
 /* Internal thread stack. */
-static K_THREAD_STACK_MEMBER(thread_stack,
+static K_KERNEL_STACK_MEMBER(thread_stack,
 			     CONFIG_LWM2M_CLIENT_UTILS_FIRMWARE_UPDATE_THREAD_STACK_SIZE);
 #endif
 
@@ -85,6 +85,7 @@ static int application_obj_id;
 static int modem_obj_id;
 static int smp_obj_id;
 static int target_image_type[FOTA_INSTANCE_COUNT];
+static bool loading_settings;
 
 
 static void dfu_target_cb(enum dfu_target_evt_id evt);
@@ -251,6 +252,7 @@ static int set(const char *key, size_t len_rd, settings_read_cb read_cb, void *c
 	}
 
 	LOG_DBG("Loading \"%s\"", key);
+	loading_settings = true;
 
 	ret = lwm2m_string_to_path(key, &path, '/');
 	if (ret) {
@@ -285,9 +287,16 @@ static int set(const char *key, size_t len_rd, settings_read_cb read_cb, void *c
 	return 0;
 }
 
+static int commit(void)
+{
+	loading_settings = false;
+	return 0;
+}
+
 static struct settings_handler lwm2m_firm_settings = {
 	.name = LWM2M_FIRM_PREFIX,
 	.h_set = set,
+	.h_commit = commit,
 };
 
 static int write_resource_to_settings(uint16_t inst, uint16_t res, uint8_t *data, uint16_t data_len)
@@ -296,6 +305,10 @@ static int write_resource_to_settings(uint16_t inst, uint16_t res, uint8_t *data
 
 	if ((inst < 0 || inst > 9) || (res < 0 || res > 99)) {
 		return -EINVAL;
+	}
+
+	if (loading_settings) {
+		return 0;
 	}
 
 	snprintk(path, sizeof(path), SETTINGS_FIRM_PATH_FMT,
@@ -310,6 +323,10 @@ static int write_resource_to_settings(uint16_t inst, uint16_t res, uint8_t *data
 static int write_image_type_to_settings(uint16_t inst, int img_type)
 {
 	char path[SETTINGS_FIRM_PATH_LEN];
+
+	if (loading_settings) {
+		return 0;
+	}
 
 	snprintk(path, sizeof(path), SETTINGS_FIRM_INSTANCE_PATH_FMT,
 		 (uint16_t)ENABLED_LWM2M_FIRMWARE_OBJECT, inst);
@@ -902,6 +919,9 @@ static void fota_download_callback(const struct fota_download_evt *evt)
 		LOG_INF("FOTA download failed, target %d", dfu_image_type);
 		target_image_type_store(ongoing_obj_id, dfu_image_type);
 		switch (evt->cause) {
+		case FOTA_DOWNLOAD_ERROR_CAUSE_PROTO_NOT_SUPPORTED:
+			set_result(ongoing_obj_id, RESULT_UNSUP_PROTO);
+			break;
 		/* Connecting to the FOTA server failed. */
 		case FOTA_DOWNLOAD_ERROR_CAUSE_CONNECT_FAILED:
 			/* FALLTHROUGH */
@@ -1097,48 +1117,52 @@ static bool modem_has_credentials(int sec_tag, enum modem_key_mgmt_cred_type cre
 	return exist;
 }
 
-static void lwm2m_firware_pull_protocol_support_resource_init(int instance_id)
+static void insert_supported_protocol(int instance_id, int index, uint8_t *protocol)
 {
-	struct lwm2m_obj_path path;
 	int ret;
-	int supported_protocol_count;
+	struct lwm2m_obj_path path = LWM2M_OBJ(ENABLED_LWM2M_FIRMWARE_OBJECT, instance_id,
+					       LWM2M_FOTA_UPDATE_PROTO_SUPPORT_ID, index);
+	ret = lwm2m_create_res_inst(&path);
+	if (ret) {
+		return;
+	}
+
+	ret = lwm2m_set_res_buf(&path, protocol, sizeof(*protocol), sizeof(*protocol),
+				LWM2M_RES_DATA_FLAG_RO);
+	if (ret) {
+		lwm2m_delete_res_inst(&path);
+		return;
+	}
+}
+
+static void lwm2m_firmware_pull_protocol_support_resource_init(int instance_id)
+{
+	int index = 0;
 
 	if (!IS_ENABLED(CONFIG_LWM2M_CLIENT_UTILS_ADV_FIRMWARE_UPDATE_OBJ_SUPPORT)) {
 		lwm2m_firmware_object_pull_protocol_init(instance_id);
 	}
 
 	int tag = CONFIG_LWM2M_CLIENT_UTILS_DOWNLOADER_SEC_TAG;
+	bool has_ca = modem_has_credentials(tag, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN);
+	bool has_psk = modem_has_credentials(tag, MODEM_KEY_MGMT_CRED_TYPE_PSK);
 
 	/* Check which protocols from pull_protocol_support[] may work.
 	 * Order in that list is CoAP, HTTP, CoAPS, HTTPS.
 	 * So unsecure protocols are first, those should always work.
 	 */
 
-	if (modem_has_credentials(tag, MODEM_KEY_MGMT_CRED_TYPE_CA_CHAIN)) {
-		/* CA chain means that HTTPS and CoAPS might work, support all */
-		supported_protocol_count = ARRAY_SIZE(pull_protocol_support);
-	} else if (modem_has_credentials(tag, MODEM_KEY_MGMT_CRED_TYPE_PSK)) {
-		/* PSK might work on CoAPS, not HTTPS. Drop it from the list */
-		supported_protocol_count = ARRAY_SIZE(pull_protocol_support) - 1;
-	} else {
-		/* Drop both secure protocols from list as we don't have credentials */
-		supported_protocol_count = ARRAY_SIZE(pull_protocol_support) - 2;
-	}
 
-	for (int i = 0; i < supported_protocol_count; i++) {
-		path = LWM2M_OBJ(ENABLED_LWM2M_FIRMWARE_OBJECT, instance_id,
-				 LWM2M_FOTA_UPDATE_PROTO_SUPPORT_ID, i);
-
-		ret = lwm2m_create_res_inst(&path);
-		if (ret) {
-			return;
+	if (IS_ENABLED(CONFIG_DOWNLOADER_TRANSPORT_COAP)) {
+		insert_supported_protocol(instance_id, index++, &pull_protocol_support[0]);
+		if (has_ca || has_psk) {
+			insert_supported_protocol(instance_id, index++, &pull_protocol_support[2]);
 		}
-
-		ret = lwm2m_set_res_buf(&path, &pull_protocol_support[i],
-					sizeof(uint8_t), sizeof(uint8_t), LWM2M_RES_DATA_FLAG_RO);
-		if (ret) {
-			lwm2m_delete_res_inst(&path);
-			return;
+	}
+	if (IS_ENABLED(CONFIG_DOWNLOADER_TRANSPORT_HTTP)) {
+		insert_supported_protocol(instance_id, index++, &pull_protocol_support[1]);
+		if (has_ca) {
+			insert_supported_protocol(instance_id, index++, &pull_protocol_support[3]);
 		}
 	}
 }
@@ -1307,7 +1331,7 @@ void update_thread(void *client, void *a, void *b)
 static void lwm2m_firmware_object_setup_init(int object_instance)
 {
 	lwm2m_firmware_load_from_settings(object_instance);
-	lwm2m_firware_pull_protocol_support_resource_init(object_instance);
+	lwm2m_firmware_pull_protocol_support_resource_init(object_instance);
 	lwm2m_firmware_register_write_callbacks(object_instance);
 }
 

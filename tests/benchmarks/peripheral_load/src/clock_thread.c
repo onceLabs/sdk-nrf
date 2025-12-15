@@ -105,6 +105,7 @@ static void test_request_release_clock_spec(const struct device *clk_dev,
 	int res = 0;
 	struct onoff_client cli;
 	uint32_t rate;
+	bool rate_supported = true;
 
 	LOG_INF("Clock under test: %s", clk_dev->name);
 	sys_notify_init_spinwait(&cli.notify);
@@ -127,12 +128,15 @@ static void test_request_release_clock_spec(const struct device *clk_dev,
 	}
 	ret = clock_control_get_rate(clk_dev, NULL, &rate);
 	LOG_INF("Clock control get rate response code: %d", ret);
-	if (ret != 0) {
+	if (ret == -ENOSYS) {
+		LOG_INF("Clock control get rate not supported");
+		rate_supported = false;
+	} else if (ret != 0) {
 		LOG_ERR("Clock control get rate failed");
 		atomic_inc(&completed_threads);
 		return;
 	}
-	if (rate != clk_spec->frequency) {
+	if (rate_supported && rate != clk_spec->frequency) {
 		LOG_ERR("Invalid rate: %d", rate);
 		atomic_inc(&completed_threads);
 		return;
@@ -195,4 +199,7 @@ static void clock_thread(void *arg1, void *arg2, void *arg3)
 
 K_THREAD_DEFINE(thread_clock_id, CLOCK_THREAD_STACKSIZE, clock_thread, NULL, NULL, NULL,
 		K_PRIO_PREEMPT(CLOCK_THREAD_PRIORITY), 0, 0);
+
+#else
+#pragma message("Clock thread skipped - feature is not supported on this platform")
 #endif

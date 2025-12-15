@@ -30,7 +30,6 @@ LOG_MODULE_REGISTER(twt, CONFIG_LOG_DEFAULT_LEVEL);
 #include <zephyr/net/net_event.h>
 #include <zephyr/drivers/gpio.h>
 
-#include<net/wifi_mgmt_ext.h>
 
 #include "net_private.h"
 #include "traffic_gen.h"
@@ -290,7 +289,7 @@ static void handle_wifi_twt_event(struct net_mgmt_event_callback *cb)
 }
 
 static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				     uint32_t mgmt_event, struct net_if *iface)
+				     uint64_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_CONNECT_RESULT:
@@ -335,7 +334,7 @@ static void print_dhcp_ip(struct net_mgmt_event_callback *cb)
 }
 
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				    uint32_t mgmt_event, struct net_if *iface)
+				    uint64_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_IPV4_DHCP_BOUND:

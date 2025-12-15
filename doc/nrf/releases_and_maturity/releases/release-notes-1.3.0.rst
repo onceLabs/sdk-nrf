@@ -52,7 +52,7 @@ This version of the |NCS| has been tested with the following modem firmware for 
 * mfw_nrf9160_1.2.0
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Changelog
 *********
@@ -133,7 +133,7 @@ nRF9160
   * Improved stability.
   * Various bugfixes.
 
-* :ref:`serial_lte_modem` application:
+* Serial LTE modem application:
 
   * Moved from samples to applications.
   * Added low-power idle mode.
@@ -193,13 +193,13 @@ See the :ref:`ug_thread` user guide to get started.
 Zigbee
 ------
 
-Added initial support for the Zigbee network protocol:
+Added initial support for the Zigbee network p`rotocol:
 
-* :ref:`nrfxlib:zboss` - port of the ZBOSS stack to the |NCS|, provided as a closed stack binary in nrfxlib.
-  The stack provided in this release has not been certified by the `Zigbee Alliance`_.
-* Light control sample consisting of :ref:`zigbee_light_bulb_sample`, :ref:`zigbee_light_switch_sample`, and :ref:`zigbee_network_coordinator_sample` - ported from the nRF5 SDK for Thread and Zigbee.
+* ZBOSS - port of the ZBOSS stack to the |NCS|, provided as a closed stack binary in nrfxlib.
+  The stack provided in this release has not been certified by the Zigbee Alliance.
+* Light control sample consisting of the Zigbee light bulb sample, Zigbee light switch sample, and Zigbee network coordinator sample - ported from the nRF5 SDK for Thread and Zigbee.
   The sample demonstrates all Zigbee roles (coordinator, router, end device).
-  The :ref:`zigbee_light_switch_sample` sample provides sleepy end device support.
+  The Zigbee light switch sample provides sleepy end device support.
 
 See the :ref:`ug_zigbee` user guide to get started.
 
@@ -401,7 +401,7 @@ MCUboot
 Build system
 ============
 
-* Added support for :ref:`ug_multi_image` for multi-core projects.
+* Added support for multi-image builds for multi-core projects.
 * Facilitated defining non-secure boards out of tree.
   Any board that matches ``*_ns`` or ``*ns`` is now considered non-secure, and its child images board is set to the secure variant.
 * Added support for defining external flash in the :ref:`partition_manager`.
@@ -433,7 +433,7 @@ In addition to documentation related to the changes listed above, the following 
 * :ref:`ug_nrf52` - added
 * :ref:`ug_thingy91` - added :ref:`thingy91_serialports`
 * :ref:`ug_nfc` - added
-* :ref:`ug_bootloader` - added :ref:`ug_bootloader_adding`
+* :ref:`ug_bootloader` - added upgradeable bootloader
 * Cloud client - updated
 * :ref:`crypto_test` - added
 * :ref:`libraries` - improved the structure of the library documentation
@@ -455,7 +455,7 @@ nRF9160
 =======
 
 * The nRF9160: Asset Tracker application prints warnings and error messages during successful FOTA. (NCSDK-5574)
-* The :ref:`lte_sensor_gateway` sample crashes when Thingy:52 is flipped. (NCSDK-5666)
+* The LTE Sensor Gateway sample crashes when Thingy:52 is flipped. (NCSDK-5666)
 
 From v1.2.0
 -----------

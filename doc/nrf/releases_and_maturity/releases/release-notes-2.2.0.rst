@@ -79,7 +79,7 @@ Supported modem firmware
 See `Modem firmware compatibility matrix`_ for an overview of which modem firmware versions have been tested with this version of the |NCS|.
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Modem-related libraries and versions
 ====================================
@@ -233,7 +233,7 @@ nRF9160: Asset Tracker v2
 
   * Handling for the new data receive events in the :ref:`lib_nrf_cloud` library.
     This is a major change in the application code but a minor change from the user perspective.
-  * :ref:`asset_tracker_v2_location_module`.
+  * Location module.
     GNSS is used through the :ref:`lib_location` library.
 
 * Updated:
@@ -242,8 +242,8 @@ nRF9160: Asset Tracker v2
   * The application now uses passive mode as the default mode for Thingy:91 builds.
   * The application now uses the :ref:`lib_location` library for retrieving location information.
     This is a major change in the application code but a minor change from the user perspective.
-  * Neighbor cell handling moved from :ref:`asset_tracker_v2_modem_module` to :ref:`asset_tracker_v2_location_module` to be used through Location library.
-  * The :ref:`asset_tracker_v2_location_module` triggers a :c:func:`location_request` with GNSS being the first priority method and cellular the second priority if they are enabled in the application configuration.
+  * Neighbor cell handling moved from the Asset Tracker v2 modem module to location module to be used through Location library.
+  * The Asset Tracker v2 location module triggers a :c:func:`location_request` with GNSS being the first priority method and cellular the second priority if they are enabled in the application configuration.
   * A-GPS/P-GPS are not requested based on triggers in the application but only based on :ref:`lib_location` library events :c:enum:`LOCATION_EVT_GNSS_ASSISTANCE_REQUEST` and :c:enum:`LOCATION_EVT_GNSS_PREDICTION_REQUEST`.
   * Currently, you cannot configure or define the LTE LC neighbor cell search type with the :ref:`lib_location` library.
     The default search type is always used.
@@ -262,7 +262,7 @@ nRF9160: Serial LTE modem
 
 * Added:
 
-  * Optional data modem flow control Kconfig option :ref:`CONFIG_SLM_DATAMODE_URC <CONFIG_SLM_DATAMODE_URC>`.
+  * Optional data modem flow control Kconfig option ``CONFIG_SLM_DATAMODE_URC``.
   * Handling for the new data receive events in the :ref:`lib_nrf_cloud` library.
 
 * Updated the service info JSON payload to use ``GNSS`` instead of ``GPS``.
@@ -454,7 +454,7 @@ nRF9160 samples
 
   * Added overlay files for nRF9160 DK with nRF7002 EK to obtain the current location by using Wi-Fi scanning results.
 
-* :ref:`lte_sensor_gateway` sample:
+* LTE Sensor Gateway sample:
 
   * Added handling for the new data receive events in the :ref:`lib_nrf_cloud` library.
   * Removed A-GPS and P-GPS processing.
@@ -513,7 +513,7 @@ Matter samples
 nRF5340 samples
 ---------------
 
-* :ref:`multiprotocol-rpmsg-sample` sample:
+* ``nRF5340: Multiprotocol RPMsg`` sample:
 
   * Updated by decreasing the maximum supported number of concurrent Bluetooth LE connections to four.
 
@@ -740,7 +740,7 @@ Libraries for networking
   * Removed the Kconfig option :kconfig:option:`CONFIG_MULTICELL_LOCATION_MAX_NEIGHBORS`.
     The maximum number of supported neighbor cell measurements for HERE location services depends on the :kconfig:option:`CONFIG_LTE_NEIGHBOR_CELLS_MAX` Kconfig option.
 
-* :ref:`lib_download_client` library:
+* Download client library:
 
   * Updated the library so that it does not retry download on disconnect.
   * Fixed a race condition when starting the download.

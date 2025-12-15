@@ -24,8 +24,6 @@ FOTA over Bluetooth Low Energy
    :start-after: fota_upgrades_over_ble_mandatory_mcuboot_start
    :end-before: fota_upgrades_over_ble_mandatory_mcuboot_end
 
-Bluetooth buffers configuration introduced by the :kconfig:option:`CONFIG_NCS_SAMPLE_MCUMGR_BT_OTA_DFU_SPEEDUP` Kconfig option is also automatically applied to the network core child image by the dedicated overlay file.
-
 .. include:: /app_dev/device_guides/nrf52/fota_update.rst
    :start-after: fota_upgrades_over_ble_additional_information_start
    :end-before: fota_upgrades_over_ble_additional_information_end
@@ -54,8 +52,8 @@ FOTA in Bluetooth Mesh
    :end-before: fota_upgrades_bt_mesh_end
 
 .. note::
-   Point-to-point DFU over Bluetooth Low Energy is supported by default, out-of-the-box, for all samples and applications compatible with :ref:`zephyr:thingy53_nrf5340`.
-   See :ref:`thingy53_app_update` for more information about updating firmware image on :ref:`zephyr:thingy53_nrf5340`.
+   Point-to-point DFU over Bluetooth Low Energy is supported by default, out-of-the-box, for all samples and applications compatible with :zephyr:board:`thingy53`.
+   See :ref:`thingy53_app_update` for more information about updating firmware image on :zephyr:board:`thingy53`.
 
 FOTA in Matter
 **************

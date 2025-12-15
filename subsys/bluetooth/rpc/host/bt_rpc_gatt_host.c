@@ -582,14 +582,15 @@ static bool bt_ccc_cfg_match_call(struct bt_conn *conn, const struct bt_gatt_att
 
 static int add_ccc_attr(struct bt_gatt_attr *attr, uint16_t param)
 {
-	struct _bt_gatt_ccc *ccc;
+	struct bt_gatt_ccc_managed_user_data *ccc;
 
-	ccc = (struct _bt_gatt_ccc *)bt_rpc_gatt_add(&gatt_buffer, sizeof(struct _bt_gatt_ccc));
+	ccc = (struct bt_gatt_ccc_managed_user_data *)bt_rpc_gatt_add(&gatt_buffer,
+			sizeof(struct bt_gatt_ccc_managed_user_data));
 	if (!ccc) {
 		return -ENOMEM;
 	}
 
-	memset(ccc, 0, sizeof(struct _bt_gatt_ccc));
+	memset(ccc, 0, sizeof(struct bt_gatt_ccc_managed_user_data));
 
 	ccc->cfg_changed =
 		(param & BT_RPC_GATT_CCC_CFG_CHANGE_PRESENT_FLAG) ? bt_ccc_cfg_changed_call : NULL;
@@ -728,6 +729,7 @@ static void bt_rpc_gatt_service_unregister_rpc_handler(const struct nrf_rpc_grou
 
 	svc = bt_rpc_gatt_get_service_by_index(svc_index);
 	if (!svc) {
+		LOG_ERR("Service unregister: Invalid service index %u", svc_index);
 		result = -EINVAL;
 	}
 
@@ -737,6 +739,16 @@ static void bt_rpc_gatt_service_unregister_rpc_handler(const struct nrf_rpc_grou
 
 	if (!result) {
 		result = bt_rpc_gatt_remove_service(svc);
+	}
+
+	if (!result && (bt_rpc_gatt_get_service_by_index(0) == NULL)) {
+		/*
+		 * The last service has been unregistered, so we can reclaim the entire GATT buffer.
+		 * Ideally, each dynamic service would use a separate buffer so that unregistering
+		 * a single service releases all its resources right away, but this requires
+		 * rewriting the GATT attribute memory management.
+		 */
+		net_buf_simple_reset(&gatt_buffer);
 	}
 
 	nrf_rpc_rsp_send_int(group, result);

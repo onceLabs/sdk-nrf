@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024 Nordic Semiconductor
+# Copyright (c) 2025 Nordic Semiconductor
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
@@ -7,9 +7,8 @@
 # nrfxlib documentation build configuration file
 
 import os
-from pathlib import Path
 import sys
-
+from pathlib import Path
 
 # Paths ------------------------------------------------------------------------
 
@@ -36,6 +35,7 @@ extensions = [
     "sphinxcontrib.mscgen",
     "inventory_builder",
     "warnings_filter",
+    "sphinx_tabs.tabs",
     "zephyr.kconfig",
     "zephyr.external_content",
     "zephyr.doxyrunner",
@@ -79,20 +79,26 @@ if nrf_mapping:
 
 # -- Options for doxyrunner plugin ---------------------------------------------
 
+_doxyrunner_outdir = utils.get_builddir() / "html" / "nrfxlib" / "doxygen"
+
 doxyrunner_doxygen = os.environ.get("DOXYGEN_EXECUTABLE", "doxygen")
-doxyrunner_doxyfile = NRF_BASE / "doc" / "nrfxlib" / "nrfxlib.doxyfile.in"
-doxyrunner_outdir = utils.get_builddir() / "html" / "nrfxlib" / "doxygen"
-doxyrunner_fmt = True
-doxyrunner_fmt_vars = {
-    "NRF_BASE": str(NRF_BASE),
-    "DOCSET_SOURCE_BASE": str(NRFXLIB_BASE),
-    "DOCSET_BUILD_DIR": str(doxyrunner_outdir),
-    "DOCSET_VERSION": version,
+doxyrunner_projects = {
+    "nrfxlib": {
+        "doxyfile": NRF_BASE / "doc" / "nrfxlib" / "nrfxlib.doxyfile.in",
+        "outdir": _doxyrunner_outdir,
+        "fmt": True,
+        "fmt_vars": {
+            "NRF_BASE": str(NRF_BASE),
+            "DOCSET_SOURCE_BASE": str(NRFXLIB_BASE),
+            "DOCSET_BUILD_DIR": str(_doxyrunner_outdir),
+            "DOCSET_VERSION": version,
+        }
+    }
 }
 
 # -- Options for doxybridge plugin ---------------------------------------------
 
-doxybridge_dir = doxyrunner_outdir
+doxybridge_projects = {"nrfxlib": _doxyrunner_outdir}
 
 # -- Options for warnings_filter -----------------------------------------------
 
@@ -106,7 +112,7 @@ external_content_contents = [(NRFXLIB_BASE, "**/*.rst"), (NRFXLIB_BASE, "**/doc/
 # -- Options for zephyr.gh_utils -----------------------------------------------
 
 gh_link_version = "main" if version.endswith("99") else f"v{version}"
-gh_link_base_url = f"https://github.com/nrfconnect/sdk-nrfxlib"
+gh_link_base_url = "https://github.com/nrfconnect/sdk-nrfxlib"
 
 
 def setup(app):

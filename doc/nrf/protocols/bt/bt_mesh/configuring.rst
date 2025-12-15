@@ -13,7 +13,7 @@ The Bluetooth® Mesh support is controlled by :kconfig:option:`CONFIG_BT_MESH`, 
 * :kconfig:option:`CONFIG_BT_OBSERVER` - Enables the Bluetooth Observer role.
 * :kconfig:option:`CONFIG_BT_PERIPHERAL` - Enables the Bluetooth Peripheral role.
 
-When the Bluetooth LE Controller is located on a separate image (like on the :ref:`zephyr:nrf5340dk_nrf5340` and :ref:`zephyr:thingy53_nrf5340` boards), the following configuration must be applied to the Bluetooth LE Controller configuration:
+When the Bluetooth LE Controller is located on a separate image (like on the :zephyr:board:`nrf5340dk` and :zephyr:board:`thingy53` boards), the following configuration must be applied to the Bluetooth LE Controller configuration:
 
 * :kconfig:option:`CONFIG_BT_EXT_ADV` =y.
 * :kconfig:option:`CONFIG_BT_EXT_ADV_MAX_ADV_SET` =5.
@@ -68,7 +68,6 @@ The provided values are meant as suggestions only, and should be individually ad
 * :kconfig:option:`CONFIG_HWINFO` - Enables the hardware information driver.
   The hardware information driver must be enabled to perform provisioning of the device.
   See the UUID section of :ref:`bt_mesh_dk_prov`.
-* :kconfig:option:`CONFIG_PM_SINGLE_IMAGE` - Enables the use of :ref:`partition_manager` for single-image builds.
 * :kconfig:option:`CONFIG_PM_PARTITION_SIZE_SETTINGS_STORAGE` - Sets the size of the partition used for settings storage.
   Use the option to increase the size if necessary.
 * :kconfig:option:`CONFIG_SOC_FLASH_NRF_PARTIAL_ERASE` - Enables partial erase on supported hardware platforms.
@@ -143,7 +142,6 @@ For more information, see :ref:`emds_readme`.
 * :kconfig:option:`CONFIG_EMDS` - Enables the emergency data storage.
 * :kconfig:option:`CONFIG_BT_MESH_RPL_STORAGE_MODE_EMDS` - Enables the persistent storage of RPL in EMDS.
 * :kconfig:option:`CONFIG_PM_PARTITION_SIZE_EMDS_STORAGE` =0x4000 - Defines the partition size for the Partition Manager.
-* :kconfig:option:`CONFIG_EMDS_SECTOR_COUNT` =4 - Defines the sector count of the emergency data storage area.
 
 .. _ug_bt_mesh_configuring_lpn:
 
@@ -207,8 +205,8 @@ The Bluetooth Mesh stack stores the following data persistently:
 * IV index
 * Sequence number
 * Heartbeat publication information
-* Application key(s) (the amount of entries is controlled by :kconfig:option:`CONFIG_BT_MESH_APP_KEY_COUNT`)
-* Network key(s) (the amount of entries is controlled by :kconfig:option:`CONFIG_BT_MESH_SUBNET_COUNT`)
+* Application keys (the amount of entries is controlled by :kconfig:option:`CONFIG_BT_MESH_APP_KEY_COUNT`)
+* Network keys (the amount of entries is controlled by :kconfig:option:`CONFIG_BT_MESH_SUBNET_COUNT`)
 * Label UUIDs for virtual addressing (the amount of entries is controlled by :kconfig:option:`CONFIG_BT_MESH_LABEL_COUNT`)
 * RPL entries (the RPL size is controlled by :kconfig:option:`CONFIG_BT_MESH_CRPL`)
 
@@ -216,7 +214,7 @@ The following data is stored for each model by the Bluetooth Mesh stack:
 
 * Model subscription state
 * Model publication state
-* Bound application key(s)
+* Bound application keys
 * Subscription list for group addresses
 * Subscription list for virtual addresses
 * Label UUIDs the model is subscribed to
@@ -247,3 +245,66 @@ Using the :ref:`bluetooth_mesh_sensor_server` sample as an example, configured a
   * Ambient light level gain
 
 Adding up all entries, it is worth setting the cache size to minimum 71.
+
+Security toolbox
+----------------
+
+Zephyr's Mesh security toolbox implementation uses third-party crypto library APIs (such as CMAC, AES-CCM, and HMAC-SHA-256) for implementing the encryption and authentication functionality.
+
+* The following options are available:
+
+  * :kconfig:option:`CONFIG_BT_MESH_USES_MBEDTLS_PSA` - Enables use of the `Mbed TLS`_ PSA API based security toolbox (default option).
+  * :kconfig:option:`CONFIG_BT_MESH_USES_TFM_PSA` - Enables use of the `Trusted Firmware M`_ PSA API based security toolbox (default option for platforms that support TF-M).
+    Zephyr's Mesh operates with open key values, including storing them in the persistent memory.
+
+.. note::
+   For Bluetooth Mesh provisioning, authenticating with the BTM_ECDH_P256_CMAC_AES128_AES_CCM (0x00) algorithm does not provide protection against an active man-in-the-middle (MITM) attacker during the provisioning process if OOB public keys are not used.
+
+The Bluetooth Mesh security toolbox based on the `PSA Certified Crypto API`_ does not operate with open key values.
+After Bluetooth Mesh receives an open key value, it immediately imports the key into the crypto library and receives the unique key identifier.
+The key identifiers are used in the security toolbox and stored in the persistent memory.
+The crypto library is responsible for storing of the key values in the Internal Trusted Storage (`PSA Certified Secure Storage API 1.0`_).
+Bluetooth Mesh data structures based on TinyCrypt (now removed from the SDK) and the PSA API, as well as images of these structures stored in the persistent memory, are not compatible due to different key representations.
+When a provisioned device updates its firmware binary from the TinyCrypt-based toolbox to firmware binary that uses the PSA API based toolbox, a provisioned device must be unprovisioned first and reprovisioned after the update.
+The provisioned device cannot restore data from the persistent memory after firmware update.
+If the image is changed over Mesh DFU, it is recommended to use :c:enumerator:`BT_MESH_DFU_EFFECT_UNPROV`.
+
+A provisioned device can update its firmware image from the TinyCrypt-based toolbox to firmware image that uses the PSA API based toolbox without unprovisioning if the key importer functionality is used.
+The :kconfig:option:`CONFIG_BT_MESH_KEY_IMPORTER` Kconfig option enables the key importer functionality.
+The key importer is an application initialization functionality that is called with kernel initialization priority before starting main.
+This functionality reads out the persistently stored Bluetooth Mesh data and if it finds keys stored by the TinyCrypt-based security toolbox, it imports them over the PSA API into the crypto library and stores the key identifiers in a format based on the PSA API toolbox.
+Once the new firmware image starts Bluetooth Mesh initialization, the persistent area already has the stored data in the correct format.
+
+The device can be vulnerable to attacks while the device uses the key importer functionality.
+The following two types of security risks are possible:
+
+* If the device is provided with a new image with the key importer functionality enabled, the new image is not yet activated and the attacker can write arbitrary data in the persistent memory during this time by whichever methods.
+  The fake keys might be imported to the PSA crypto library after the next device reset (which activates the new firmware with the key importer).
+  The device gets provisioned to the attackers network and the attacker can read out the mesh state data from the device.
+
+  Mitigation:
+
+  * Ensure that the device is protected from unauthorized writes to the non-volatile storage.
+
+* Even after the key importer imports the keys to the crypto library, the plain text values are left in the flash until the next garbage collection is triggered by the storage backend.
+
+  Mitigation:
+
+  * Ensure that the device is protected from unauthorized reads (such as reading flash from programmer, or using mcumgr shell commands) from the non-volatile storage.
+  * Execute a key refresh procedure for all existing keys used on the entire network as soon as possible by excluding the compromised device, if any.
+    The mechanism to determine if the device is compromised is up to the OEM developers.
+
+Additionally, after upgrading the device firmware with the key importer functionality enabled, and once the key import is complete, it is recommended to update device firmware with the key importer functionality disabled as soon as possible.
+
+Secure storage
+--------------
+
+:ref:`secure_storage_in_ncs` lets you securely store and manage sensitive data.
+Currently, all :ref:`bt_mesh_samples` in the |NCS| use the :ref:`trusted_storage_readme` library as the PSA Secure Storage API implementation for all supported platforms.
+
+.. note::
+   For the nRF52840 devices, in regards to :ref:`bt_mesh_samples` in |NCS|, AEAD keys are derived using hashes of entry UIDs (:kconfig:option:`CONFIG_TRUSTED_STORAGE_BACKEND_AEAD_KEY_HASH_UID`).
+   This approach is less secure than using the :ref:`lib_hw_unique_key` library for key derivation as it only provides integrity of sensitive material.
+   It is also possible to implement a custom AEAD key generation method when the :kconfig:option:`CONFIG_TRUSTED_STORAGE_BACKEND_AEAD_KEY_CUSTOM` Kconfig option is selected.
+
+For more details about AEAD key generation and backend configuration, see the :ref:`trusted_storage_readme` readme.

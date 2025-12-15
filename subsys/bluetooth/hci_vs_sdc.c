@@ -28,7 +28,7 @@ static int hci_vs_cmd_no_rsp(uint16_t opcode, const void *params, size_t params_
 {
 	struct net_buf *buf;
 
-	buf = bt_hci_cmd_create(opcode, params_size);
+	buf = bt_hci_cmd_alloc(K_FOREVER);
 	if (!buf) {
 		return -ENOMEM;
 	}
@@ -45,7 +45,7 @@ static int hci_vs_cmd_with_rsp(
 	struct net_buf *buf;
 	struct net_buf *rsp_buf;
 
-	buf = bt_hci_cmd_create(opcode, params_size);
+	buf = bt_hci_cmd_alloc(K_FOREVER);
 	if (!buf) {
 		return -ENOMEM;
 	}
@@ -126,14 +126,6 @@ int hci_vs_sdc_zephyr_read_tx_power(
 	return hci_vs_cmd_with_rsp(SDC_HCI_OPCODE_CMD_VS_ZEPHYR_READ_TX_POWER,
 				   params, sizeof(*params),
 				   return_params, sizeof(*return_params));
-}
-
-int hci_vs_sdc_read_supported_vs_commands(
-	sdc_hci_cmd_vs_read_supported_vs_commands_return_t *return_params)
-{
-	return hci_vs_cmd_with_rsp_only(SDC_HCI_OPCODE_CMD_VS_READ_SUPPORTED_VS_COMMANDS,
-					return_params,
-					sizeof(*return_params));
 }
 
 int hci_vs_sdc_llpm_mode_set(const sdc_hci_cmd_vs_llpm_mode_set_t *params)
@@ -329,6 +321,14 @@ int hci_vs_sdc_conn_anchor_point_update_event_report_enable(
 	const sdc_hci_cmd_vs_conn_anchor_point_update_event_report_enable_t *params)
 {
 	return hci_vs_cmd_no_rsp(SDC_HCI_OPCODE_CMD_VS_CONN_ANCHOR_POINT_UPDATE_EVENT_REPORT_ENABLE,
+				 params,
+				 sizeof(*params));
+}
+
+int hci_vs_sdc_enable_periodic_adv_event_counter_reports(
+	const sdc_hci_cmd_vs_enable_periodic_adv_event_counter_reports_t *params)
+{
+	return hci_vs_cmd_no_rsp(SDC_HCI_OPCODE_CMD_VS_ENABLE_PERIODIC_ADV_EVENT_COUNTER_REPORTS,
 				 params,
 				 sizeof(*params));
 }

@@ -14,9 +14,9 @@
 #include <silexpk/cmddefs/edwards.h>
 #include <string.h>
 
-/** Write a ED25519 digest into a pair of operand slots.
+/** Write a Ed25519 digest into a pair of operand slots.
  *
- * A ED25519 digest has twice as many bytes as the normal operand size.
+ * A Ed25519 digest has twice as many bytes as the normal operand size.
  *
  * \param op The digest bytes to write into the operand slot.
  * \param slots The pair of slots to write the operand into.
@@ -27,7 +27,8 @@ static inline void write_ed25519dgst(const struct sx_ed25519_dgst *op, struct sx
 	sx_wrpkmem(slots->b.addr, op->bytes + SX_ED25519_SZ, SX_ED25519_SZ);
 }
 
-static inline void encode_eddsa_pt(const char *pxbuf, const char *pybuf, struct sx_ed25519_pt *pt)
+static inline void encode_eddsa_pt(const uint8_t *pxbuf, const uint8_t *pybuf,
+				   struct sx_ed25519_pt *pt)
 {
 	sx_rdpkmem(pt->encoded, pybuf, sizeof(pt->encoded));
 	pt->encoded[31] |= (pxbuf[0] & 1) << 7;
@@ -55,7 +56,7 @@ struct sx_pk_acq_req sx_async_ed25519_ptmult_go(const struct sx_ed25519_dgst *r)
 
 void sx_async_ed25519_ptmult_end(sx_pk_req *req, struct sx_ed25519_pt *pt)
 {
-	const char **outputs = sx_pk_get_output_ops(req);
+	const uint8_t **outputs = sx_pk_get_output_ops(req);
 
 	encode_eddsa_pt(outputs[0], outputs[1], pt);
 
@@ -105,7 +106,7 @@ struct sx_pk_acq_req sx_pk_async_ed25519_sign_go(const struct sx_ed25519_dgst *k
 
 void sx_async_ed25519_sign_end(sx_pk_req *req, struct sx_ed25519_v *sig_s)
 {
-	const char **outputs = sx_pk_get_output_ops(req);
+	const uint8_t **outputs = sx_pk_get_output_ops(req);
 
 	sx_rdpkmem(&sig_s->bytes, outputs[0], sizeof(sig_s->bytes));
 
@@ -134,8 +135,8 @@ static inline int ed25519_decode_pt_x(const struct sx_ed25519_pt *pt)
 	return (pt->encoded[SX_ED25519_PT_SZ - 1] >> 7) & 1;
 }
 
-/** Write the y affine coordinate of an encoded ED25519 point into memory */
-static inline void ed25519_pt_write_y(const struct sx_ed25519_pt *pt, char *ay)
+/** Write the y affine coordinate of an encoded Ed25519 point into memory */
+static inline void ed25519_pt_write_y(const struct sx_ed25519_pt *pt, uint8_t *ay)
 {
 	sx_wrpkmem(ay, pt->encoded, SX_ED25519_PT_SZ);
 	sx_wrpkmem_byte(&ay[SX_ED25519_PT_SZ - 1], pt->encoded[SX_ED25519_PT_SZ - 1] & 0x7f);

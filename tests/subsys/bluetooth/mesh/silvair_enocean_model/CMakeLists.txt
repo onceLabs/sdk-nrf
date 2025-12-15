@@ -14,6 +14,7 @@ target_sources(app PRIVATE ${app_sources})
 target_sources(app
     PRIVATE
     ${ZEPHYR_BASE}/subsys/bluetooth/common/addr.c
+    ${ZEPHYR_BASE}/subsys/bluetooth/common/bt_str.c
     ${ZEPHYR_NRF_MODULE_DIR}/subsys/bluetooth/mesh/vnd/silvair_enocean_srv.c
     )
 
@@ -29,7 +30,7 @@ target_compile_options(app
     -DCONFIG_BT_MESH_SILVAIR_ENOCEAN_AUTO_COMMISSION=1
     -DCONFIG_BT_MESH_MODEL_KEY_COUNT=1
     -DCONFIG_BT_MESH_MODEL_GROUP_COUNT=1
-    -DCONFIG_BT_MESH_USES_TINYCRYPT
+    -DCONFIG_BT_MESH_USES_MBEDTLS_PSA=1
     )
 
 zephyr_ld_options(

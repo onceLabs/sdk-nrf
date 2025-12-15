@@ -7,7 +7,7 @@ Reducing power consumption in Matter
    :local:
    :depth: 2
 
-The Matter protocol can be used in various device types that are designed to be battery supplied, where a low power consumption is of critical importance.
+The Matter protocol can be used in various device types that are designed to be battery supplied, where low power consumption is of critical importance.
 
 There are many ways to reduce the power consumption in your application, including methods related to the adopted network technology, disabling specific modules, or configuring features meant for optimizing power consumption.
 See the following sections for more information.
@@ -19,6 +19,13 @@ The following Matter samples and applications use the low power configuration by
 * :ref:`Matter smoke CO alarm <matter_smoke_co_alarm_sample>`
 * :ref:`Matter window covering sample <matter_window_covering_sample>`
 * :ref:`Matter weather station application <matter_weather_station_app>`
+* :ref:`Matter temperature sensor sample <matter_temperature_sensor_sample>`
+* :ref:`Matter contact sensor sample <matter_contact_sensor_sample>`
+
+The following additional materials and tools might help you to optimize, estimate, and measure the power consumption of your device are:
+
+* `nWP049 - Matter over Thread: Power consumption and battery life`_
+* :ref:`ug_matter_gs_tools_opp`
 
 .. _ug_matter_device_low_power_icd:
 
@@ -127,7 +134,7 @@ To enable this functionality, set the :kconfig:option:`CONFIG_CHIP_ICD_REPORT_ON
 Enable low power mode for the selected networking technology
 ************************************************************
 
-The Matter supports using Thread and Wi-Fi as the IPv6-based networking technologies.
+The Matter supports using Thread and Wi-Fi® as the IPv6-based networking technologies.
 Both of the technologies come with their own solutions for optimizing the protocol behavior in terms of power consumption.
 However, the general goal of the optimization for both is to reduce the time spent in the active state and put the device in the inactive (sleep) state whenever possible.
 Reducing the device activity time usually comes with a higher response time and a lower performance.
@@ -197,7 +204,7 @@ Configure Bluetooth LE advertising duration
 
 A Matter device uses Bluetooth® Low Energy (LE) to advertise its service for device commissioning purposes.
 The duration of this advertising is configurable and can last up to 15 minutes in the standard mode and up to 48 hours in the Extended Announcement mode.
-An extended advertising duration may improve the user experience, as it gives more time for the user to setup the device, but it also increases the energy consumption.
+An extended advertising duration may improve the user experience, as it gives more time for the user to set up the device, but it also increases the energy consumption.
 
 Selecting the optimal advertising duration is a compromise and depends on the specific application use case.
 Use the following Kconfig options to configure the advertising and reduce the consumed energy:
@@ -237,9 +244,9 @@ Disable LEDs module
 When performing the power measurements on various development kits, the LEDs can either be included in the measurement circuit or not:
 
 * For the nRF52840 DK and nRF5340 DK, the LEDs are excluded from the measurement circuit, so they can be enabled for the low power configuration and it is not going to impact the measurement results.
-* For the nRF54L15 DK, the MOSFET transistors controlling the LEDs are included in the measurement circuit.
+* For the nRF54L15 DK and nRF54LM20 DK, the MOSFET transistors controlling the LEDs are included in the measurement circuit.
   This results in measurement results being increased by an additional, small leakage current that appears if an LED is turned on.
-  To measure the current consumption of the nRF54L15 SoC without including development kit components, such as LEDs, it is recommended to disable them.
+  To measure the current consumption of the nRF54L15 or nRF54LM20 SoC without including development kit components, such as LEDs, it is recommended to disable them.
 
 To disable LEDs in the Matter samples and applications, set the :ref:`CONFIG_NCS_SAMPLE_MATTER_LEDS <CONFIG_NCS_SAMPLE_MATTER_LEDS>` Kconfig option to ``n``.
 
@@ -287,6 +294,26 @@ Configure radio transmitter power
    :end-before: radio_power_end
 
 See :ref:`ug_matter_gs_transmission_power` for more information.
+
+.. _ug_matter_device_low_power_calibration_period:
+
+Configure radio driver temperature calibration period
+*****************************************************
+
+The radio driver requires periodic calibration events to compensate the potential temperature changes that may affect the clock configuration.
+The frequency of the calibration depends on the device's environment and the temperature changes the device is exposed to.
+For example, a device that is mobile or installed outdoors likely requires shorter calibration period than a device that is installed indoors.
+
+Additionally, the calibration period has an impact on the device's power consumption, because it results in device wake-ups.
+It is recommended not to use a calibration period value smaller than required to avoid the unnecessary increase in power consumption.
+
+You can configure the calibration period using the following Kconfig options:
+
+* :kconfig:option:`CONFIG_NRF_802154_TEMPERATURE_UPDATE_PERIOD` -  Configures the 802.15.4 radio driver calibration period in milliseconds.
+  The default value is 60000 ms (60 s), which is optimal for most use cases.
+* :kconfig:option:`CONFIG_MPSL_CALIBRATION_PERIOD` - Configures Multiprotocol Service Layer (MPSL) driver calibration period in milliseconds.
+  This is used only, if the application uses LFRC or it is run on an nRF54L Series SoC.
+  The default value is 4000 ms (4 s), which is likely too aggressive for most use cases.
 
 Disable unused RAM sections
 ***************************

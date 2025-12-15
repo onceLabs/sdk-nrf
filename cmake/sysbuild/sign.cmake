@@ -14,20 +14,19 @@ function(b0_gen_keys)
   set(SIGNATURE_PUBLIC_KEY_FILE ${GENERATED_PATH}/public.pem)
   set(SIGNATURE_PUBLIC_KEY_FILE ${GENERATED_PATH}/public.pem PARENT_SCOPE)
 
+  if(SB_CONFIG_SECURE_BOOT_SIGNATURE_TYPE_ED25519)
+    set(keygen_algorithm --algorithm ed25519)
+  else()
+    set(keygen_algorithm)
+  endif()
+
   if(SB_CONFIG_SECURE_BOOT_SIGNING_PYTHON)
     set(PUB_GEN_CMD
       ${PYTHON_EXECUTABLE}
       ${ZEPHYR_NRF_MODULE_DIR}/scripts/bootloader/keygen.py
-      --public
+      --public ${keygen_algorithm}
       --in ${SIGNATURE_PRIVATE_KEY_FILE}
       --out ${SIGNATURE_PUBLIC_KEY_FILE}
-      )
-  elseif(SB_CONFIG_SECURE_BOOT_SIGNING_OPENSSL)
-    set(PUB_GEN_CMD
-      openssl ec
-      -pubout
-      -in ${SIGNATURE_PRIVATE_KEY_FILE}
-      -out ${SIGNATURE_PUBLIC_KEY_FILE}
       )
   elseif(SB_CONFIG_SECURE_BOOT_SIGNING_CUSTOM)
     string(CONFIGURE "${SB_CONFIG_SECURE_BOOT_SIGNING_PUBLIC_KEY}" SIGNATURE_PUBLIC_KEY_FILE)
@@ -35,6 +34,16 @@ function(b0_gen_keys)
 
     if(NOT EXISTS ${SIGNATURE_PUBLIC_KEY_FILE} OR IS_DIRECTORY ${SIGNATURE_PUBLIC_KEY_FILE})
       message(WARNING "Invalid public key file: ${SIGNATURE_PUBLIC_KEY_FILE}")
+    else()
+      execute_process(COMMAND ${PYTHON_EXECUTABLE}
+        ${ZEPHYR_NRF_MODULE_DIR}/scripts/bootloader/keyhash_validate.py ${keygen_algorithm}
+        -in ${SIGNATURE_PUBLIC_KEY_FILE} RESULT_VARIABLE keyhash)
+        if(NOT "${keyhash}" STREQUAL "0")
+          message(WARNING "Key file ${SIGNATURE_PUBLIC_KEY_FILE} yields HASH that contains 0xffff "
+                          "which isn't allowed due to limitations of the internal clockworks. "
+                          "To solve the issue use another key."
+          )
+        endif()
     endif()
   else()
     message(WARNING "Unable to parse signing config.")
@@ -66,7 +75,7 @@ function(b0_gen_keys)
     )
 endfunction()
 
-function(b0_sign_image slot)
+function(b0_sign_image slot cpunet_target)
   set(GENERATED_PATH ${CMAKE_BINARY_DIR}/nrf/subsys/bootloader/generated)
 
   # Get variables for secure boot usage
@@ -100,10 +109,10 @@ function(b0_sign_image slot)
       # If slot is a target of it's own, then it means we target the hex directly and not a merged hex.
       sysbuild_get(${slot}_image_dir IMAGE ${slot} VAR APPLICATION_BINARY_DIR CACHE)
       sysbuild_get(${slot}_kernel_name IMAGE ${slot} VAR CONFIG_KERNEL_BIN_NAME KCONFIG)
-      sysbuild_get(${slot}_kernel_elf IMAGE ${slot} VAR CONFIG_KERNEL_ELF_NAME KCONFIG)
       sysbuild_get(${slot}_crypto_id IMAGE ${slot} VAR CONFIG_SB_VALIDATION_INFO_CRYPTO_ID KCONFIG)
       sysbuild_get(${slot}_validation_offset IMAGE ${slot} VAR CONFIG_SB_VALIDATION_METADATA_OFFSET KCONFIG)
 
+      set(slot_bin ${${slot}_image_dir}/zephyr/${${slot}_kernel_name}.bin)
       set(slot_hex ${${slot}_image_dir}/zephyr/${${slot}_kernel_name}.hex)
       set(sign_depends ${${slot}_image_dir}/zephyr/${${slot}_kernel_name}.elf)
       set(target_name ${slot})
@@ -119,6 +128,7 @@ function(b0_sign_image slot)
       sysbuild_get(${slot}_crypto_id IMAGE ${target_name} VAR CONFIG_SB_VALIDATION_INFO_CRYPTO_ID KCONFIG)
       sysbuild_get(${slot}_validation_offset IMAGE ${target_name} VAR CONFIG_SB_VALIDATION_METADATA_OFFSET KCONFIG)
 
+      set(slot_bin ${${target_name}_image_dir}/zephyr/${${target_name}_kernel_name}.bin)
       set(slot_hex ${${target_name}_image_dir}/zephyr/${${target_name}_kernel_name}.hex)
       set(sign_depends ${target_name} ${${target_name}_image_dir}/zephyr/${${target_name}_kernel_name}.elf)
     else()
@@ -133,66 +143,98 @@ function(b0_sign_image slot)
       "This value of SB_VALIDATION_INFO_CRYPTO_ID is not supported")
   endif()
 
-  set(to_sign ${slot_hex})
-  set(hash_file ${GENERATED_PATH}/${slot}_firmware.sha256)
   set(signature_file ${GENERATED_PATH}/${slot}_firmware.signature)
 
-  set(hash_cmd
-    ${PYTHON_EXECUTABLE}
-    ${ZEPHYR_NRF_MODULE_DIR}/scripts/bootloader/hash.py
-    --in ${to_sign}
-    > ${hash_file}
-    )
+  if(cpunet_target)
+    set(config_addition NETCORE)
+  else()
+    set(config_addition APPCORE)
+  endif()
+
+  if(SB_CONFIG_SECURE_BOOT_${config_addition}_HASH_TYPE_NONE)
+    set(hash_file ${slot_bin})
+    set(to_sign ${slot_hex})
+  elseif(SB_CONFIG_SECURE_BOOT_SIGNATURE_TYPE_ED25519)
+    set(hash_file ${GENERATED_PATH}/${slot}_firmware.sha512)
+    set(hash_cmd_type --type sha512)
+    set(sign_cmd_hash_type sha512)
+  elseif(SB_CONFIG_SECURE_BOOT_HASH_TYPE_SHA256)
+    set(hash_file ${GENERATED_PATH}/${slot}_firmware.sha256)
+    set(hash_cmd_type)
+    set(sign_cmd_hash_type sha256)
+  endif()
+
+  if(sign_cmd_hash_type)
+    set(to_sign ${slot_hex})
+    set(hash_cmd
+      ${PYTHON_EXECUTABLE}
+      ${ZEPHYR_NRF_MODULE_DIR}/scripts/bootloader/hash.py
+      --in ${to_sign} ${hash_cmd_type}
+      > ${hash_file}
+      )
+  endif()
 
   if(SB_CONFIG_SECURE_BOOT_SIGNING_PYTHON)
+    if(SB_CONFIG_SECURE_BOOT_SIGNATURE_TYPE_ED25519)
+      set(sign_cmd_signature_type --algorithm ed25519)
+    else()
+      set(sign_cmd_signature_type)
+    endif()
+
     set(sign_cmd
       ${PYTHON_EXECUTABLE}
       ${ZEPHYR_NRF_MODULE_DIR}/scripts/bootloader/do_sign.py
       --private-key ${SIGNATURE_PRIVATE_KEY_FILE}
-      --in ${hash_file}
-      > ${signature_file}
-      )
-  elseif(SB_CONFIG_SECURE_BOOT_SIGNING_OPENSSL)
-    set(sign_cmd
-      openssl dgst
-      -sha256
-      -sign ${SIGNATURE_PRIVATE_KEY_FILE} ${hash_file} |
-      ${PYTHON_EXECUTABLE}
-      ${ZEPHYR_NRF_MODULE_DIR}/scripts/bootloader/asn1parse.py
-      --alg ecdsa
-      --contents signature
+      --in ${hash_file} ${sign_cmd_signature_type}
       > ${signature_file}
       )
   elseif(SB_CONFIG_SECURE_BOOT_SIGNING_CUSTOM)
     set(custom_sign_cmd "${SB_CONFIG_SECURE_BOOT_SIGNING_COMMAND}")
     string(CONFIGURE "${custom_sign_cmd}" custom_sign_cmd)
 
-    if (("${custom_sign_cmd}" STREQUAL "") OR (NOT EXISTS ${SIGNATURE_PUBLIC_KEY_FILE}))
+    if(("${custom_sign_cmd}" STREQUAL "") OR (NOT EXISTS ${SIGNATURE_PUBLIC_KEY_FILE}))
       message(FATAL_ERROR "You must specify a signing command and valid public key file for custom signing.")
     endif()
 
     string(APPEND custom_sign_cmd " ${hash_file} > ${signature_file}")
     string(REPLACE " " ";" sign_cmd ${custom_sign_cmd})
-  else ()
+  else()
     message(WARNING "Unable to parse signing config.")
   endif()
 
-  add_custom_command(
-    OUTPUT
-    ${signature_file}
-    COMMAND
-    ${hash_cmd}
-    COMMAND
-    ${sign_cmd}
-    DEPENDS
-    ${sign_depends}
-    WORKING_DIRECTORY
-    ${PROJECT_BINARY_DIR}
-    COMMENT
-    "Creating signature of application"
-    USES_TERMINAL
-    COMMAND_EXPAND_LISTS
-    )
+  if(sign_cmd_hash_type)
+    add_custom_command(
+      OUTPUT
+      ${signature_file}
+      COMMAND
+      ${hash_cmd}
+      COMMAND
+      ${sign_cmd}
+      DEPENDS
+      ${sign_depends}
+      WORKING_DIRECTORY
+      ${PROJECT_BINARY_DIR}
+      COMMENT
+      "Creating signature of application"
+      USES_TERMINAL
+      COMMAND_EXPAND_LISTS
+      )
+  else()
+    add_custom_command(
+      OUTPUT
+      ${signature_file}
+      COMMAND
+      ${sign_cmd}
+      DEPENDS
+      ${sign_depends}
+      WORKING_DIRECTORY
+      ${PROJECT_BINARY_DIR}
+      COMMENT
+      "Creating signature of application"
+      USES_TERMINAL
+      COMMAND_EXPAND_LISTS
+      )
+  endif()
 
   add_custom_target(
     ${slot}_signature_file_target
@@ -204,6 +246,12 @@ function(b0_sign_image slot)
   cmake_path(GET to_sign FILENAME to_sign_filename)
   set(validation_comment "Creating validation for ${to_sign_filename}, storing to ${signed_hex_filename}")
 
+  if(SB_CONFIG_SECURE_BOOT_SIGNATURE_TYPE_ED25519)
+    set(validation_signature_cmd --algorithm ed25519)
+  else()
+    set(validation_signature_cmd)
+  endif()
+
   add_custom_command(
     OUTPUT
     ${signed_hex}
@@ -211,7 +259,7 @@ function(b0_sign_image slot)
     COMMAND
     ${PYTHON_EXECUTABLE}
     ${ZEPHYR_NRF_MODULE_DIR}/scripts/bootloader/validation_data.py
-    --input ${to_sign}
+    --input ${to_sign} ${validation_signature_cmd}
     --output-hex ${signed_hex}
     --output-bin ${signed_bin}
     --offset ${${slot}_validation_offset}
@@ -238,17 +286,20 @@ function(b0_sign_image slot)
     signature_public_key_file_target
     )
 
-  # Set hex file and target for the ${slot) (s0/s1) container partition.
-  # This includes the hex file (and its corresponding target) to the build.
-  set_property(
-    GLOBAL PROPERTY
-    ${target_name}_PM_HEX_FILE
-    ${signed_hex}
+  if(NOT SB_CONFIG_BOOTLOADER_MCUBOOT OR cpunet_target)
+    # Set hex file and target for the ${slot) (s0/s1) container partition.
+    # This includes the hex file (and its corresponding target) to the build.
+    # Only do this if this is the network core target or MCUboot is not enabled
+    set_property(
+      GLOBAL PROPERTY
+      ${target_name}_PM_HEX_FILE
+      ${signed_hex}
     )
 
-  set_property(
-    GLOBAL PROPERTY
-    ${target_name}_PM_TARGET
-    ${slot}_signed_kernel_hex_target
+    set_property(
+      GLOBAL PROPERTY
+      ${target_name}_PM_TARGET
+      ${slot}_signed_kernel_hex_target
     )
+  endif()
 endfunction()

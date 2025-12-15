@@ -10,7 +10,8 @@
 
 #include "unicast_client.h"
 #include "zbus_common.h"
-#include "nrf5340_audio_dk.h"
+#include "peripherals.h"
+#include "led_assignments.h"
 #include "led.h"
 #include "button_assignments.h"
 #include "macros_common.h"
@@ -22,9 +23,13 @@
 #include "bt_content_ctrl.h"
 #include "le_audio_rx.h"
 #include "fw_info_app.h"
+#include "server_store.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
+
+BUILD_ASSERT(CONFIG_BT_AUDIO_CONCURRENT_RX_STREAMS_MAX <= CONFIG_AUDIO_DECODE_CHANNELS_MAX);
+BUILD_ASSERT(CONFIG_BT_AUDIO_CONCURRENT_TX_STREAMS_MAX <= CONFIG_AUDIO_ENCODE_CHANNELS_MAX);
 
 static enum stream_state strm_state = STATE_PAUSED;
 
@@ -53,6 +58,8 @@ K_THREAD_STACK_DEFINE(button_msg_sub_thread_stack, CONFIG_BUTTON_MSG_SUB_STACK_S
 K_THREAD_STACK_DEFINE(le_audio_msg_sub_thread_stack, CONFIG_LE_AUDIO_MSG_SUB_STACK_SIZE);
 K_THREAD_STACK_DEFINE(content_control_msg_sub_thread_stack,
 		      CONFIG_CONTENT_CONTROL_MSG_SUB_STACK_SIZE);
+
+#define SRV_STORE_LOCK_WAIT_TIME_MS K_MSEC(50)
 
 /* Function for handling all stream state changes */
 static void stream_state_set(enum stream_state stream_state_new)
@@ -119,6 +126,11 @@ static void button_msg_sub_thread(void)
 
 		switch (msg.button_pin) {
 		case BUTTON_PLAY_PAUSE:
+			if (!IS_ENABLED(CONFIG_BT_CONTENT_CTRL_MEDIA)) {
+				LOG_WRN("Play/pause not supported");
+				break;
+			}
+
 			if (IS_ENABLED(CONFIG_WALKIE_TALKIE_DEMO)) {
 				LOG_WRN("Play/pause not supported in walkie-talkie mode");
 				break;
@@ -222,19 +234,19 @@ static void le_audio_msg_sub_thread(void)
 		case LE_AUDIO_EVT_STREAMING:
 			LOG_DBG("LE audio evt streaming");
 
+			if (msg.dir == BT_AUDIO_DIR_SINK) {
+				audio_system_encoder_start();
+			}
+
 			if (strm_state == STATE_STREAMING) {
 				LOG_DBG("Got streaming event in streaming state");
 				break;
 			}
 
-			if (msg.dir == BT_AUDIO_DIR_SINK) {
-				audio_system_encoder_start();
-			}
-
 			audio_system_start();
 			stream_state_set(STATE_STREAMING);
 
-			ret = led_blink(LED_APP_1_BLUE);
+			ret = led_blink(LED_AUDIO_CONN_STATUS);
 			ERR_CHK(ret);
 			break;
 
@@ -253,7 +265,7 @@ static void le_audio_msg_sub_thread(void)
 			stream_state_set(STATE_PAUSED);
 			audio_system_stop();
 
-			ret = led_on(LED_APP_1_BLUE);
+			ret = led_on(LED_AUDIO_CONN_STATUS);
 			ERR_CHK(ret);
 			break;
 
@@ -276,7 +288,7 @@ static void le_audio_msg_sub_thread(void)
 			if (ret) {
 				LOG_ERR("Failed to get conn info");
 			} else {
-				interval = conn_info.le.interval;
+				interval = BT_GAP_US_TO_CONN_INTERVAL(conn_info.le.interval_us);
 			}
 
 			/* Only update conn param once */
@@ -299,7 +311,7 @@ static void le_audio_msg_sub_thread(void)
 
 			LOG_DBG("LE audio config received");
 
-			ret = unicast_client_config_get(msg.conn, msg.dir, &bitrate_bps,
+			ret = unicast_client_config_get(msg.stream, &bitrate_bps,
 							&sampling_rate_hz);
 			if (ret) {
 				LOG_WRN("Failed to get config: %d", ret);
@@ -313,6 +325,16 @@ static void le_audio_msg_sub_thread(void)
 				ret = audio_system_config_set(sampling_rate_hz, bitrate_bps,
 							      VALUE_NOT_SET);
 				ERR_CHK(ret);
+
+				/* Update the locations / number of encoder channels */
+				uint32_t locations = 0;
+
+				ret = unicast_client_locations_get(&locations, BT_AUDIO_DIR_SINK);
+				ERR_CHK(ret);
+
+				ret = audio_system_encoder_num_ch_set(locations);
+				ERR_CHK(ret);
+
 			} else if (msg.dir == BT_AUDIO_DIR_SOURCE) {
 				ret = audio_system_config_set(VALUE_NOT_SET, VALUE_NOT_SET,
 							      sampling_rate_hz);
@@ -341,7 +363,7 @@ static void le_audio_msg_sub_thread(void)
 				}
 			}
 
-			if (num_conn < CONFIG_BT_MAX_CONN) {
+			if (num_conn < CONFIG_BT_MAX_CONN && num_filled < msg.set_size) {
 				/* Room for more connections, start scanning again */
 				ret = bt_mgmt_scan_start(0, 0, BT_MGMT_SCAN_TYPE_CONN, NULL,
 							 BRDCAST_ID_NOT_USED);
@@ -362,6 +384,26 @@ static void le_audio_msg_sub_thread(void)
 		}
 
 		STACK_USAGE_PRINT("le_audio_msg_thread", &le_audio_msg_sub_thread_data);
+	}
+}
+
+static void discovery_process_start(struct bt_conn *conn)
+{
+	int ret;
+
+	ret = bt_r_and_c_discover(conn);
+	if (ret) {
+		LOG_WRN("Failed to discover rendering services");
+	}
+
+	if (IS_ENABLED(CONFIG_STREAM_BIDIRECTIONAL)) {
+		ret = unicast_client_discover(conn, UNICAST_SERVER_BIDIR);
+	} else {
+		ret = unicast_client_discover(conn, UNICAST_SERVER_SINK);
+	}
+
+	if (ret) {
+		LOG_ERR("Failed to handle unicast client discover: %d", ret);
 	}
 }
 
@@ -392,20 +434,44 @@ static void bt_mgmt_evt_handler(const struct zbus_channel *chan)
 	case BT_MGMT_SECURITY_CHANGED:
 		LOG_INF("Security changed");
 
-		ret = bt_r_and_c_discover(msg->conn);
-		if (ret) {
-			LOG_WRN("Failed to discover rendering services");
-		}
+		ret = srv_store_lock(SRV_STORE_LOCK_WAIT_TIME_MS);
+		ERR_CHK_MSG(ret, "Failed to lock server store");
 
-		if (IS_ENABLED(CONFIG_STREAM_BIDIRECTIONAL)) {
-			ret = unicast_client_discover(msg->conn, UNICAST_SERVER_BIDIR);
+		if (srv_store_server_exists(&msg->addr)) {
+			/* If the server is already in server_store, it must have already
+			 * been paired with.
+			 */
+
+			ret = srv_store_conn_update(msg->conn, &msg->addr);
+			if (ret) {
+				LOG_ERR("Failed to update conn in store: %d", ret);
+				srv_store_unlock();
+				return;
+			}
+
+			srv_store_unlock();
+			discovery_process_start(msg->conn);
 		} else {
-			ret = unicast_client_discover(msg->conn, UNICAST_SERVER_SINK);
+			srv_store_unlock();
 		}
 
+		break;
+
+	case BT_MGMT_PAIRING_COMPLETE:
+		LOG_INF("Pairing complete event");
+
+		ret = srv_store_lock(SRV_STORE_LOCK_WAIT_TIME_MS);
+		ERR_CHK_MSG(ret, "Failed to lock server store");
+
+		ret = srv_store_add_by_conn(msg->conn);
 		if (ret) {
-			LOG_ERR("Failed to handle unicast client discover: %d", ret);
+			LOG_ERR("Failed to add server to store: %d", ret);
+			srv_store_unlock();
+			return;
 		}
+
+		srv_store_unlock();
+		discovery_process_start(msg->conn);
 
 		break;
 
@@ -414,10 +480,36 @@ static void bt_mgmt_evt_handler(const struct zbus_channel *chan)
 		LOG_INF("Disconnection event. Num connections: %u", num_conn);
 
 		unicast_client_conn_disconnected(msg->conn);
+
+		/* Update the locations / number of encoder channels */
+		uint32_t locations = 0;
+
+		ret = unicast_client_locations_get(&locations, BT_AUDIO_DIR_SINK);
+		ERR_CHK(ret);
+
+		ret = audio_system_encoder_num_ch_set(locations);
+		ERR_CHK(ret);
+
+		break;
+
+	case BT_MGMT_BOND_DELETED:
+		LOG_DBG("Bond deleted");
+
+		ret = srv_store_lock(SRV_STORE_LOCK_WAIT_TIME_MS);
+		ERR_CHK_MSG(ret, "Failed to lock server store");
+
+		ret = srv_store_remove_by_addr(&msg->addr);
+		if (ret) {
+			LOG_ERR("Failed to remove server from store: %d", ret);
+		}
+
+		srv_store_unlock();
+
 		break;
 
 	default:
 		LOG_WRN("Unexpected/unhandled bt_mgmt event: %d", msg->event);
+
 		break;
 	}
 }
@@ -437,7 +529,8 @@ static int zbus_subscribers_create(void)
 		&button_msg_sub_thread_data, button_msg_sub_thread_stack,
 		CONFIG_BUTTON_MSG_SUB_STACK_SIZE, (k_thread_entry_t)button_msg_sub_thread, NULL,
 		NULL, NULL, K_PRIO_PREEMPT(CONFIG_BUTTON_MSG_SUB_THREAD_PRIO), 0, K_NO_WAIT);
-	ret = k_thread_name_set(button_msg_sub_thread_id, "BUTTON_MSG_SUB");
+
+	ret = k_thread_name_set(button_msg_sub_thread_id, "Msg_sub_btn");
 	if (ret) {
 		LOG_ERR("Failed to create button_msg thread");
 		return ret;
@@ -447,7 +540,8 @@ static int zbus_subscribers_create(void)
 		&le_audio_msg_sub_thread_data, le_audio_msg_sub_thread_stack,
 		CONFIG_LE_AUDIO_MSG_SUB_STACK_SIZE, (k_thread_entry_t)le_audio_msg_sub_thread, NULL,
 		NULL, NULL, K_PRIO_PREEMPT(CONFIG_LE_AUDIO_MSG_SUB_THREAD_PRIO), 0, K_NO_WAIT);
-	ret = k_thread_name_set(le_audio_msg_sub_thread_id, "LE_AUDIO_MSG_SUB");
+
+	ret = k_thread_name_set(le_audio_msg_sub_thread_id, "Msg_sub_LE_Audio");
 	if (ret) {
 		LOG_ERR("Failed to create le_audio_msg thread");
 		return ret;
@@ -458,7 +552,8 @@ static int zbus_subscribers_create(void)
 		CONFIG_CONTENT_CONTROL_MSG_SUB_STACK_SIZE,
 		(k_thread_entry_t)content_control_msg_sub_thread, NULL, NULL, NULL,
 		K_PRIO_PREEMPT(CONFIG_CONTENT_CONTROL_MSG_SUB_THREAD_PRIO), 0, K_NO_WAIT);
-	ret = k_thread_name_set(content_control_thread_id, "CONTENT_CONTROL_MSG_SUB");
+
+	ret = k_thread_name_set(content_control_thread_id, "Msg_sub_content_ctrl");
 	if (ret) {
 		return ret;
 	}
@@ -504,7 +599,7 @@ static int zbus_link_producers_observers(void)
 	}
 
 	ret = zbus_chan_add_obs(&cont_media_chan, &content_control_evt_sub,
-				ZBUS_ADD_OBS_TIMEOUT_MS);
+		ZBUS_ADD_OBS_TIMEOUT_MS);
 
 	return 0;
 }
@@ -514,15 +609,13 @@ uint8_t stream_state_get(void)
 	return strm_state;
 }
 
-void streamctrl_send(void const *const data, size_t size, uint8_t num_ch)
+void streamctrl_send(struct net_buf const *const audio_frame)
 {
 	int ret;
 	static int prev_ret;
 
-	struct le_audio_encoded_audio enc_audio = {.data = data, .size = size, .num_ch = num_ch};
-
 	if (strm_state == STATE_STREAMING) {
-		ret = unicast_client_send(0, enc_audio);
+		ret = unicast_client_send(audio_frame, 0);
 
 		if (ret != 0 && ret != prev_ret) {
 			if (ret == -ECANCELED) {
@@ -536,13 +629,31 @@ void streamctrl_send(void const *const data, size_t size, uint8_t num_ch)
 	}
 }
 
+static void fill_server_store_by_bonded(const struct bt_bond_info *info, void *user_data)
+{
+	LOG_DBG("Traversing bonds to fill server store");
+	int ret;
+
+	if (!IS_ENABLED(CONFIG_BT_BONDABLE)) {
+		return;
+	}
+
+	ret = srv_store_lock(SRV_STORE_LOCK_WAIT_TIME_MS);
+	ERR_CHK_MSG(ret, "Failed to lock server store");
+
+	ret = srv_store_add_by_addr(&info->addr);
+	ERR_CHK_MSG(ret, "Failed to add server store");
+
+	srv_store_unlock();
+}
+
 int main(void)
 {
 	int ret;
 
 	LOG_DBG("Main started");
 
-	ret = nrf5340_audio_dk_init();
+	ret = peripherals_init();
 	ERR_CHK(ret);
 
 	ret = fw_info_app_print();
@@ -571,6 +682,9 @@ int main(void)
 
 	ret = unicast_client_enable(0, le_audio_rx_data_handler);
 	ERR_CHK(ret);
+
+	/* Go through all existing bonds */
+	bt_foreach_bond(BT_ID_DEFAULT, fill_server_store_by_bonded, NULL);
 
 	ret = bt_mgmt_scan_start(0, 0, BT_MGMT_SCAN_TYPE_CONN, CONFIG_BT_DEVICE_NAME,
 				 BRDCAST_ID_NOT_USED);

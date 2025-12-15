@@ -27,10 +27,10 @@ Sign up for the `nRF Connect SDK v2.3.0 webinar`_ to learn more about the new fe
     This feature allows Periodic Advertising synchronization data to be transferred over an ACL connection, which gives power saving benefits for energy constraint devices.
     This is a key feature for the `Auracast™`_ Assistant.
   * The :ref:`lib_location` library now supports sending both Wi-Fi and cellular location data to nRF Cloud location services for improved location accuracy.
-    This is demonstrated in :ref:`asset_tracker_v2`, :ref:`modem_shell_application`, and :ref:`lwm2m_client`.
+    This is demonstrated in Asset Tracker v2, :ref:`modem_shell_application`, and :ref:`lwm2m_client`.
   * Writing modem trace to external flash for later retrieval.
     The :ref:`modem_shell_application` sample now demonstrates how to store and upload modem trace to cloud.
-  * New :ref:`Serial LTE Modem (SLM) Shell <slm_shell_sample>` sample:
+  * New Serial LTE Modem (SLM) Shell sample:
     The sample demonstrates sending AT commands to the nRF9160 SiP from shell for nRF53 and nRF52 Series SoCs.
   * New :ref:`mqtt_sample` sample supporting Wi-Fi together with cellular connectivity (replacing the Simple MQTT sample).
 
@@ -74,7 +74,7 @@ Supported modem firmware
 See `Modem firmware compatibility matrix`_ for an overview of which modem firmware versions have been tested with this version of the |NCS|.
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Modem-related libraries and versions
 ====================================
@@ -277,7 +277,7 @@ Wi-Fi
 
   * New sample :ref:`wifi_sr_coex_sample` demonstrating Wi-Fi Bluetooth LE coexistence.
   * :ref:`ug_wifi` document.
-  * :ref:`lib_wifi_credentials` library to store credentials.
+  * Wi-Fi credentials library to store credentials.
   * :ref:`wifi_mgmt_ext` library to provide an ``autoconnect`` command based on Wi-Fi credentials.
 
 * Updated:
@@ -301,7 +301,7 @@ nRF9160: Asset Tracker v2
 * Added:
 
   * Wi-Fi support for nRF9160 DK + nRF7002 EK configuration.
-  * A section about :ref:`Custom transport <asset_tracker_v2_ext_transport>` in the :ref:`asset_tracker_v2_debug_module` documentation.
+  * A section about custom transport in the debug module documentation.
 
 * Updated:
 
@@ -482,7 +482,7 @@ nRF9160 samples
 
   * The :ref:`mqtt_sample` sample that supports Wi-Fi and LTE connectivity.
   * The :ref:`nidd_sample` sample that demonstrates how to use Non-IP Data Delivery (NIDD).
-  * The :ref:`slm_shell_sample` sample for nRF52 and nRF53 Series devices to send AT commands to nRF9160 SiP from shell.
+  * The SLM Shell sample for nRF52 and nRF53 Series devices to send AT commands to nRF9160 SiP from shell.
 
 * :ref:`modem_shell_application` sample:
 
@@ -628,8 +628,8 @@ Wi-Fi samples
 
 * Updated:
 
-  * The :ref:`wifi_shell_sample` sample now uses the :ref:`lib_wifi_credentials` and :ref:`wifi_mgmt_ext` libraries.
-  * The :ref:`wifi_provisioning` sample now uses the :ref:`lib_wifi_credentials` and :ref:`wifi_prov_readme` libraries.
+  * The :ref:`wifi_shell_sample` sample now uses the Wi-Fi credentials and :ref:`wifi_mgmt_ext` libraries.
+  * The :ref:`wifi_provisioning` sample now uses the Wi-Fi credentials and :ref:`wifi_prov_readme` libraries.
 
 * Removed nRF7002 revision A support.
 
@@ -638,7 +638,7 @@ Other samples
 
 * Enhanced ShockBurst: Transmitter/Receiver sample:
 
-  * Added support for front-end modules and :ref:`zephyr:nrf21540dk_nrf52840`.
+  * Added support for front-end modules and :zephyr:board:`nrf21540dk`.
 
 * :ref:`radio_test` sample:
 
@@ -786,8 +786,8 @@ Modem libraries
 
   * Fixed an issue causing the A-GPS data download to be delayed until the RRC connection release.
 
-* Added the :ref:`lib_modem_slm` library.
-  This library is meant for the external MCU to work with nRF9160 SiP through the :ref:`serial_lte_modem` application.
+* Added the Modem SLM library.
+  This library is meant for the external MCU to work with nRF9160 SiP through the Serial LTE modem application.
 
 * Multicell location library is :ref:`deprecated <api_deprecation>` and will be removed in one of the future releases.
 

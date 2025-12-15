@@ -166,8 +166,8 @@ static uint64_t dect_phy_mac_client_next_rach_tx_time_get(
 
 	uint64_t time_now = dect_app_modem_time_now();
 	uint64_t beacon_received = target_nbr->time_rcvd_mdm_ticks;
-	uint64_t first_possible_tx =
-		time_now + (US_TO_MODEM_TICKS(current_settings->scheduler.scheduling_delay_us));
+	uint64_t first_possible_tx = time_now + dect_phy_ctrl_modem_latency_for_next_op_get(true) +
+		(US_TO_MODEM_TICKS(current_settings->scheduler.scheduling_delay_us));
 	uint64_t next_beacon_frame_start, beacon_interval_mdm_ticks, ra_start_mdm_ticks;
 	uint64_t ra_interval_mdm_ticks, last_valid_rach_rx_frame_time;
 
@@ -294,6 +294,17 @@ static void dect_phy_mac_client_rach_tx_worker(struct k_work *work_item)
 		strncpy(cmd_params.tx_data_str, tmp_str, DECT_DATA_MAX_LEN - 1);
 	}
 
+	/* Get fresh nbr info */
+	struct dect_phy_mac_nbr_info_list_item *scan_info =
+		dect_phy_mac_nbr_info_get_by_long_rd_id(cmd_params.target_long_rd_id);
+
+	if (!scan_info) {
+		desh_warn("(%s): Beacon with long RD ID %u has not been seen in scan results",
+			(__func__), cmd_params.target_long_rd_id);
+		return;
+	}
+
+	data->target_nbr = *scan_info;
 	err = dect_phy_mac_client_rach_tx(&data->target_nbr, &cmd_params);
 	if (err) {
 		desh_error("(%s): client_rach_tx failed: %d", (__func__), err);

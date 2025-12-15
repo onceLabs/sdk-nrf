@@ -12,8 +12,10 @@ tests:
       - nrf9151dk/nrf9151/ns
       - nrf9160dk/nrf9160/ns
       - nrf9161dk/nrf9161/ns
-    tags: ci_build sysbuild ci_samples_cellular
-
+    tags:
+      - ci_build
+      - sysbuild
+      - ci_samples_cellular
   # Following configurations will be used by the positioning CI integration job to verify PRs
   sample.cellular.gnss.integration_config_positioning_agnss_nrfcloud_ltem_pvt:
     sysbuild: true
@@ -33,12 +35,16 @@ tests:
       - CONFIG_GNSS_SAMPLE_REFERENCE_LONGITUDE="23.77588976"
       - CONFIG_MODEM_ANTENNA_GNSS_EXTERNAL=y
       - CONFIG_LOG_BUFFER_SIZE=2048
+      - CONFIG_NRF_CLOUD_CLIENT_ID_SRC_INTERNAL_UUID=y
     extra_args: gnss_SNIPPET="nrf91-modem-trace-uart"
     integration_platforms:
       - nrf9151dk/nrf9151/ns
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    tags: ci_build sysbuild ci_samples_cellular
+    tags:
+      - ci_build
+      - sysbuild
+      - ci_samples_cellular
   sample.cellular.gnss.integration_config_positioning_agnss_nrfcloud_nbiot_nmea_lte_on:
     sysbuild: true
     build_only: true
@@ -57,12 +63,16 @@ tests:
       - CONFIG_GNSS_SAMPLE_REFERENCE_LONGITUDE="23.77588976"
       - CONFIG_MODEM_ANTENNA_GNSS_EXTERNAL=y
       - CONFIG_LOG_BUFFER_SIZE=2048
+      - CONFIG_NRF_CLOUD_CLIENT_ID_SRC_INTERNAL_UUID=y
     extra_args: gnss_SNIPPET="nrf91-modem-trace-uart"
     integration_platforms:
       - nrf9151dk/nrf9151/ns
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    tags: ci_build sysbuild ci_samples_cellular
+    tags:
+      - ci_build
+      - sysbuild
+      - ci_samples_cellular
   sample.cellular.gnss.integration_config_positioning_pgps_nrfcloud_ltem_nmea:
     sysbuild: true
     build_only: true
@@ -80,6 +90,7 @@ tests:
       - CONFIG_GNSS_SAMPLE_REFERENCE_LONGITUDE="23.77588976"
       - CONFIG_MODEM_ANTENNA_GNSS_EXTERNAL=y
       - CONFIG_LOG_BUFFER_SIZE=2048
+      - CONFIG_NRF_CLOUD_CLIENT_ID_SRC_INTERNAL_UUID=y
     extra_args:
       - EXTRA_CONF_FILE=overlay-pgps.conf
       - gnss_SNIPPET="nrf91-modem-trace-uart"
@@ -87,7 +98,10 @@ tests:
       - nrf9151dk/nrf9151/ns
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    tags: ci_build sysbuild ci_samples_cellular
+    tags:
+      - ci_build
+      - sysbuild
+      - ci_samples_cellular
   sample.cellular.gnss.integration_config_positioning_gnss_ltem_pvt:
     sysbuild: true
     build_only: true
@@ -106,9 +120,13 @@ tests:
       - CONFIG_GNSS_SAMPLE_REFERENCE_LONGITUDE="23.77588976"
       - CONFIG_MODEM_ANTENNA_GNSS_EXTERNAL=y
       - CONFIG_LOG_BUFFER_SIZE=2048
+      - CONFIG_NRF_CLOUD_CLIENT_ID_SRC_INTERNAL_UUID=y
     extra_args: gnss_SNIPPET="nrf91-modem-trace-uart"
     integration_platforms:
       - nrf9151dk/nrf9151/ns
     platform_allow:
       - nrf9151dk/nrf9151/ns
-    tags: ci_build sysbuild ci_samples_cellular
+    tags:
+      - ci_build
+      - sysbuild
+      - ci_samples_cellular

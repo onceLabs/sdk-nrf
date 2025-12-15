@@ -102,7 +102,7 @@ struct sx_pk_inops_ik_ptmult {
 
 struct sx_pk_config_ik {
 	/** Key Bundle name */
-	uint32_t *key_bundle;
+	const uint32_t *key_bundle;
 
 	/** Key Bundle size in 32 bit words
 	 *
@@ -112,7 +112,7 @@ struct sx_pk_config_ik {
 	int key_bundle_sz;
 
 	/** Device Secret */
-	uint32_t *device_secret;
+	const uint32_t *device_secret;
 
 	/** Device Secret size in 32 bit words
 	 *
@@ -138,15 +138,6 @@ struct sx_pk_config_ik {
  * @return ::SX_ERR_UNKNOWN_ERROR
  */
 int sx_pk_ik_derive_keys(struct sx_pk_config_ik *cfg);
-
-/** Exit IK mode.
- *
- * @param[in,out] cnx Connection structure obtained through sx_pk_open() at
- * startup
- *
- * @return Any \ref SX_PK_STATUS "status code"
- */
-int sx_pk_ik_mode_exit(struct sx_pk_cnx *cnx);
 
 struct sx_pk_config_rng {
 	/** Personalization string */

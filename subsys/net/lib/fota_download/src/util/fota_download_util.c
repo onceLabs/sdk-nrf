@@ -11,6 +11,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/net/tls_credentials.h>
 #include <string.h>
 #include <nrfx.h>
 
@@ -32,14 +33,12 @@
 #include "fota_download_smp.h"
 #endif
 
-#include "download_client_internal.h"
-
 LOG_MODULE_REGISTER(fota_download_util, CONFIG_FOTA_DOWNLOAD_LOG_LEVEL);
 
 /**
  * @brief FOTA download url data.
  */
-struct fota_download_client_url_data {
+struct fota_download_url_data {
 	/** Host name */
 	const char *host;
 	/** Host name length */
@@ -48,8 +47,6 @@ struct fota_download_client_url_data {
 	const char *file;
 	/** File name length */
 	size_t file_len;
-	/** HTTPs or CoAPs */
-	bool sec_tag_needed;
 };
 
 static void start_fota_download(struct k_work *work);
@@ -57,12 +54,12 @@ static K_WORK_DEFINE(download_work, start_fota_download);
 static fota_download_callback_t fota_client_callback;
 static char fota_path[CONFIG_FOTA_DOWNLOAD_FILE_NAME_LENGTH];
 static char fota_host[CONFIG_FOTA_DOWNLOAD_HOST_NAME_LENGTH];
-static int fota_sec_tag = -1;
+static int fota_sec_tag = SEC_TAG_TLS_INVALID;
 static bool download_active;
 static enum dfu_target_image_type active_dfu_type;
 
 int fota_download_parse_dual_resource_locator(char *const file, bool s0_active,
-					     const char **selected_path)
+					      const char **selected_path)
 {
 	if (file == NULL || selected_path == NULL) {
 		LOG_ERR("Got NULL pointer");
@@ -119,10 +116,10 @@ static void fota_download_callback(const struct fota_download_evt *evt)
 	}
 }
 
-static int fota_download_client_url_parse(const char *uri,
-					  struct fota_download_client_url_data *parsed_uri)
+static int fota_download_url_parse(const char *uri,
+					  struct fota_download_url_data *parsed_uri)
 {
-	int len, err, proto, type;
+	int len;
 	char *e, *s;
 
 	len = strlen(uri);
@@ -136,12 +133,6 @@ static int fota_download_client_url_parse(const char *uri,
 	}
 	s += strlen("://");
 
-	/* Verify that download client knows the protocol */
-	err = url_parse_proto(uri, &proto, &type);
-	if (err) {
-		return err;
-	}
-
 	/* Find the end of host name, which is start of path */
 	e = strchr(s, '/');
 
@@ -154,20 +145,18 @@ static int fota_download_client_url_parse(const char *uri,
 	parsed_uri->host_len = e - uri;
 	parsed_uri->file = e + 1;
 	parsed_uri->file_len = strlen(uri) - parsed_uri->host_len;
-	parsed_uri->sec_tag_needed =
-		strncmp(uri, "https://", 8) == 0 || strncmp(uri, "coaps://", 8) == 0;
 
 	return 0;
 }
 
-static int download_url_parse(const char *uri, int sec_tag)
+static int download_url_parse(const char *uri)
 {
 	int ret;
-	struct fota_download_client_url_data parsed_uri;
+	struct fota_download_url_data parsed_uri;
 
 	LOG_INF("Download url %s", uri);
 
-	ret = fota_download_client_url_parse(uri, &parsed_uri);
+	ret = fota_download_url_parse(uri, &parsed_uri);
 	if (ret) {
 		return ret;
 	}
@@ -178,16 +167,6 @@ static int download_url_parse(const char *uri, int sec_tag)
 	} else if (parsed_uri.file_len >= sizeof(fota_path)) {
 		LOG_ERR("File name too big %d", parsed_uri.host_len);
 		return -ENOMEM;
-	}
-
-	if (parsed_uri.sec_tag_needed) {
-		if (sec_tag == -1) {
-			LOG_ERR("FOTA SMP sec tag not configured");
-			return -EINVAL;
-		}
-		fota_sec_tag = sec_tag;
-	} else {
-		fota_sec_tag = -1;
 	}
 
 	strncpy(fota_host, parsed_uri.host, parsed_uri.host_len);
@@ -206,10 +185,24 @@ static void start_fota_download(struct k_work *work)
 	ret = fota_download_start_with_image_type(fota_host, fota_path, fota_sec_tag, 0, 0,
 						  active_dfu_type);
 	if (ret) {
-		struct fota_download_evt evt;
+		struct fota_download_evt evt = {
+			.id = FOTA_DOWNLOAD_EVT_ERROR
+		};
+
+		switch (ret) {
+		case -EINVAL:
+		case -E2BIG:
+			evt.cause = FOTA_DOWNLOAD_ERROR_CAUSE_INVALID_CONFIGURATION;
+			break;
+		case -EPROTONOSUPPORT:
+			evt.cause = FOTA_DOWNLOAD_ERROR_CAUSE_PROTO_NOT_SUPPORTED;
+			break;
+		default:
+			evt.cause = FOTA_DOWNLOAD_ERROR_CAUSE_INTERNAL;
+			break;
+		}
 
 		LOG_ERR("fota_download_start() failed, return code %d", ret);
-		evt.id = FOTA_DOWNLOAD_EVT_CANCELLED;
 		fota_download_callback(&evt);
 	}
 }
@@ -237,8 +230,8 @@ int fota_download_util_stream_init(void)
 }
 
 int fota_download_util_download_start(const char *download_uri,
-				     enum dfu_target_image_type dfu_target_type, int sec_tag,
-				     fota_download_callback_t client_callback)
+				      enum dfu_target_image_type dfu_target_type, int sec_tag,
+				      fota_download_callback_t client_callback)
 {
 	int ret;
 
@@ -246,7 +239,7 @@ int fota_download_util_download_start(const char *download_uri,
 		return -EBUSY;
 	}
 
-	ret = download_url_parse(download_uri, sec_tag);
+	ret = download_url_parse(download_uri);
 	if (ret) {
 		return ret;
 	}
@@ -254,6 +247,7 @@ int fota_download_util_download_start(const char *download_uri,
 	LOG_INF("Download Path %s host %s", fota_path, fota_host);
 
 	active_dfu_type = dfu_target_type;
+	fota_sec_tag = sec_tag;
 
 	/* Register Callback */
 	ret = fota_download_util_client_init(

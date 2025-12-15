@@ -7,6 +7,11 @@ nRF Cloud REST
    :local:
    :depth: 2
 
+.. note::
+
+   This library has been deprecated and it will be removed in one of the future releases.
+   Use the :ref:`lib_nrf_cloud_coap` library instead.
+
 The nRF Cloud REST library enables applications to use `nRF Cloud's REST-based device API <nRF Cloud REST API_>`_.
 This library is an enhancement to the :ref:`lib_nrf_cloud` library.
 
@@ -92,7 +97,7 @@ These are documented on the function itself.
 Configuration
 *************
 
-Configure the :kconfig:option:`CONFIG_NRF_CLOUD_REST` option to enable or disable the use of this library.
+To enable this library, set the :kconfig:option:`CONFIG_NRF_CLOUD` and :kconfig:option:`CONFIG_NRF_CLOUD_REST` Kconfig options.
 
 Additionally, configure the following options for the needs of your application:
 

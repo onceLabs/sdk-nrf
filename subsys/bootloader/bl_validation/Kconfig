@@ -7,7 +7,7 @@
 menu "Secure Boot firmware validation"
 
 config SECURE_BOOT_VALIDATION
-	bool "Enable Secure Boot validation code"
+	bool "Secure Boot validation"
 	select FW_INFO
 	depends on SECURE_BOOT_CRYPTO
 	depends on SECURE_BOOT_STORAGE
@@ -51,13 +51,25 @@ config SB_VALIDATION_METADATA_OFFSET
 	  the metadata is appended directly after the application image,
 	  aligned to the closest word.
 
+config SB_VALIDATION_STRUCT_HAS_HASH
+	bool
+	default y if !SB_CRYPTO_PSA_ED25519
+	help
+	  Set if the struct should contain the hash field.
+
+config SB_VALIDATION_STRUCT_HAS_PUBLIC_KEY
+	bool
+	default y if !SB_CRYPTO_PSA_ED25519
+	help
+	  Set if the struct should contain the public key field.
+
 if SECURE_BOOT_VALIDATION
 
 EXT_API = BL_VALIDATE_FW
 id = 0x1101
 flags = 3
 ver = 1
-source "${ZEPHYR_BASE}/../nrf/subsys/fw_info/Kconfig.template.fw_info_ext_api"
+source "$(ZEPHYR_NRF_MODULE_DIR)/subsys/fw_info/Kconfig.template.fw_info_ext_api"
 
 endif # SECURE_BOOT_VALIDATION
 

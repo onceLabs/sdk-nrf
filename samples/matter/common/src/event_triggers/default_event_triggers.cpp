@@ -61,7 +61,6 @@ void DelayTimerCallback(k_timer *timer)
 
 		switch (ctx->action) {
 		case DelayedAction::FactoryReset:
-			GroupDataProviderImpl::Instance().WillBeFactoryReset();
 			Server::GetInstance().ScheduleFactoryReset();
 			break;
 #ifdef CONFIG_NCS_SAMPLE_MATTER_WATCHDOG_EVENT_TRIGGERS
@@ -99,8 +98,8 @@ CHIP_ERROR FactoryResetCallback(TestEventTrigger::TriggerValue delayMs)
 	delayedContext->action = DelayedAction::FactoryReset;
 	delayedContext->value = delayMs;
 
-	k_timer_start(&sDelayTimer, K_MSEC(delayMs), K_NO_WAIT);
 	k_timer_user_data_set(&sDelayTimer, reinterpret_cast<void *>(delayedContext.get()));
+	k_timer_start(&sDelayTimer, K_MSEC(delayMs), K_NO_WAIT);
 
 	delayedContext.release();
 
@@ -119,8 +118,6 @@ CHIP_ERROR RebootCallback(TestEventTrigger::TriggerValue delayMs)
 			sys_reboot(SYS_REBOOT_WARM);
 		},
 		nullptr /* context */);
-
-	return CHIP_NO_ERROR;
 }
 
 #ifdef CONFIG_NCS_SAMPLE_MATTER_WATCHDOG_EVENT_TRIGGERS
@@ -137,8 +134,8 @@ CHIP_ERROR BlockMainThreadCallback(TestEventTrigger::TriggerValue blockingTimeS)
 	delayedContext->action = DelayedAction::BlockMainThread;
 	delayedContext->value = blockingTimeS * 1000;
 
-	k_timer_start(&sDelayTimer, K_MSEC(delayTimeMs), K_NO_WAIT);
 	k_timer_user_data_set(&sDelayTimer, reinterpret_cast<void *>(delayedContext.get()));
+	k_timer_start(&sDelayTimer, K_MSEC(delayTimeMs), K_NO_WAIT);
 
 	delayedContext.release();
 
@@ -152,7 +149,7 @@ CHIP_ERROR BlockMatterThreadCallback(TestEventTrigger::TriggerValue blockingTime
 
 		LOG_INF("Blocking Matter thread for %d seconds", blockingTimeS);
 
-		while (startTime + (blockingTimeS * 1000) > k_uptime_get()) {
+		while (startTime + static_cast<int64_t>(blockingTimeS) * 1000 > k_uptime_get()) {
 			;
 		}
 
@@ -174,15 +171,14 @@ CHIP_ERROR DiagnosticLogsUserDataCallback(TestEventTrigger::TriggerValue bytesNu
 		return CHIP_ERROR_NO_MEMORY;
 	}
 
-	ChipLogProgress(Zcl, "Storing %zu User logs", logSize);
 	if (logSize == 0) {
-		DiagnosticLogProvider::GetInstance().ClearTestingBuffer(
+		ChipLogProgress(Zcl, "Clearing User logs");
+		DiagnosticLogProvider::GetInstance().ClearLogs(
 			chip::app::Clusters::DiagnosticLogs::IntentEnum::kEndUserSupport);
 	} else {
-		VerifyOrReturnError(DiagnosticLogProvider::GetInstance().StoreTestingLog(
-					    chip::app::Clusters::DiagnosticLogs::IntentEnum::kEndUserSupport,
-					    sTempLogBuffer, logSize),
-				    CHIP_ERROR_NO_MEMORY);
+		ChipLogProgress(Zcl, "Storing %zu User logs", logSize);
+		ReturnErrorOnFailure(DiagnosticLogProvider::GetInstance().PushLog(
+			chip::app::Clusters::DiagnosticLogs::IntentEnum::kEndUserSupport, sTempLogBuffer, logSize));
 	}
 
 	return CHIP_NO_ERROR;
@@ -198,16 +194,14 @@ CHIP_ERROR DiagnosticLogsNetworkDataCallback(TestEventTrigger::TriggerValue byte
 		return CHIP_ERROR_NO_MEMORY;
 	}
 
-	ChipLogProgress(Zcl, "Storing %zu Network logs", logSize);
-
 	if (logSize == 0) {
-		DiagnosticLogProvider::GetInstance().ClearTestingBuffer(
+		ChipLogProgress(Zcl, "Clearing Network logs");
+		DiagnosticLogProvider::GetInstance().ClearLogs(
 			chip::app::Clusters::DiagnosticLogs::IntentEnum::kNetworkDiag);
 	} else {
-		VerifyOrReturnError(DiagnosticLogProvider::GetInstance().StoreTestingLog(
-					    chip::app::Clusters::DiagnosticLogs::IntentEnum::kNetworkDiag,
-					    sTempLogBuffer, logSize),
-				    CHIP_ERROR_NO_MEMORY);
+		ChipLogProgress(Zcl, "Storing %zu Network logs", logSize);
+		ReturnErrorOnFailure(DiagnosticLogProvider::GetInstance().PushLog(
+			chip::app::Clusters::DiagnosticLogs::IntentEnum::kNetworkDiag, sTempLogBuffer, logSize));
 	}
 
 	return CHIP_NO_ERROR;
@@ -267,6 +261,11 @@ CHIP_ERROR Register()
 		Ids::DiagnosticLogsCrash, TestEventTrigger::EventTrigger{ 0, DiagnosticLogsCrashCallback }));
 #endif /* CONFIG_NCS_SAMPLE_MATTER_DIAGNOSTIC_LOGS_CRASH_LOGS */
 #endif /* CONFIG_NCS_SAMPLE_MATTER_DIAGNOSTIC_LOGS_TEST */
+
+#ifdef CONFIG_CHIP_ENABLE_ICD_SUPPORT
+	/* Register ICD test event triggers */
+	ReturnErrorOnFailure(Nrf::Matter::TestEventTrigger::Instance().RegisterICDTestEventTriggers());
+#endif
 
 	/* Register OTA test events handler */
 	static chip::OTATestEventTriggerHandler otaTestEventTrigger;

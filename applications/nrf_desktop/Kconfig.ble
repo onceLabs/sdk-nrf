@@ -13,9 +13,8 @@ config DESKTOP_BT
 	imply DESKTOP_BLE_BOND_ENABLE
 	select BT
 	select BT_SETTINGS
-	select BT_SIGNING
 	select BT_SMP
-	imply BT_CONN_TX_NOTIFY_WQ if SOC_FLASH_NRF_RADIO_SYNC_MPSL
+	imply BT_CONN_TX_NOTIFY_WQ if BT_LL_SOFTDEVICE
 	help
 	  Enable support for Bluetooth connectivity in the nRF Desktop
 	  application. Specific Bluetooth configurations and application
@@ -24,8 +23,9 @@ config DESKTOP_BT
 	  the nRF Desktop use case.
 
 	  nRF Desktop conditionally implies using a separate workqueue for
-	  connection TX notify processing. This is done to work around the MPSL
-	  flash synchronization timeout known issue (NCSDK-29354).
+	  connection TX notify processing. This is done to work around HCI
+	  command timeout e.g. while erasing secondary image slot in the
+	  background.
 
 if DESKTOP_BT
 
@@ -38,6 +38,7 @@ config DESKTOP_BT_PERIPHERAL
 	imply DESKTOP_HIDS_ENABLE
 	imply BT_DIS
 	imply DESKTOP_DEV_DESCR_ENABLE
+	imply BT_ID_AUTO_SWAP_MATCHING_BONDS
 	select BT_PERIPHERAL
 	help
 	  HID peripherals are configured to use the GAP Peripheral role as
@@ -54,19 +55,11 @@ config DESKTOP_BT_PERIPHERAL
 	  module. The module implements a custom GATT Service which is required
 	  to connect with nRF Desktop dongles.
 
+	  The nRF Desktop peripheral enables the feature that is used
+	  to automatically swap matching bonds when the local Bluetooth
+	  identity changes.
+
 if DESKTOP_BT_PERIPHERAL
-
-config BT_ID_UNPAIR_MATCHING_BONDS
-	default y
-	help
-	  Delete bond with the same peer on another Bluetooth local identity
-	  when bonding to prevent bonding failures. That improves user
-	  experience during the erase advertising procedure.
-
-	  By default, overwriting bond requires authenticated pairing.
-
-	  Enabling this option is needed to pass the Fast Pair Validator's
-	  end-to-end integration tests.
 
 config BT_ID_ALLOW_UNAUTH_OVERWRITE
 	default y
@@ -123,6 +116,14 @@ config BT_CONN_PARAM_UPDATE_TIMEOUT
 	  nRF Desktop peripherals update connection parameters earlier to lower
 	  HID data latency.
 
+config BT_BUF_ACL_TX_COUNT
+	default 4
+	help
+	  This number of outgoing ACL buffers allows the nRF Desktop peripheral
+	  to simultaneously send two GATT notifications with HID reports
+	  (required for HID input report pipeline support), BAS notification,
+	  and an ATT response.
+
 config BT_ATT_SENT_CB_AFTER_TX
 	default y
 	help
@@ -167,13 +168,25 @@ config BT_GATT_UUID16_POOL_SIZE
 
 if BT_DIS
 
-config BT_DIS_MANUF
+config BT_DIS_MANUF_NAME
+	default y
+	help
+	  nRF Desktop enables the Manufacturer Name String characteristic as
+	  part of the DIS configuration.
+
+config BT_DIS_MANUF_NAME_STR
 	default DESKTOP_DEVICE_MANUFACTURER
 	help
 	  nRF Desktop defines common HID device identification values
 	  and passes them as defaults to the Bluetooth DIS configuration.
 
-config BT_DIS_MODEL
+config BT_DIS_MODEL_NUMBER
+	default y
+	help
+	  nRF Desktop enables the Model Number String characteristic as
+	  part of the DIS configuration.
+
+config BT_DIS_MODEL_NUMBER_STR
 	default DESKTOP_DEVICE_PRODUCT
 	help
 	  nRF Desktop defines common HID device identification values
@@ -258,17 +271,16 @@ config BT_MAX_PAIRED
 	  Change the default value for the maximum number of paired devices
 	  to be compatible with the dongle bond count.
 
+config BT_BUF_ACL_TX_COUNT
+	default 6
+	help
+	  This number of outgoing ACL buffers allows nRF Desktop dongles to
+	  connect with a subsequent peripheral before finishing subscribing for
+	  HID reports from the previously connected peripheral.
+
 endif # DESKTOP_BT_CENTRAL
 
-if BT_CTLR
-
-choice BT_LL_CHOICE
-	default BT_LL_SOFTDEVICE
-	help
-	  nRF Desktop devices should use the Softdevice controller by default.
-	  Other controller variants may be used for resource-constrained
-	  devices.
-endchoice
+if HAS_BT_CTLR
 
 choice BT_CTLR_TX_PWR
 	default BT_CTLR_TX_PWR_0
@@ -282,7 +294,17 @@ config BT_CTLR_CONN_PARAM_REQ
 	  nRF Desktop devices disable support for the Connection Parameter
 	  Request feature as it is not needed.
 
-endif # BT_CTLR
+if BT_LL_SOFTDEVICE
+
+config BT_CTLR_SDC_TX_PACKET_COUNT
+	default BT_BUF_ACL_TX_COUNT
+	help
+	  The number of ACL TX packets must be aligned between the Bluetooth
+	  Controller and Host.
+
+endif # BT_LL_SOFTDEVICE
+
+endif # HAS_BT_CTLR
 
 config BT_DEVICE_NAME
 	default DESKTOP_DEVICE_PRODUCT
@@ -315,6 +337,28 @@ config BT_SETTINGS_CCC_LAZY_LOADING
 	  nRF Desktop devices disable the lazy loading feature for the CCC
 	  descriptor to speed up reconnections and reduce delay for the
 	  first HID report.
+
+config BT_ATT_TX_COUNT
+	default BT_BUF_ACL_TX_COUNT
+	help
+	  For an nRF Desktop device, the maximum number of ATT buffers
+	  is aligned to the number of outgoing ACL buffers.
+
+config BT_L2CAP_TX_BUF_COUNT
+	default BT_BUF_ACL_TX_COUNT
+	help
+	  For an nRF Desktop device, the maximum number of L2CAP buffers
+	  is aligned to the number of outgoing ACL buffers.
+
+if SOC_FLASH_NRF_RADIO_SYNC_MPSL
+
+config SOC_FLASH_NRF_RADIO_SYNC_MPSL_NORMAL_PRIORITY_TIMEOUT_US
+	default 0
+	help
+	  Start using high MPSL timeslot priority quicker to speed up
+	  non-volatile memory operations.
+
+endif # SOC_FLASH_NRF_RADIO_SYNC_MPSL
 
 choice BT_HCI_CORE_LOG_LEVEL_CHOICE
 	default BT_HCI_CORE_LOG_LEVEL_WRN

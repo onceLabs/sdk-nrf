@@ -38,7 +38,7 @@ The following sections describe how to add either |NSIB| or MCUboot as an immuta
 Adding |NSIB| as an immutable bootloader
 ========================================
 
-To build |NSIB| with a Zephyr or |NCS| sample, enable the ``SB_CONFIG_SECURE_BOOT_APPCORE`` in the application's :file:`sysbuild.conf` file or using the command line:
+To build |NSIB| with a Zephyr or |NCS| sample, enable the :kconfig:option:`SB_CONFIG_SECURE_BOOT_APPCORE` in the application's :file:`sysbuild.conf` file or using the command line:
 
 .. code-block:: console
 
@@ -69,7 +69,7 @@ The following sections describe different configuration options available for |N
 Adding a custom signature key file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To specify a signature key file for this bootloader, set the ``SB_CONFIG_SECURE_BOOT_SIGNING_KEY_FILE`` option in the application's :file:`sysbuild.conf` file or using the command line:
+To specify a signature key file for this bootloader, set the :kconfig:option:`SB_CONFIG_SECURE_BOOT_SIGNING_KEY_FILE` option in the application's :file:`sysbuild.conf` file or using the command line:
 
 .. tabs::
 
@@ -87,7 +87,8 @@ To specify a signature key file for this bootloader, set the ``SB_CONFIG_SECURE_
 
       Escaped quotations avoid malformed-string warnings from Kconfig.
 
-This option only accepts the private key of an ECDSA key pair, as the build system scripts automatically extract the public key at build time.
+This option accepts the private key of an Ed25519 key pair for nRF54L SoCs and private key of an ECDSA key pair for the others.
+The build system scripts automatically extract the public key at build time.
 
 The file argument must be a string and is specified in one of the following ways:
 
@@ -143,12 +144,12 @@ You can find specific configuration options for keys with this bootloader in :fi
 
 See :ref:`ug_fw_update_keys` for information on how to generate custom keys for a project.
 
-Additionally, the |NSIB| supports the following methods for signing images with private keys:
+For SoCs using KMU for NSIB (nRF54L Series devices), the private key must be provisioned in the KMU before NSIB can be run.
 
-* Uses the ``SB_CONFIG_SECURE_BOOT_SIGNING_OPENSSL`` Kconfig option.
-* :ref:`Using a custom command <ug_bootloader_adding_sysbuild_immutable_b0_custom_signing>` - Uses the ``SB_CONFIG_SECURE_BOOT_SIGNING_CUSTOM`` Kconfig option.
+Additionally, the |NSIB| supports a custom method for signing images with private keys:
 
-The OpenSSL method is handled internally by the build system, whereas using custom commands requires more configuration steps.
+* :ref:`Using a custom command <ug_bootloader_adding_sysbuild_immutable_b0_custom_signing>` - Uses the :kconfig:option:`SB_CONFIG_SECURE_BOOT_SIGNING_CUSTOM` Kconfig option.
+
 
 Checking the public key
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -203,7 +204,7 @@ To use a custom signing command with this bootloader, set the following options 
      When not specified, it is assumed as the default application source directory.
    * Using the absolute path to a file.
 
-See ``SB_CONFIG_SECURE_BOOT_SIGNING_COMMAND`` for specifics about what a usable signing command must do.
+See :kconfig:option:`SB_CONFIG_SECURE_BOOT_SIGNING_COMMAND` for specifics about what a usable signing command must do.
 The command string can include its own arguments like a typical terminal command, including arguments specific to the build system:
 
 .. parsed-literal::
@@ -211,7 +212,7 @@ The command string can include its own arguments like a typical terminal command
 
    my_command *[options]* *<args ...>* *<build_system_args ..>*
 
-See the description of ``SB_CONFIG_SECURE_BOOT_SIGNING_COMMAND`` for which arguments can be sent to the build system in this way.
+See the description of :kconfig:option:`SB_CONFIG_SECURE_BOOT_SIGNING_COMMAND` for which arguments can be sent to the build system in this way.
 
 .. note::
 
@@ -224,7 +225,7 @@ See the description of ``SB_CONFIG_SECURE_BOOT_SIGNING_COMMAND`` for which argum
 Adding MCUboot as an immutable bootloader
 =========================================
 
-To build :doc:`MCUboot <mcuboot:index-ncs>` with a Zephyr or |NCS| sample, enable the ``SB_CONFIG_BOOTLOADER_MCUBOOT`` in the application's :file:`sysbuild.conf` file or using the command line:
+To build :doc:`MCUboot <mcuboot:index-ncs>` with a Zephyr or |NCS| sample, enable the :kconfig:option:`SB_CONFIG_BOOTLOADER_MCUBOOT` in the application's :file:`sysbuild.conf` file or using the command line:
 
 .. code-block:: console
 
@@ -244,7 +245,7 @@ The following sections describe different configuration options available for MC
 Adding a custom signature key file
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can specify the signature key file for this bootloader by setting the ``SB_CONFIG_BOOT_SIGNATURE_KEY_FILE`` option to the selected private key file.
+You can specify the signature key file for this bootloader by setting the :kconfig:option:`SB_CONFIG_BOOT_SIGNATURE_KEY_FILE` option to the selected private key file.
 You can set the option in :file:`sysbuild.conf` or using the command line:
 
 .. tabs::
@@ -306,7 +307,7 @@ Adding MCUboot as an upgradable bootloader
 To use MCUboot as an upgradable bootloader to your application, complete the following steps:
 
 1. :ref:`Add nRF Secure Immutable Bootloader as the immutable bootloader <ug_bootloader_adding_sysbuild_immutable_b0>`.
-#. Add MCUboot to the boot chain by including the ``SB_CONFIG_BOOTLOADER_MCUBOOT`` Kconfig option with either the build command or in the application's :file:`sysbuild.conf` file:
+#. Add MCUboot to the boot chain by including the :kconfig:option:`SB_CONFIG_BOOTLOADER_MCUBOOT` Kconfig option with either the build command or in the application's :file:`sysbuild.conf` file:
 
    .. code-block::
 
@@ -316,18 +317,7 @@ To use MCUboot as an upgradable bootloader to your application, complete the fol
 
    |how_to_configure|
 
-#. Optionally, you can configure MCUboot to use the cryptographic functionality exposed by the immutable bootloader and reduce the flash memory usage for MCUboot to less than 16 kB.
-   To enable this configuration, apply both the :file:`prj_minimal.conf` Kconfig project file and the :file:`external_crypto.conf` Kconfig fragment for the MCUboot image:
-
-   .. code-block::
-
-      west build -b nrf52840dk/nrf52840 zephyr/samples/hello_world -- \
-      -DSB_CONFIG_SECURE_BOOT_APPCORE=y \
-      -DSB_CONFIG_BOOTLOADER_MCUBOOT=y \
-      -Dmcuboot_FILE_SUFFIX=minimal \
-      -Dmcuboot_EXTRA_CONF_FILE=external_crypto.conf
-
-   See :ref:`ug_bootloader_config` for more information about using Kconfig fragments with bootloaders.
+#. In order to reduce the flash memory usage for MCUboot, see :ref:`mcuboot_minimal_configuration`.
 
 The build process generates several :ref:`app_build_output_files`, including :ref:`app_build_mcuboot_output`.
 
@@ -356,92 +346,40 @@ This variant image will use the same application configuration as the base image
 You only have to modify the version set in the :kconfig:option:`CONFIG_FW_INFO_FIRMWARE_VERSION` Kconfig option.
 To make ``s1_image`` bootable with |NSIB|, the value of :kconfig:option:`CONFIG_FW_INFO_FIRMWARE_VERSION` for the default image (or MCUboot if using MCUboot as a second-stage bootloader) must be bigger than the one for original image.
 
+.. _ug_bootloader_using_firmware_loader_mode:
+
 Using MCUboot in firmware loader mode
 **************************************
 
 MCUboot includes a firmware loader mode supported in sysbuild.
 This mode enables a project configuration that includes MCUboot instance (optionally with serial recovery), a main application not intended for firmware updates, and a secondary application which is dedicated to loading firmware updates.
-The benefit of this configuration is having a dedicated application for loading firmware updates, for example, over Bluetooth.
+The benefit of this configuration is having a dedicated application for loading firmware updates, for example, over Bluetooth®.
 This allows the main application to be larger in comparison to any symmetric size dual-bank mode update, which helps on devices with limited flash or RAM.
 
 To use this mode, you must create a static partition file for the application that designates the addresses and sizes of the main image and firmware loader applications.
 Ensure the firmware loader partition is named ``firmware_loader``.
 This partition must be located identically as ``mcuboot_secondary_app`` partition, starting after the image's header offset within ``mcuboot_secondary`` partition.
 
-The following is an example static Partition Manager file for the nRF53 devices:
+The following are example static Partition Manager files:
 
-.. code-block:: yaml
+.. tabs::
 
-    app:
-      address: 0x10200
-      region: flash_primary
-      size: 0xdfe00
-    mcuboot:
-      address: 0x0
-      region: flash_primary
-      size: 0x10000
-    mcuboot_pad:
-      address: 0x10000
-      region: flash_primary
-      size: 0x200
-    mcuboot_primary:
-      address: 0x10000
-      orig_span: &id001
-      - mcuboot_pad
-      - app
-      region: flash_primary
-      size: 0xc0000
-      span: *id001
-    mcuboot_primary_app:
-      address: 0x10200
-      orig_span: &id002
-      - app
-      region: flash_primary
-      size: 0xbfe00
-      span: *id002
-    firmware_loader:
-      address: 0xd0200
-      region: flash_primary
-      size: 0x1fe00
-    mcuboot_secondary:
-      address: 0xd0000
-      orig_span: &id003
-      - mcuboot_pad
-      - firmware_loader
-      region: flash_primary
-      size: 0x20000
-      span: *id003
-    mcuboot_secondary_app:
-      address: 0xd0200
-      orig_span: &id004
-      - firmware_loader
-      region: flash_primary
-      size: 0x1fe00
-      span: *id004
-    settings_storage:
-      address: 0xf0000
-      region: flash_primary
-      size: 0x10000
-    pcd_sram:
-      address: 0x20000000
-      size: 0x2000
-      region: sram_primary
+    .. group-tab:: nRF52840
+        .. literalinclude:: ../../../../../samples/mcuboot/firmware_loader_entrance/pm_static_nrf52840dk_nrf52840.yml
+           :language: yaml
 
-The project must also have a ``sysbuild.cmake`` file which includes the firmware loader application in the build, this **must** be named ``firmware_loader``:
+    .. group-tab:: nRF54L15
+        .. literalinclude:: ../../../../../samples/mcuboot/firmware_loader_entrance/pm_static_nrf54l15dk_nrf54l15_cpuapp.yml
+           :language: yaml
 
-.. code-block:: cmake
-
-      ExternalZephyrProject_Add(
-        APPLICATION firmware_loader
-        SOURCE_DIR <path_to_firmware_loader_application>
-      )
-
-There must also be a ``sysbuild.conf`` file which selects the required sysbuild options for enabling MCUboot and selecting the firmware loader mode:
+The project must also configure MCUboot to operate in firmware loader mode and specify a firmware loader image in the :file:`sysbuild.conf` file.
+For example to select ``smp_svr``, set the following options:
 
 .. code-block:: cfg
 
     SB_CONFIG_BOOTLOADER_MCUBOOT=y
     SB_CONFIG_MCUBOOT_MODE_FIRMWARE_UPDATER=y
+    SB_CONFIG_FIRMWARE_LOADER_IMAGE_SMP_SVR=y
 
 At least one mode must be set in MCUboot for entering the firmware loader application, supported entrance methods include:
 
@@ -457,3 +395,4 @@ For this example, the use of a GPIO when booting will be used. Create a ``sysbui
     CONFIG_BOOT_FIRMWARE_LOADER_ENTRANCE_GPIO=y
 
 The project can now be built and flashed and will boot the firmware loader application when the button is held upon device reboot, or the main application will be booted when the device is reset and the button is not held down.
+See :ref:`sysbuild_images_adding_custom_firmware_loader_images` for details on how to add custom firmware loader images using sysbuild.

@@ -25,6 +25,21 @@
 extern "C" {
 #endif
 
+/* DLT-4257 and DLT-4470*/
+#if defined(CONFIG_SOC_NRF54LM20A) || defined(CONFIG_SOC_NRF54LV10A)
+#undef CRACEN_PROTECTED_RAM_AES_KEY0
+#undef CRACEN_PROTECTED_RAM_AES_KEY1
+
+#if defined(CONFIG_SOC_NRF54LM20A)
+#define CRACEN_PROTECTED_RAM_AES_KEY0 0x2007FF00
+#define CRACEN_PROTECTED_RAM_AES_KEY1 0x2007FF20
+#elif defined(CONFIG_SOC_NRF54LV10A)
+#define CRACEN_PROTECTED_RAM_AES_KEY0 0x2002FF00
+#define CRACEN_PROTECTED_RAM_AES_KEY1 0x2002FF20
+#endif
+
+#endif /* CONFIG_SOC_NRF54LM20A || CONFIG_SOC_NRF54LV10A */
+
 /** @def LIB_KMU_SUCCESS
  *
  * @brief Indicates a successful KMU operation.
@@ -91,6 +106,18 @@ int lib_kmu_provision_slot(int slot_id, struct kmu_src *kmu_src);
  *  @return -LIB_KMU_ERROR         If the operation returned an error.
  */
 int lib_kmu_push_slot(int slot_id);
+
+/** @brief Block one or more consecutive KMU slots.
+ *
+ *  @param[in] slot_id ID of the first KMU slot to block.
+ *  @param[in] slot_count Number of consecutive slots to block.
+ *
+ *  @return LIB_KMU_SUCCESS        If the operation was successful.
+ *  @return -LIB_KMU_ERROR         If the operation returned an error.
+ *
+ *  @note This uses the `PUSHBLOCK` task on devices that do not have the `BLOCK` one.
+ */
+int lib_kmu_block_slot_range(int slot_id, unsigned int slot_count);
 
 /** @brief Revoke the KMU slot.
  *

@@ -19,13 +19,13 @@ target_include_directories(app PRIVATE
 
 target_sources(app PRIVATE
   ${app_sources}
-  ../common/net_l2_openthread.c
   ../common/nrf_rpc_single_thread.c
 )
 
-# Fill the gaps due to not setting NET_L2_OPENTHREAD.
+# Fill the gaps due to not setting OPENTHREAD.
 zephyr_include_directories(
   ${ZEPHYR_OPENTHREAD_MODULE_DIR}/include
+  ${ZEPHYR_BASE}/modules/openthread/include
 )
 
 zephyr_compile_definitions(

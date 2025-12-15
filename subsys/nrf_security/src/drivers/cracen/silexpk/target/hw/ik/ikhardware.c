@@ -18,6 +18,9 @@
 #include "regs_addr.h"
 #include <silexpk/ec_curves.h>
 #include <silexpk/ik.h>
+#ifdef CONFIG_CRACEN_HW_VERSION_LITE
+#include "hal/nrf_cracen.h"
+#endif
 
 int cracen_prepare_ik_key(const uint8_t *user_data);
 
@@ -40,46 +43,26 @@ int sx_ik_read_status(sx_pk_req *req)
 	return convert_ba414_status(status);
 }
 
-void sx_pk_run(sx_pk_req *req)
-{
-	/* Selection of operands ignore by hardware if in IK mode */
-	sx_pk_select_ops(req);
-	wmb(); /* comment for compliance */
-	if (sx_pk_is_ik_cmd(req)) {
-		sx_pk_wrreg(&req->regs, IK_REG_PK_CONTROL,
-			    IK_PK_CONTROL_START_OP | IK_PK_CONTROL_CLEAR_IRQ);
-	} else {
-		sx_pk_wrreg(&req->regs, PK_REG_CONTROL,
-			    PK_RB_CONTROL_START_OP | PK_RB_CONTROL_CLEAR_IRQ);
-	}
-}
-
-int sx_pk_get_status(sx_pk_req *req)
-{
-	rmb(); /* comment for compliance */
-
-	if (sx_pk_is_ik_cmd(req)) {
-		return sx_ik_read_status(req);
-	}
-
-	uint32_t status = sx_pk_rdreg(&req->regs, PK_REG_STATUS);
-
-	return convert_ba414_status(status);
-}
-
 int sx_pk_list_ik_inslots(sx_pk_req *req, unsigned int key, struct sx_pk_slot *inputs)
 {
 	int slots = req->cmd->inslots;
-	char *cryptoram = req->cryptoram;
+	uint8_t *cryptoram = req->cryptoram;
 	int i = 0;
 	const struct sx_pk_capabilities *caps;
 
 	if (req->cmd->cmdcode == PK_OP_IK_EXIT) {
+#ifdef CONFIG_CRACEN_HW_VERSION_LITE
+		/* Workaround to handle IKG freezing on CRACEN lite.
+		 * THE PKE-IKG interrupt can not be cleared from software, but can
+		 * be cleared by hardware when in PK mode.
+		 * so the interrupt is disabled after leaving PK mode and enabled when entering.
+		 */
+		nrf_cracen_int_disable(NRF_CRACEN, CRACEN_INTENCLR_PKEIKG_Msk);
+#endif
 		req->ik_mode = 0;
 	} else {
 		if (!req->ik_mode) {
-			int status = cracen_prepare_ik_key((uint8_t *)&key);
-
+			int status = cracen_prepare_ik_key((const uint8_t *)&key);
 			if (status != SX_OK) {
 				sx_pk_release_req(req);
 				return SX_ERR_INVALID_PARAM;
@@ -96,7 +79,7 @@ int sx_pk_list_ik_inslots(sx_pk_req *req, unsigned int key, struct sx_pk_slot *i
 		return SX_ERR_IK_NOT_READY;
 	}
 
-	int max_opsz = caps->max_gfp_opsz;
+	int slot_sz = caps->max_gfp_opsz;
 
 	req->op_size = caps->ik_opsz;
 	uint32_t rval = req->cmd->cmdcode & 0x301;
@@ -108,13 +91,13 @@ int sx_pk_list_ik_inslots(sx_pk_req *req, unsigned int key, struct sx_pk_slot *i
 		/* In big endian mode, the operands should be put at the end
 		 * of the slot.
 		 */
-		cryptoram += max_opsz - req->op_size;
+		cryptoram += slot_sz - req->op_size;
 	}
 	while (slots) {
 		if (slots & 1) {
 			inputs[i++].addr = cryptoram;
 		}
-		cryptoram += max_opsz;
+		cryptoram += slot_sz;
 		slots >>= 1;
 	}
 
@@ -234,26 +217,6 @@ int sx_pk_ik_derive_keys(struct sx_pk_config_ik *cfg)
 	}
 
 	return r;
-}
-
-int sx_pk_ik_mode_exit(struct sx_pk_cnx *cnx)
-{
-	int sx_status;
-	struct sx_pk_acq_req pkreq = sx_pk_acquire_req(SX_PK_CMD_IK_EXIT);
-
-	if (pkreq.status) {
-		return pkreq.status;
-	}
-
-	pkreq.status = sx_pk_list_ik_inslots(pkreq.req, 0, NULL);
-	if (pkreq.status) {
-		return pkreq.status;
-	}
-
-	sx_pk_run(pkreq.req);
-	sx_status = sx_pk_wait(pkreq.req);
-	sx_pk_release_req(pkreq.req);
-	return sx_status;
 }
 
 int sx_pk_ik_rng_reconfig(struct sx_pk_cnx *cnx, struct sx_pk_config_rng *cfg)

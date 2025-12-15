@@ -80,6 +80,11 @@ struct mqtt_helper_cfg {
 		mqtt_helper_on_pingresp_t on_pingresp;
 		mqtt_helper_on_error_t on_error;
 	} cb;
+
+#if defined(CONFIG_MQTT_LIB_TLS)
+	const sec_tag_t *sec_tag_list;
+	size_t sec_tag_count;
+#endif
 };
 
 struct mqtt_helper_conn_params {
@@ -88,6 +93,11 @@ struct mqtt_helper_conn_params {
 	struct mqtt_helper_buf device_id;
 	struct mqtt_helper_buf user_name;
 	struct mqtt_helper_buf password;
+
+	/** Name of the interface that the MQTT helper should be bound to.
+	 *  Leave as NULL if not specified.
+	 */
+	const char *if_name;
 };
 
 /** @brief Initialize the MQTT helper.

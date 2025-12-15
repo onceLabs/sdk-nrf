@@ -7,7 +7,7 @@ Enabling support for front-end modules using Simple GPIO interface
    :local:
    :depth: 2
 
-You can use the Skyworks range extenders with nRF52 and nRF53 Series devices.
+You can use the Skyworks range extenders with nRF52, nRF53 and nRF54L Series devices.
 SKY66112-11 is one of many FEM devices that support the 2-pin PA/LNA interface.
 You can use SKY66112-11 as an example on how to create bindings for different devices that support the 2-pin PA/LNA interface.
 
@@ -51,21 +51,37 @@ To use the Simple GPIO implementation of FEM with SKY66112-11, complete the foll
    The state of the other control pins should be set according to the SKY66112-11 documentation.
    See the official `SKY66112-11 page`_ for more information.
 
-#. On nRF53 devices, you must also apply the same devicetree node mentioned in **Step 1** to the network core using sysbuild.
-   To apply the overlay to the correct network core child image, create an overlay file named :file:`sysbuild/*childImageName*/boards/nrf5340dk_nrf5340_cpunet.overlay` in your application directory, for example :file:`sysbuild/ipc_radio/boards/nrf5340dk_nrf5340_cpunet.overlay`.
+#. On nRF53 Series devices, apply the same devicetree node mentioned in **Step 1** to the network core using sysbuild.
+   To apply the overlay to the correct network core image, create an overlay file named :file:`sysbuild/*image_name*/boards/nrf5340dk_nrf5340_cpunet.overlay` in your application directory, for example :file:`sysbuild/ipc_radio/boards/nrf5340dk_nrf5340_cpunet.overlay`.
    For more information, see the :ref:`Migrating to sysbuild <child_parent_to_sysbuild_migration>` page.
 
-   The *childImageName* default value is set to ``ipc_radio``:
+   The *image_name* value is ``ipc_radio``:
 
    ``ipc_radio`` represents all applications with support for the combination of both 802.15.4 and Bluetooth.
-   You can configure your application using the following sysbuild configurations:
+   You can configure your application using the following sysbuild Kconfig options:
 
-   * ``SB_CONFIG_NETCORE_IPC_RADIO=y`` for applications having support for 802.15.4, but not for Bluetooth.
-   * ``SB_CONFIG_NETCORE_IPC_RADIO_BT_HCI_IPC=y`` for application having support for Bluetooth, but not for 802.15.4.
-   * ``SB_CONFIG_NETCORE_IPC_RADIO=y`` and ``SB_CONFIG_NETCORE_IPC_RADIO_BT_HCI_IPC=y`` for multiprotocol applications having support for both 802.15.4 and Bluetooth.
+   * :kconfig:option:`SB_CONFIG_NETCORE_IPC_RADIO` for applications having support for 802.15.4, but not for Bluetooth.
+   * :kconfig:option:`SB_CONFIG_NETCORE_IPC_RADIO_BT_HCI_IPC` for application having support for Bluetooth, but not for 802.15.4.
+   * :kconfig:option:`SB_CONFIG_NETCORE_IPC_RADIO` and :kconfig:option:`SB_CONFIG_NETCORE_IPC_RADIO_BT_HCI_IPC` for multiprotocol applications having support for both 802.15.4 and Bluetooth.
 
    .. note::
        This step is not needed when testing with the :ref:`direct_test_mode` or :ref:`radio_test` samples on nRF53 Series devices.
+
+#. On nRF54L Series devices, make sure the GPIO pins of the SoC selected to control ``ctx-gpios`` and ``crx-gpios`` support GPIOTE.
+   For example, on the nRF54L15 device, use pins belonging to GPIO P1 or GPIO P0 only.
+   You cannot use the GPIO P2 pins, because there is no related GPIOTE peripheral.
+   It is recommended to use the GPIO pins that belong to the PERI Power Domain of the nRF54L device.
+   For example, on the nRF54L15, these are pins belonging to GPIO P1.
+   Using pins belonging to Low Power Domain (GPIO P0 on nRF54L15) is supported but requires more DPPI and PPIB channels of the SoC.
+   Ensure that the following devicetree instances are enabled (have ``status = "okay"``):
+
+   * ``dppic10``
+   * ``dppic20``
+   * ``dppic30``
+   * ``ppib11``
+   * ``ppib21``
+   * ``ppib22``
+   * ``ppib30``
 
 Optional FEM properties for simple GPIO
 ***************************************

@@ -1,6 +1,12 @@
 common:
   sysbuild: true
-  tags: ci_build ci_tests_benchmarks_multicore hpu ppk_power_measure
+  tags:
+    - ci_build
+    - ci_tests_benchmarks_multicore
+    - hpu
+    - ppk_power_measure
+  extra_args:
+    - CONFIG_SOC_NRF54H20_CPURAD_ENABLE=y
 
 tests:
   benchmarks.multicore.idle_hpu_temp_meas:
@@ -15,4 +21,4 @@ tests:
       fixture: ppk_power_measure
       pytest_root:
         - "${CUSTOM_ROOT_TEST_DIR}/test_measure_power_consumption.py::test_measure_and_data_dump_power_consumption_hpu_feature"
-    timeout: 120
+    timeout: 160

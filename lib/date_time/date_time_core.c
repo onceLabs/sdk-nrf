@@ -4,23 +4,22 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+
+#ifdef _POSIX_C_SOURCE
 #undef _POSIX_C_SOURCE
+#endif
 #define _POSIX_C_SOURCE 200809L /* Required for gmtime_r */
 
+#include <time.h>
 #include <date_time.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/clock.h>
 #include <modem/at_monitor.h>
 #include <modem/lte_lc.h>
 
 #include "date_time_core.h"
 #include "date_time_modem.h"
 #include "date_time_ntp.h"
-
-#if defined(CONFIG_ARCH_POSIX) && defined(CONFIG_EXTERNAL_LIBC)
-#include <time.h>
-#else
-#include <zephyr/posix/time.h>
-#endif
 
 LOG_MODULE_DECLARE(date_time, CONFIG_DATE_TIME_LOG_LEVEL);
 
@@ -215,6 +214,12 @@ void date_time_core_init(void)
 	if (!IS_ENABLED(CONFIG_DATE_TIME_AUTO_UPDATE)) {
 		date_time_core_schedule_update();
 	}
+
+	if (IS_ENABLED(CONFIG_BOARD_NATIVE_SIM) && !IS_ENABLED(CONFIG_UNITY)) {
+		LOG_DBG("Running on native_sim, consider time updated.");
+		k_sleep(K_MSEC(1));
+		date_time_last_update_uptime = k_uptime_get();
+	}
 }
 
 int date_time_core_now(int64_t *unix_time_ms)
@@ -222,12 +227,12 @@ int date_time_core_now(int64_t *unix_time_ms)
 	int err;
 	struct timespec tp;
 
-	err = clock_gettime(CLOCK_REALTIME, &tp);
+	err = sys_clock_gettime(SYS_CLOCK_REALTIME, &tp);
 	if (err) {
-		LOG_WRN("clock_gettime failed, errno %d", errno);
+		LOG_WRN("sys_clock_gettime failed, errno %d", errno);
 		return -ENODATA;
 	}
-	*unix_time_ms = tp.tv_sec * 1000 + tp.tv_nsec / 1000000;
+	*unix_time_ms = (int64_t)tp.tv_sec * 1000 + (int64_t)tp.tv_nsec / 1000000;
 
 	return 0;
 }
@@ -340,7 +345,7 @@ void date_time_core_store_tz(int64_t curr_time_ms, enum date_time_evt_type time_
 	tp.tv_sec = curr_time_ms / 1000;
 	tp.tv_nsec = (curr_time_ms % 1000) * 1000000;
 
-	ret = clock_settime(CLOCK_REALTIME, &tp);
+	ret = sys_clock_settime(SYS_CLOCK_REALTIME, &tp);
 	if (ret != 0) {
 		LOG_ERR("Could not set system time, %d", ret);
 		date_time_core_notify_event(DATE_TIME_NOT_OBTAINED);

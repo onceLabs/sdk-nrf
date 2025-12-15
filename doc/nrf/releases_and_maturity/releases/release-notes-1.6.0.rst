@@ -45,7 +45,7 @@ Supported modem firmware
 See `Modem firmware compatibility matrix`_ for an overview of which modem firmware versions have been tested with this version of |NCS|.
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Known issues
 ************
@@ -134,7 +134,7 @@ nRF9160
 
       * :kconfig:option:`CONFIG_NRF_CLOUD_CELL_POS`
 
-  * :ref:`asset_tracker_v2` application:
+  * Asset Tracker v2 application:
 
     * Added support for Azure IoT Hub.
     * Added support for nRF Cloud.
@@ -152,13 +152,13 @@ nRF9160
   * :ref:`lib_ftp_client` library:
 
     * Support subset of RFC959 FTP commands only.
-    * Added support of STOU and APPE (besides STOR) for "put".
+    * Added support of STOU and APPE (besides STOR) for ``put``.
     * Added detection of socket errors, report with proprietary reply message.
     * Increased FTP payload size from NET_IPV4_MTU(576) to MSS as defined on modem side (708).
     * Added polling "226 Transfer complete" after data channel TX/RX, with a configurable timeout of 60 seconds.
     * Ignored the reply code of "UTF8 ON" command as some FTP servers return abnormal replies.
 
-  * :ref:`at_params_readme` library:
+  * AT parameters library:
 
     * Added function :c:func:`at_params_int64_get` that allows for getting AT param list entries containing signed 64-bit integers.
 
@@ -169,7 +169,7 @@ nRF9160
     * Added support for %XMODEMSLEEP AT command notifications, which allows the application to get notifications related to modem sleep.
     * Added support for %CONEVAL AT command that can be used to evaluate the LTE radio signal state in a cell prior to data transmission.
 
-  * :ref:`serial_lte_modem` application:
+  * Serial LTE modem application:
 
     * Fixed TCP/UDP port range issue (0~65535).
     * Added AT#XSLEEP=2 to power off UART interface.
@@ -180,7 +180,7 @@ nRF9160
     * Added data mode to the MQTT Publish service to support JSON-type payload.
     * Added SMS support, to send/receive SMS in plain text.
 
-  * :ref:`at_cmd_parser_readme` library:
+  * AT command parser library:
 
     * Added support for parsing parameters of type unsigned int or unsigned short.
 
@@ -324,11 +324,11 @@ Zigbee
 In this release, Zigbee is supported for development and should not be used for production.
 |NCS| v1.5.1 contains the certified Zigbee solution supported for production.
 
-* Added version 0.9.5 of the `ZBOSS NCP Host`_ package that includes a simple gateway application.
+* Added version 0.9.5 of the ZBOSS NCP Host package that includes a simple gateway application.
 * Updated:
 
-  * Reworked the :ref:`NCP sample <zigbee_ncp_sample>` to work with the simple gateway application.
-  * Moved the `NCP Host documentation`_ from the `ZBOSS NCP Host`_ package to the same location as the `external ZBOSS development guide and API documentation`_.
+  * Reworked the Zigbee NCP sample to work with the simple gateway application.
+  * Moved the NCP Host documentation from the ZBOSS NCP Host package to the same location as the external ZBOSS development guide and API documentation.
 
 nRF Desktop
 -----------
@@ -408,7 +408,7 @@ Modem library
 * Updated :ref:`nrf_modem` to version 1.2.1.
   See the :ref:`nrfxlib:nrf_modem_changelog` for detailed information.
 * Added a new function-based GNSS API with support for new GNSS features in modem firmware v1.3.0.
-  See :ref:`nrfxlib:gnss_interface` for more information.
+  See :ref:`GNSS interface <nrfxlib:gnss_interface>` for more information.
 
   * GNSS socket API is now deprecated.
 
@@ -569,8 +569,8 @@ In addition to documentation related to the changes listed above, the following 
 
    * Added the following bootloader user guides:
 
-      * :ref:`ug_bootloader_adding`
-      * :ref:`ug_bootloader_testing`
+      * Upgradeable bootloader
+      * Bootloader output testing
       * :ref:`ug_bootloader_external_flash`
       * :ref:`ug_bootloader_config`
       * :ref:`ug_fw_update`
@@ -578,9 +578,9 @@ In addition to documentation related to the changes listed above, the following 
    * :ref:`app_bootloaders` - Bootloader and firmware update guide header page.
    * :ref:`bootloader` - Refactored to include more information about implemented features.
    * :ref:`ug_bootloader` - Updated architecture information for clarifying first- and second-stage bootloader design.
-   * "Immutable bootloader" references have been changed to "|NSIB|".
+   * ``Immutable bootloader`` references have been changed to ``|NSIB|``.
 
-* :ref:`ug_multi_image` - Added more information regarding child image usage, configuration options, and image-specific variables.
+* Multi-image builds - Added more information regarding child image usage, configuration options, and image-specific variables.
 * :ref:`partition_manager` - Added section about partition reports.
 * :ref:`ug_tfm` - Added references to new crypto samples that utilize TF-M and information about the TF-M minimal build.
 * :ref:`ug_thread` - The following sections were added or changed considerably:
@@ -591,9 +591,9 @@ In addition to documentation related to the changes listed above, the following 
 
 * :ref:`ug_zigbee`:
 
-   * :ref:`zigbee_memory` - Updated the memory values for the latest release.
-   * :ref:`ug_zigbee_other_ecosystems` - New page.
-   * :ref:`ug_zigbee_tools` - Updated with new content and structure.
+   * Zigbee memory requirements - Updated the memory values for the latest release.
+   * Configuring Zigbee samples for other ecosystems - New page.
+   * Zigbee tools - Updated with new content and structure.
 
 * Documentation updates in HomeKit and Find My private repositories.
 
@@ -603,12 +603,12 @@ Applications and samples
 * nRF9160:
 
    * nRF9160: Asset Tracker - Added sections on using nRF Cloud A-GPS or P-GPS, and on using nRF Cloud FOTA.
-   * :ref:`asset_tracker_v2`:
+   * Asset Tracker v2:
 
       * Added a table showing cloud services and the corresponding cloud-side instances.
       * Extended the documentation to include Azure IoT Hub and nRF Cloud support.
 
-   * :ref:`serial_lte_modem` - Added links to AT command reference guides.
+   * Serial LTE modem - Added links to AT command reference guides.
    * :ref:`agps_sample` - Added a section on using nRF Cloud A-GPS or P-GPS.
    * nRF9160: AWS FOTA sample - Changes in the sample configuration section.
    * :ref:`fmfu_smp_svr_sample` - Updated the Building and running section.
@@ -638,8 +638,8 @@ Applications and samples
 
 * Zigbee
 
-   * Added links to ZBOSS API documentation in :ref:`zigbee_light_bulb_sample`, :ref:`zigbee_network_coordinator_sample`, and :ref:`zigbee_light_switch_sample` samples.
-   * :ref:`zigbee_ncp_sample` - Updated the nRF5 SDK Bootloader section.
+   * Added links to ZBOSS API documentation in Zigbee Light bulb, Zigbee Network coordinator, and Zigbee Light switch samples.
+   * Zigbee NCP sample - Updated the nRF5 SDK Bootloader section.
 
 Libraries and drivers
 ---------------------
@@ -655,4 +655,4 @@ nrfxlib
 
 * :ref:`nrf_802154` - Full documentation of the radio driver is now available as part of nrfxlib and replaces the previous nRF 802.15.4 Service Layer documentation.
 * :ref:`nrf_security_readme` - Added section on Building with TF-M.
-* Added :ref:`zboss_certification`.
+* Added ZBOSS library certification.

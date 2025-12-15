@@ -33,10 +33,11 @@ constexpr uint16_t kSimulatedReadingFrequency = (60000 / kSensorTimerPeriodMs); 
 constexpr int16_t sMockTemp[] = { 2000, 2731, 1600, 2100, 1937, 3011, 1500, 1899 };
 #endif
 
-} // namespace
+} /* namespace */
 
 TemperatureSensor::TemperatureSensor()
 {
+	mCycleCounter = 0;
 	mMockTempIndex = 0;
 	mPreviousTemperature = startingMockedValue;
 	BindingHandler::Init();
@@ -57,7 +58,7 @@ void TemperatureSensor::InternalMeasurement()
 
 	mCycleCounter++;
 	if (mCycleCounter >= kSimulatedReadingFrequency) {
-		if (mMockTempIndex >= ArraySize(sMockTemp) - 1) {
+		if (mMockTempIndex >= MATTER_ARRAY_SIZE(sMockTemp) - 1) {
 			mMockTempIndex = 0;
 		} else {
 			mMockTempIndex++;
@@ -85,15 +86,17 @@ void TemperatureSensor::InternalMeasurement()
 void TemperatureSensor::ExternalMeasurement()
 {
 	Nrf::Matter::BindingHandler::BindingData *data = Platform::New<Nrf::Matter::BindingHandler::BindingData>();
-	data->ClusterId = Clusters::TemperatureMeasurement::Id;
-	data->EndpointId = mTemperatureMeasurementEndpointId;
-	data->InvokeCommandFunc = ExternalTemperatureMeasurementReadHandler;
-	BindingHandler::RunBoundClusterAction(data);
+	if (data) {
+		data->ClusterId = Clusters::TemperatureMeasurement::Id;
+		data->EndpointId = mTemperatureMeasurementEndpointId;
+		data->InvokeCommandFunc = ExternalTemperatureMeasurementReadHandler;
+		BindingHandler::RunBoundClusterAction(data);
+	}
 }
 
-void TemperatureSensor::ExternalTemperatureMeasurementReadHandler(const EmberBindingTableEntry &binding,
-								  OperationalDeviceProxy *deviceProxy,
-								  Nrf::Matter::BindingHandler::BindingData &bindingData)
+void TemperatureSensor::ExternalTemperatureMeasurementReadHandler(
+	const chip::app::Clusters::Binding::TableEntry &binding, OperationalDeviceProxy *deviceProxy,
+	Nrf::Matter::BindingHandler::BindingData &bindingData)
 {
 	auto onSuccess = [dataPointer = Platform::New<Nrf::Matter::BindingHandler::BindingData>(bindingData)](
 				 const ConcreteDataAttributePath &attributePath, const auto &dataResponse) {

@@ -16,6 +16,49 @@ You can use this application as a reference for creating your own application.
    The `Matter weather station application from the v2.1.1`_ |NCS| release participated in Matter Specification Validation Event (SVE) and successfully passed all required test cases to be considered as a device compliant with Matter 1.0.
    You can use the |NCS| v2.1.1 release to see the application configuration and the files that were originally used in Matter 1.0 certification.
 
+Application overview
+********************
+
+The application uses a single button for controlling the device state.
+The weather station device is periodically performing temperature, air pressure, and relative humidity measurements.
+The measurement results are stored in the device memory and can be read using the Matter controller.
+The controller communicates with the weather station device over the Matter protocol and exchanges data using the Matter Data Model.
+The data model describes data measurements within the proper clusters that correspond to the measurement type.
+
+The application supports over-the-air (OTA) :term:`Device Firmware Update (DFU)` using one of the two following protocols:
+
+* Matter OTA software update protocol that uses the Matter operational network for querying and downloading a new firmware image.
+* Simple Management Protocol (SMP) over Bluetooth® LE.
+  In this case, the DFU can be done either using a smartphone application or a PC command line tool.
+  Note that this protocol is not part of the Matter specification.
+
+In both cases, the MCUboot secure bootloader is used to apply the new firmware image.
+For information about how to upgrade the device firmware using a PC or a mobile, see the :ref:`matter_weather_station_app_dfu` section.
+
+Testing with the Matter Quick Start app
+=======================================
+
+.. |sample_type| replace:: application
+
+.. include:: /includes/matter_quick_start.txt
+
+.. _matter_weather_station_network_mode:
+
+Remote testing in a network
+===========================
+
+By default, the Matter accessory device has no IPv6 network configured.
+You must pair it with the Matter controller over Bluetooth LE to get the configuration from the controller to use the device within a Thread or Wi-Fi® network.
+
+The Bluetooth LE advertising starts automatically upon the device startup, but only for a predefined period of time (1 hour by default).
+If the Bluetooth LE advertising times out, you can re-enable it manually using **Button (SW3)**.
+
+Additionally, the controller must get the `Onboarding information`_ from the Matter accessory device and provision the device into the network.
+For details, see the `Testing`_ section.
+
+.. note::
+   |matter_unique_discriminator_note|
+
 Requirements
 ************
 
@@ -30,7 +73,7 @@ The recommended way of getting measurement values is using the mobile Matter con
 To program a Thingy:53 device where the preprogrammed MCUboot bootloader has been erased, you need the external J-Link programmer.
 If you have an nRF5340 DK that has an onboard J-Link programmer, you can also use it for this purpose.
 
-If the Thingy:53 is programmed with Thingy:53-compatible sample or application, you can also update the firmware using MCUboot's serial recovery or DFU over Bluetooth® Low Energy (LE).
+If the Thingy:53 is programmed with Thingy:53-compatible sample or application, you can also update the firmware using MCUboot's serial recovery or DFU over Bluetooth Low Energy (LE).
 
 .. note::
    If you build Matter Weather Station firmware with factory data support it will not be compatible with other Thingy:53 samples and applications.
@@ -49,39 +92,6 @@ The development kits for this sample offer the following IPv6 network support fo
 * Matter over Thread is supported for ``thingy53/nrf5340/cpuapp``.
 * Matter over Wi-Fi is supported for ``thingy53/nrf5340/cpuapp`` with the ``nrf7002`` expansion board attached, for the :ref:`release configuration <matter_weather_station_custom_configs>` only.
   See `Building for the nRF7002 Wi-Fi expansion board`_ for more information.
-
-Overview
-********
-
-The application uses a single button for controlling the device state.
-The weather station device is periodically performing temperature, air pressure, and relative humidity measurements.
-The measurement results are stored in the device memory and can be read using the Matter controller.
-The controller communicates with the weather station device over the Matter protocol using Zigbee Cluster Library (ZCL).
-The library describes data measurements within the proper clusters that correspond to the measurement type.
-
-The application supports over-the-air (OTA) device firmware upgrade (DFU) using one of the two following protocols:
-
-* Matter OTA update protocol that uses the Matter operational network for querying and downloading a new firmware image.
-* Simple Management Protocol (SMP) over Bluetooth LE.
-  In this case, the DFU can be done either using a smartphone application or a PC command line tool.
-  Note that this protocol is not part of the Matter specification.
-
-In both cases, MCUboot secure bootloader is used to apply the new firmware image.
-For information about how to upgrade the device firmware using a PC or a mobile, see the :ref:`matter_weather_station_app_dfu` section.
-
-.. _matter_weather_station_network_mode:
-
-Remote testing in a network
-===========================
-
-By default, the Matter accessory device has no IPv6 network configured.
-You must pair it with the Matter controller over Bluetooth LE to get the configuration from the controller to use the device within a Thread or Wi-Fi network.
-
-The Bluetooth LE advertising starts automatically upon the device startup, but only for a predefined period of time (15 minutes by default).
-If the Bluetooth LE advertising times out, you can re-enable it manually using **Button (SW3)**.
-
-Additionally, the controller must get the `Onboarding information`_ from the Matter accessory device and provision the device into the network.
-For details, see the `Testing`_ section.
 
 User interface
 **************
@@ -191,6 +201,11 @@ Building and running
 
 .. include:: /includes/build_and_run.txt
 
+.. |sample_or_app| replace:: application
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
+
 Selecting a configuration
 =========================
 
@@ -223,7 +238,7 @@ To build this application to work with the nRF7002 Wi-Fi expansion board:
 Generating factory data
 =======================
 
-To enable factory data support, you need to select the ``overlay-factory_data`` configuration overlay from the available application :ref:`build configuration overlays <matter_weather_station_app_build_configuration_overlays>`, set the ``SB_CONFIG_MATTER_FACTORY_DATA_GENERATE`` Kconfig option to ``y``, and use the ``factory_data`` file suffix.
+To enable factory data support, you need to select the ``overlay-factory_data`` configuration overlay from the available application :ref:`build configuration overlays <matter_weather_station_app_build_configuration_overlays>`, set the :kconfig:option:`SB_CONFIG_MATTER_FACTORY_DATA_GENERATE` Kconfig option to ``y``, and use the ``factory_data`` file suffix.
 You can generate new factory data set when building for the given board target by invoking the following command:
 
 .. code-block:: console

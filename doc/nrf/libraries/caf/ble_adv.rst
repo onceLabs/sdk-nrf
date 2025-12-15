@@ -7,7 +7,7 @@ CAF: Bluetooth LE advertising module
    :local:
    :depth: 2
 
-When enabled for an application, the Bluetooth® LE advertising module is responsible for controlling the Bluetooth LE advertising for Bluetooth LE Peripheral device.
+When enabled for an application, the Bluetooth LE advertising module is responsible for controlling the Bluetooth® LE advertising for Bluetooth LE Peripheral device.
 
 This module can only work together with the :ref:`CAF Bluetooth LE state module <caf_ble_state>`.
 The Bluetooth LE state module is a core Bluetooth module in the :ref:`lib_caf` (CAF).
@@ -20,6 +20,8 @@ The following Kconfig options are available for this module:
 * :kconfig:option:`CONFIG_CAF_BLE_ADV`
 * :kconfig:option:`CONFIG_CAF_BLE_ADV_PM_EVENTS`
 * :kconfig:option:`CONFIG_CAF_BLE_ADV_POWER_DOWN_ON_DISCONNECTION_REASON_0X15`
+* :kconfig:option:`CONFIG_CAF_BLE_ADV_MODULE_SUSPEND_EVENTS`
+* :kconfig:option:`CONFIG_CAF_BLE_ADV_SUSPEND_ON_READY`
 * :kconfig:option:`CONFIG_CAF_BLE_ADV_DIRECT_ADV`
 * :kconfig:option:`CONFIG_CAF_BLE_ADV_FAST_ADV`
 * :kconfig:option:`CONFIG_CAF_BLE_ADV_FAST_ADV_TIMEOUT`
@@ -71,6 +73,14 @@ Synchronizing RPA and advertising data updates
 With the :kconfig:option:`CONFIG_BT_PRIVACY` Kconfig option enabled, set the :kconfig:option:`CONFIG_CAF_BLE_ADV_ROTATE_RPA` option to synchronize Resolvable Private Address (RPA) rotation with the undirected advertising data update.
 You can control the rotation period with the :kconfig:option:`CONFIG_CAF_BLE_ADV_ROTATE_RPA_TIMEOUT` option and change the randomization factor of the rotation period with the :kconfig:option:`CONFIG_CAF_BLE_ADV_ROTATE_RPA_TIMEOUT_RAND` option.
 
+Suspending the module
+=====================
+
+When the :kconfig:option:`CONFIG_CAF_BLE_ADV_MODULE_SUSPEND_EVENTS` Kconfig option is enabled, you can suspend the module using a module suspend request event (:c:struct:`module_suspend_req_event`) directed to this module.
+When entering the suspended state, the module stops Bluetooth LE advertising and disconnects connected peers.
+You can resume the module using a module resume request event (:c:struct:`module_resume_req_event`) directed to this module.
+When the :kconfig:option:`CONFIG_CAF_BLE_ADV_SUSPEND_ON_READY` Kconfig option is enabled, the module is suspended automatically right after initialization.
+
 Power-down
 ==========
 
@@ -92,12 +102,12 @@ During the grace period, Swift Pair data is removed from the advertising packet 
 This is done to ensure that the user does not try to connect to the device that is no longer available.
 
 .. note::
-   Make sure that :kconfig:option:`CONFIG_CAF_BLE_ADV_GRACE_PERIOD` Kconfig option is enabled if both following conditions are met:
+   Make sure that the :kconfig:option:`CONFIG_CAF_BLE_ADV_GRACE_PERIOD` Kconfig option is enabled if both following conditions are met:
 
    * Any of the providers requests the grace period.
    * :kconfig:option:`CONFIG_CAF_BLE_ADV_PM_EVENTS` is enabled.
 
-   The :kconfig:option:`CONFIG_CAF_BLE_ADV_GRACE_PERIOD` is enabled by default if the Swift Pair advertising data provider is enabled in the configuration.
+   The :kconfig:option:`CONFIG_CAF_BLE_ADV_GRACE_PERIOD` option is enabled by default if the Swift Pair advertising data provider is enabled in the configuration.
 
 Force power down on bonded peer power off
 -----------------------------------------
@@ -153,4 +163,4 @@ Grace period with synchronized updates of RPA and advertising data
 ==================================================================
 
 With both the :kconfig:option:`CONFIG_CAF_BLE_ADV_GRACE_PERIOD` and the :kconfig:option:`CONFIG_CAF_BLE_ADV_ROTATE_RPA` options enabled, if the RPA rotation occurs in the grace period, it terminates the grace period prematurely.
-This limitation is caused by the Bluetooth API, which doesn't allow to delay the RPA rotation.
+This limitation is caused by the Bluetooth API, which does not allow delay in the RPA rotation.

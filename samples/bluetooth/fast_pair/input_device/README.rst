@@ -12,7 +12,7 @@ This sample demonstrates :ref:`how to use Google Fast Pair with the nRF Connect 
 Google Fast Pair Service (GFPS) is a standard for pairing Bluetooth® and Bluetooth LE devices with as little user interaction required as possible.
 Google also provides additional features built upon the Fast Pair standard.
 For detailed information about supported functionalities, see the official `Fast Pair`_ documentation.
-The software maturity level for the input device use case is outlined in the :ref:`software_maturity_fast_pair_use_case` table.
+The software maturity level for the input device use case is outlined in the :ref:`Google Fast Pair use case support <software_maturity_fast_pair_use_case>` table.
 
 .. note::
    Support for Fast Pair input device use case is also integrated into :ref:`nrf_desktop`.
@@ -27,7 +27,10 @@ The sample supports the following development kits:
 
 .. include:: /includes/tfm.txt
 
-.. include:: /includes/hci_ipc_overlay.txt
+.. note::
+   This sample does not build or run for the ``nrf54h20dk/nrf54h20/cpuapp`` board target due to the IronSide SE migration.
+   See the ``NCSDK-34821`` in the :ref:`known_issues` page for more information.
+   The codebase and documentation will be updated in the future releases to address this issue.
 
 Overview
 ********
@@ -71,7 +74,7 @@ By default, if Model ID and Anti-Spoofing Private Key are not specified, the fol
 
    * Device Name: NCS input device
    * Model ID: ``0x2A410B``
-   * Anti-Spoofing Private Key (base64, uncompressed): ``Unoh+nycK/ZJ7k3dHsdcNpiP1SfOy0P/Lx5XixyYois=``
+   * Anti-Spoofing Private Key (Base64, uncompressed): ``Unoh+nycK/ZJ7k3dHsdcNpiP1SfOy0P/Lx5XixyYois=``
    * Device Type: Input Device
    * Notification Type: Fast Pair
    * Data-Only connection: true
@@ -86,7 +89,7 @@ See :ref:`ug_bt_fast_pair_provisioning` in the Fast Pair user guide for details.
 .. tip::
    The sample provides TX power in the Bluetooth advertising data.
    There is no need to provide the TX power value during device model registration.
-   The device is using only Bluetooth LE, so you must select **Skip connecting audio profiles (e.g. A2DP or HFP)** option when registering the device.
+   The device is using only Bluetooth LE, so you must select :guilabel:`Skip connecting audio profiles (e.g. A2DP or HFP)` option when registering the device.
 
 Seeker device
 =============
@@ -235,7 +238,12 @@ Building and running
 
 .. include:: /includes/build_and_run_ns.txt
 
-When building the sample, you can provide the Fast Pair Model ID (``FP_MODEL_ID``) and the Fast Pair Anti-Spoofing Key (``FP_ANTI_SPOOFING_KEY``) as CMake options.
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
+
+When building the sample, you can provide the Fast Pair Model ID (:kconfig:option:`SB_CONFIG_BT_FAST_PAIR_MODEL_ID`) and the Fast Pair Anti-Spoofing Key (:kconfig:option:`SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY`) as sysbuild Kconfig options.
 If the data is not provided, the sample uses the default provisioning data obtained for the *NCS input device* (the input device debug Fast Pair provider).
 See :ref:`ug_bt_fast_pair_provisioning` for detailed guide.
 
@@ -455,21 +463,48 @@ Personalized Name extension
 Testing Personalized Name extension is described in `Fast Pair Certification Guidelines for Personalized Name`_.
 
 .. note::
-   To mitigate Android Personalized Name write issues, whenever you change the Personalized Name on an Android phone, perform the following:
+   For Android devices running Android 15 or lower, to mitigate Android Personalized Name write issues when you change the Personalized Name, perform the following:
 
-   * Write the new Personalized Name.
-   * Disconnect the phone from the Fast Pair Provider.
-   * Put the Fast Pair Provider in not discoverable advertising mode.
-   * The phone reconnects and sends new Personalized Name to the Fast Pair Provider.
+   1. Write the new Personalized Name.
+   #. Disconnect the phone from the Fast Pair Provider.
+   #. Put the Fast Pair Provider in not discoverable advertising mode.
+   #. The phone reconnects automatically or you need to reconnect it manually.
+   #. The phone sends new Personalized Name to the Fast Pair Provider.
 
 Battery Notification extension
 ------------------------------
 
 Complete the following steps to test `Fast Pair Battery Notification extension`_:
 
-#. Pair the Fast Pair Provider with at least one Fast Pair Seeker.
-#. Set the Fast Pair Provider in not discoverable advertising mode.
-#. Verify that the Provider is advertising sample battery data using the `nRF Connect for Mobile`_ application.
+.. tabs::
+
+   .. group-tab:: nRF52 and nRF53 DKs
+
+      #. Pair the Fast Pair Provider with at least one Fast Pair Seeker.
+      #. Disconnect the Fast Pair Seeker from the Fast Pair Provider.
+      #. After disconnection, the provider automatically switches from the discoverable advertising to the not discoverable advertising with the show UI indication mode and starts advertising sample battery data.
+         **LED 3** is blinking rapidly.
+      #. Verify that the Provider is advertising sample battery data using the `nRF Connect for Mobile`_ application:
+
+         a. Open the `nRF Connect for Mobile`_ application.
+         #. Open the :guilabel:`SCANNER` tab.
+         #. Identify your test device that acts as the Fast Pair Provider in the scanning list.
+         #. Tap on it to expand advertising details.
+         #. Verify that the sample battery level and charging status are displayed in the **Fast Pair** section.
+
+   .. group-tab:: nRF54 DKs
+
+      #. Pair the Fast Pair Provider with at least one Fast Pair Seeker.
+      #. Disconnect the Fast Pair Seeker from the Fast Pair Provider.
+      #. After disconnection, the provider automatically switches from the discoverable advertising to the not discoverable advertising with the show UI indication mode and starts advertising sample battery data.
+         **LED 2** is blinking rapidly.
+      #. Verify that the Provider is advertising sample battery data using the `nRF Connect for Mobile`_ application:
+
+         a. Open the `nRF Connect for Mobile`_ application.
+         #. Open the :guilabel:`SCANNER` tab.
+         #. Identify your test device that acts as the Fast Pair Provider in the scanning list.
+         #. Tap on it to expand advertising details.
+         #. Verify that the sample battery level and charging status are displayed in the **Fast Pair** section.
 
 .. note::
    Currently, Android phones have trouble with the Battery Notification extension and sometimes do not display battery information as a user indication.
@@ -486,8 +521,8 @@ Fast Pair GATT Service
 This sample uses the :ref:`bt_fast_pair_readme` and its dependencies and is configured to meet the requirements of the Fast Pair standard.
 See :ref:`ug_bt_fast_pair` for details about integrating Fast Pair in the |NCS|.
 
-This sample enables the ``SB_CONFIG_BT_FAST_PAIR`` Kconfig option.
-With this option enabled, the build system calls the :ref:`bt_fast_pair_provision_script`, which automatically generates a hexadecimal file containing Fast Pair Model ID and Anti Spoofing Private Key.
+By default, this sample sets the :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_MODEL_ID` and :kconfig:option:`SB_CONFIG_BT_FAST_PAIR_ANTI_SPOOFING_PRIVATE_KEY` Kconfig options to use the Nordic device model that is intended for demonstration purposes.
+With these options set, the build system calls the :ref:`bt_fast_pair_provision_script` that automatically generates a hexadecimal file containing Fast Pair Model ID and the Anti-Spoofing Private Key.
 For more details about enabling Fast Pair for your application, see the :ref:`ug_bt_fast_pair_prerequisite_ops_kconfig` section in the Fast Pair integration guide.
 
 Bluetooth LE advertising data providers

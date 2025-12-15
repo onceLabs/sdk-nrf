@@ -59,7 +59,6 @@ struct hw_task_desc {
 static struct timer_desc m_timer;
 static struct timer_desc m_sync_timer;
 static struct hw_task_desc m_hw_task;
-static volatile bool m_clock_ready;
 static bool m_in_critical_section;
 
 void timer_handler(int32_t id, uint64_t expire_time, void *user_data)
@@ -140,7 +139,7 @@ static void hw_task_rtc_cc_bind_to_ppi(int32_t cc_num, uint32_t ppi_num)
 {
 	uint32_t event_address = hw_task_rtc_get_compare_evt_address(cc_num);
 
-	nrfx_gppi_event_endpoint_setup(ppi_num, event_address);
+	nrfx_gppi_ep_to_ch_attach(event_address, ppi_num);
 }
 
 static void hw_task_rtc_cc_unbind(int32_t cc_num, uint32_t ppi_num)
@@ -148,7 +147,7 @@ static void hw_task_rtc_cc_unbind(int32_t cc_num, uint32_t ppi_num)
 	if (ppi_num != NRF_802154_SL_HW_TASK_PPI_INVALID) {
 		uint32_t event_address = hw_task_rtc_get_compare_evt_address(cc_num);
 
-		nrfx_gppi_event_endpoint_clear(ppi_num, event_address);
+		nrfx_gppi_ep_ch_clear(event_address, ppi_num);
 	}
 }
 
@@ -427,7 +426,7 @@ nrf_802154_sl_lptimer_platform_result_t nrf_802154_platform_sl_lptimer_hw_task_p
 	}
 
 	if (ppi_channel != NRF_802154_SL_HW_TASK_PPI_INVALID) {
-		nrfx_gppi_event_endpoint_setup(ppi_channel, evt_address);
+		nrfx_gppi_ep_to_ch_attach(evt_address, ppi_channel);
 	}
 	m_hw_task.ppi = ppi_channel;
 	m_hw_task.fire_lpticks = fire_lpticks;

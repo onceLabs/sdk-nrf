@@ -1,13 +1,13 @@
 .. _bluetooth_mesh_light_lc:
 
-Bluetooth Mesh: Light fixture
-#############################
+Bluetooth Mesh NLC: Lightness Controller/Energy Monitor
+#######################################################
 
 .. contents::
    :local:
    :depth: 2
 
-The Bluetooth® Mesh light fixture sample demonstrates how to set up a light control mesh server model application, and control a dimmable LED with Bluetooth Mesh using the :ref:`bt_mesh_onoff_readme`.
+The Bluetooth® Mesh NLC Lightness Controller/Energy Monitor sample demonstrates how to set up a light control mesh server model application, and control a dimmable LED with Bluetooth Mesh using the :ref:`bt_mesh_onoff_readme`.
 
 This sample demonstrates how to implement the following :ref:`ug_bt_mesh_nlc`:
 
@@ -144,11 +144,11 @@ User interface
         If the :ref:`emds_readme` feature is enabled and **Button 4** is pressed **LEDs 2** to **LED 4** will light up to show that the board is halted.
 
       .. note::
-        :ref:`zephyr:thingy53_nrf5340` supports only one RGB LED.
+        :zephyr:board:`thingy53` supports only one RGB LED.
         Each RGB LED channel is used as separate LED.
 
       .. note::
-        :ref:`zephyr:thingy53_nrf5340` and the :ref:`zephyr:nrf52840dongle_nrf52840` do not support emergency data storage.
+        :zephyr:board:`thingy53` and the :zephyr:board:`nrf52840dongle` do not support emergency data storage.
 
    .. group-tab:: nRF54 DKs
 
@@ -167,7 +167,15 @@ Configuration
 
 |config|
 
-|nrf5340_mesh_sample_note|
+.. tabs::
+
+   .. group-tab:: nRF52 DK (nRF52832)
+
+      Due to limited RAM on the nRF52832 device, the Friend feature is disabled for this DK.
+
+   .. group-tab:: nRF53 DKs
+
+      |nrf5340_mesh_sample_note|
 
 The Kconfig option :kconfig:option:`CONFIG_BT_MESH_LIGHT_CTRL_REG_SPEC` is set by default as it is necessary for the :ref:`bt_mesh_light_ctrl_srv_readme` model according to the `Bluetooth Mesh model specification`_.
 The option enables a separate module called illuminance regulator.
@@ -192,6 +200,10 @@ Emergency data storage
 
 To build this sample with support for emergency data storage (EMDS), set :makevar:`EXTRA_CONF_FILE` to :file:`overlay-emds.conf` using the respective :ref:`CMake option <cmake_options>`.
 This will save replay protection list (RPL) data and some of the :ref:`bt_mesh_lightness_srv_readme` data to the emergency data storage instead of to the :ref:`settings_api`.
+The EMDS storing data API is called from the interrupt service routine (:ref:`ISR <zephyr:interrupts_v2>`) with priority 0 to prevent pre-emption of the storing procedure.
+As a part of the interrupt routine, the Multiprotocol Service Layer (:ref:`MPSL <mpsl_lib>`) is uninitialized to ensure that no radio activity is ongoing during the EMDS storing procedure (only if radio is present as a peripheral module in the core running the EMDS).
+After the storing procedure has completed, the sample leaves the MPSL uninitialized until the next system reset.
+Because the EMDS "data storing completed" callback is invoked from the same interrupt service routine, it is not possible to use the MPSL API or any API that depends on MPSL within this callback.
 When using EMDS, certain considerations need to be taken regarding hardware choices in your application design.
 See :ref:`emds_readme_application_integration` in the EMDS documentation for more information.
 
@@ -203,6 +215,11 @@ Building and running
 .. |sample path| replace:: :file:`samples/bluetooth/mesh/light_ctrl`
 
 .. include:: /includes/build_and_run_ns.txt
+
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
 
 .. _bluetooth_mesh_light_ctrl_testing:
 
@@ -306,6 +323,11 @@ Do this in the following way:
 * Go to the Light LC Server configuration that is located on the Element 2.
 * Scroll down to the **OCCUPANCY MODE** and tap :guilabel:`ON` to enable the Occupancy mode in the **Standby** state.
 * When the Light LC Server is in the **Standby** state, press ``Button 2`` on the **Mesh Sensor** node.
+
+External flash for settings partition
+=====================================
+
+.. include:: /includes/mesh_ext_flash_settings.txt
 
 Dependencies
 ************

@@ -20,41 +20,16 @@ The sample supports the following development kits:
 
 The sample also requires a device to connect to the peripheral, for example, a phone or a tablet with `nRF Connect for Mobile`_ or `nRF Toolbox`_.
 
-
 Overview
 ********
 
 When connected to another device, the sample discovers the services of the connected device and outputs the service information.
-
-User interface
-**************
-
-.. tabs::
-
-   .. group-tab:: nRF52 and nRF53 DKs
-
-      Button 1:
-         During the pairing procedure, press this button to accept the pairing.
-
-      Button 2:
-         During the pairing procedure, press this button to reject the pairing.
-
-   .. group-tab:: nRF54 DKs
-
-      Button 0:
-         During the pairing procedure, press this button to accept the pairing.
-
-      Button 1:
-         During the pairing procedure, press this button to reject the pairing.
 
 Building and running
 ********************
 .. |sample path| replace:: :file:`samples/bluetooth/peripheral_gatt_dm`
 
 .. include:: /includes/build_and_run_ns.txt
-
-.. note::
-   |54H_engb_2_8|
 
 .. _peripheral_gatt_dm_testing:
 

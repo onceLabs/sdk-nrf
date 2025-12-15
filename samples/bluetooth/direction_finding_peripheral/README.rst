@@ -41,6 +41,10 @@ Configuration
    :end-before: bt_dir_finding_tx_aoa_mode_end
 
 .. include:: /samples/bluetooth/direction_finding_connectionless_tx/README.rst
+   :start-after: bt_dir_finding_tx_aod_mode_start
+   :end-before: bt_dir_finding_tx_aod_mode_end
+
+.. include:: /samples/bluetooth/direction_finding_connectionless_tx/README.rst
    :start-after: bt_dir_finding_tx_ant_aod_start
    :end-before: bt_dir_finding_tx_ant_aod_end
 
@@ -49,6 +53,11 @@ Building and Running
 .. |sample path| replace:: :file:`samples/bluetooth/direction_finding_peripheral`
 
 .. include:: /includes/build_and_run.txt
+
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
 
 Testing
 =======

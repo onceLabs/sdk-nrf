@@ -109,12 +109,12 @@ Gazell automatically notifies the application when a packet is received.
 
 To set up a Gazell application, complete the following steps:
 
-1. Initialize Gazell Link Layer glue code using :c:func:`gzll_glue_init()`.
-#. Initialize Gazell using :c:func:`nrf_gzll_init()` and choose either Host or Device.
+1. Initialize Gazell Link Layer glue code using :c:func:`gzll_glue_init`.
+#. Initialize Gazell using :c:func:`nrf_gzll_init` and choose either Host or Device.
 #. Reconfigure Gazell's default parameters.
 
    At a minimum, reconfigure the addresses and channels to avoid interfering with other Gazell networks.
-#. Enable Gazell using :c:func:`nrf_gzll_enable()`.
+#. Enable Gazell using :c:func:`nrf_gzll_enable`.
 #. Continue to either `Setting up a Device`_ to set up a Device, or `Setting up a Host`_ to setup a Host.
 
 
@@ -123,11 +123,11 @@ Setting up a Device
 
 If the node is a Device, complete the following steps:
 
-1. Add payloads to the TX FIFO using :c:func:`nrf_gzll_add_packet_to_tx_fifo()`.
-#. Handle the returned ACK packet when the :c:func:`nrf_gzll_device_tx_success()` callback is called.
+1. Add payloads to the TX FIFO using :c:func:`nrf_gzll_add_packet_to_tx_fifo`.
+#. Handle the returned ACK packet when the :c:func:`nrf_gzll_device_tx_success` callback is called.
 
-   Fetch the payloads from the RX FIFO using :c:func:`nrf_gzll_fetch_packet_from_rx_fifo()`.
-#. Handle the failed packet transmissions when the :c:func:`nrf_gzll_device_tx_failed()` callback is called.
+   Fetch the payloads from the RX FIFO using :c:func:`nrf_gzll_fetch_packet_from_rx_fifo`.
+#. Handle the failed packet transmissions when the :c:func:`nrf_gzll_device_tx_failed` callback is called.
 
    Failed packets are automatically removed from the TX FIFO.
 
@@ -136,19 +136,19 @@ Setting up a Host
 
 If the node is a Host, start listening by completing the following steps:
 
-1. Handle the received data packets when the :c:func:`nrf_gzll_host_rx_data_ready()` callback is called.
+1. Handle the received data packets when the :c:func:`nrf_gzll_host_rx_data_ready` callback is called.
 
-   Fetch the packets from the RX FIFO using :c:func:`nrf_gzll_fetch_from_rx_fifo()`.
-#. Add any payloads to send to the TX FIFO using :c:func:`nrf_gzll_add_packet_to_tx_fifo()`.
+   Fetch the packets from the RX FIFO using :c:func:`nrf_gzll_fetch_from_rx_fifo`.
+#. Add any payloads to send to the TX FIFO using :c:func:`nrf_gzll_add_packet_to_tx_fifo`.
 
 Disabling Gazell
 ****************
 
-You can also disable Gazell at any time using the :c:func:`nrf_gzll_disable()` function.
+You can also disable Gazell at any time using the :c:func:`nrf_gzll_disable` function.
 
 When this is called, Gazell completes any ongoing transmission or reception before being disabled.
 (That is, until the end of the current timeslot, see :ref:`gazell_timeslots`).
-When the disabling operation is complete, Gazell calls the :c:func:`nrf_gzll_disabled()` function.
+When the disabling operation is complete, Gazell calls the :c:func:`nrf_gzll_disabled` function.
 When this callback is completed, the Gazell CPU context, radio and Gazell timer stop.
 
 You can now call any of the configuration set functions, which will be valid, once Gazell is enabled again.
@@ -158,9 +158,9 @@ Packet transactions
 
 A typical packet transaction between a Device and a Host consists of a Device initiating the transaction by sending a data packet to the Host and the Host sending an ACK packet in return.
 
-When the Device receives an ACK packet, it knows that the initial packet was successfully transmitted and the :c:func:`nrf_gzll_device_tx_success()` callback function is called to notify the application of this.
+When the Device receives an ACK packet, it knows that the initial packet was successfully transmitted and the :c:func:`nrf_gzll_device_tx_success` callback function is called to notify the application of this.
 
-Similarly, when the Host receives the initial packet, the :c:func:`nrf_gzll_host_rx_data_ready()` callback function is called to notify to the application that a new packet has been received.
+Similarly, when the Host receives the initial packet, the :c:func:`nrf_gzll_host_rx_data_ready` callback function is called to notify to the application that a new packet has been received.
 
 .. note::
 
@@ -176,7 +176,7 @@ A transaction can fail if the Host did not receive the initial packet from the D
 Gazell ignores packets with a failing Cyclic Redundancy Check (CRC).
 
 If a transaction fails, the Device makes an attempt to retransmit the initial packet to the Host until the ACK is finally received or the maximum number of transmission attempts is reached.
-If the maximum number of transmission attempts is reached, the retransmissions stop and the :c:func:`nrf_gzll_device_tx_failed()` callback is called.
+If the maximum number of transmission attempts is reached, the retransmissions stop and the :c:func:`nrf_gzll_device_tx_failed` callback is called.
 
 If only the ACK packet sent from the Host to the Device is lost, but the Host receives successfully both the initial packet and the subsequent retransmission attempts, the Host discards the repeated packets.
 The ACK packets are still sent in return to the Device.
@@ -265,10 +265,10 @@ Callback queueing
 Gazell has an internal callback queue for queueing pending callbacks.
 This queue steps in when Gazell attempts to call a new callback function while the application is already servicing the previous one.
 
-For example, if a new packet is received by the Host while the application is already servicing the :c:func:`nrf_gzll_host_rx_data_ready()` callback from a previously received packet, the callback for the latest packet is added to the callback queue and serviced at a later opportunity.
-In this case, :c:func:`nrf_gzll_host_rx_data_ready()` is called once for every received packet, and the application does not need to handle the potential race condition scenario where a new packet is being received just before the application is about to exit the :c:func:`nrf_gzll_host_rx_data_ready()` function.
+For example, if a new packet is received by the Host while the application is already servicing the :c:func:`nrf_gzll_host_rx_data_ready` callback from a previously received packet, the callback for the latest packet is added to the callback queue and serviced at a later opportunity.
+In this case, :c:func:`nrf_gzll_host_rx_data_ready` is called once for every received packet, and the application does not need to handle the potential race condition scenario where a new packet is being received just before the application is about to exit the :c:func:`nrf_gzll_host_rx_data_ready` function.
 
-In a Device, the :c:func:`nrf_gzll_device_tx_success()` callback is called once for every packet receiving an ACK, even when a new packet is receiving an ACK while the application is servicing the callback of a previously transmitted packet.
+In a Device, the :c:func:`nrf_gzll_device_tx_success` callback is called once for every packet receiving an ACK, even when a new packet is receiving an ACK while the application is servicing the callback of a previously transmitted packet.
 
 The size of the callback queue is given by :c:macro:`NRF_GZLL_CONST_CALLBACK_QUEUE_LENGTH` but it cannot be configured.
 
@@ -278,7 +278,7 @@ Timeslots
 *********
 
 Timeslot is a core parameter in Gazell.
-It can be seen as the internal Gazell "heartbeat".
+It can be seen as the internal Gazell "heartbeat."
 
 In a Device, any packet transmission (both new packets and retransmitted packets) starts at the beginning of a timeslot, and only one packet transmission (including ACK) can take place within a timeslot.
 
@@ -295,12 +295,12 @@ In addition, it may optionally change the RF channel it listens to.
 
    Relation between Host operation and timeslot
 
-To set the period for the heartbeat, use the :c:func:`nrf_gzll_set_timeslot_period()` function.
+To set the period for the heartbeat, use the :c:func:`nrf_gzll_set_timeslot_period` function.
 
 Frequency hopping
 *****************
 
-To ensure good coexistence performance with other radio products operating in the same 2.4 GHz frequency band as Gazell, such as Wi-Fi or Bluetooth, Gazell implements mechanisms for hopping between various radio frequency channels.
+To ensure good coexistence performance with other radio products operating in the same 2.4 GHz frequency band as Gazell, such as Wi-Fi® or Bluetooth®, Gazell implements mechanisms for hopping between various radio frequency channels.
 
 When enabled, Gazell picks channels from a predefined channel table.
 
@@ -317,7 +317,7 @@ Following are the core parameters deciding the channel hopping behavior:
 * ``timeslots_per_channel_when_device_out_of_sync`` (applies to "out of sync" Device only, set by :c:func:`nrf_gzll_set_timeslots_per_channel_when_device_out_of_sync()`).
 * ``channel_selection_policy`` (applies to "in sync" Device only, set by :c:func:`nrf_gzll_set_device_channel_selection_policy()`).
 
-Which one to use depends on whether Gazell is "in sync" or "out of sync", see :ref:`gazell_sync`.
+Which one to use depends on whether Gazell is "in sync" or "out of sync," see :ref:`gazell_sync`.
 Therefore, ``timeslots_per_channel`` is used instead of these terms.
 
 The ``timeslots_per_channel`` parameter sets the number of timeslots Gazell has on a single channel before the channel is changed.
@@ -338,7 +338,7 @@ This is because there is at least one transmission attempt for every timeslot.
 The ``channel_selection_policy`` parameter is used by a Device in sync to decide the initial channel to be used when sending a new packet to a Host (that is, for the first time the new packet is sent, not for the retransmission attempts).
 
 Once synchronized with the Host, the Device can send either on the current channel that it believes the Host is on or on the last successful channel.
-To configure this, use the :c:func:`nrf_gzll_set_device_channel_selection_policy()` function.
+To configure this, use the :c:func:`nrf_gzll_set_device_channel_selection_policy` function.
 
 The ``channel_selection_policy`` parameter can take the following two values:
 
@@ -358,7 +358,7 @@ The application can reconfigure the channel table during runtime to overcome thi
 The channel selection policy only applies to the initially transmitted packet.
 If the transmission of this initial packet fails, the following retransmission attempts are always sent in the channel the Device believes the Host is monitoring.
 
-If Gazell is "out of sync", it always starts the packet transmission immediately using the previous successful transmission channel.
+If Gazell is "out of sync," it always starts the packet transmission immediately using the previous successful transmission channel.
 If Gazell has not transmitted a successful packet and thus has no previous successful channel to relate to, it starts using the first channel in the channel table.
 
 .. _gazell_sync:
@@ -366,7 +366,7 @@ If Gazell has not transmitted a successful packet and thus has no previous succe
 Synchronization
 ***************
 
-The internal timeslot, or "heartbeat", mechanism of Gazell is used to obtain synchronous communication while still enabling efficient channel switching.
+The internal timeslot, or "heartbeat," mechanism of Gazell is used to obtain synchronous communication while still enabling efficient channel switching.
 This mechanism is useful when a Device needs to switch to a new channel while there is radio interference on the current channel.
 
 Each Gazell Device has two synchronization states: in sync and out of sync.
@@ -400,7 +400,7 @@ Once the ``sync_lifetime`` has expired on a Device, the internal timer is stoppe
 
 If you set the ``sync_lifetime`` to zero, the Device will never be in sync.
 The ``sync_lifetime`` should be chosen with regard to how often packets are required to be sent and the fact that synchronization can only be maintained for a finite time due to clock drift and radio interference.
-To configure the sync lifetime, use the :c:func:`nrf_gzll_set_sync_lifetime()` function.
+To configure the sync lifetime, use the :c:func:`nrf_gzll_set_sync_lifetime` function.
 
 The Device knows it is in sync when the number of retransmissions gets close to zero.
 The :c:struct:`nrf_gzll_device_tx_info_t` structure is passed to the Device callback functions, and it contains the number of transmit attempts required for the current packet.
@@ -423,7 +423,7 @@ The default channel tables require adjustment.
 Depending on your project, do one of the following:
 
 * Edit the :file:`gzll_params.h` file used in the nRF24L IC projects.
-* Use the :c:func:`nrf_gzll_set_channel_table()` function in the nRF52 Series projects.
+* Use the :c:func:`nrf_gzll_set_channel_table` function in the nRF52 Series projects.
 
 Timeslot periods
 ================
@@ -446,7 +446,7 @@ In addition, the relation between the Device and Host timing parameters should b
 Depending on your project, do one of the following:
 
 * Edit the :file:`gzll_params.h` file used in the nRF24L IC projects.
-* Use the :c:func:`nrf_gzll_set_timeslot_period()` function in the nRF52 Series projects (nRF52 Series Gazell timeslot period = 0.5*GZLL_RX_PERIOD).
+* Use the :c:func:`nrf_gzll_set_timeslot_period` function in the nRF52 Series projects (nRF52 Series Gazell timeslot period = 0.5*GZLL_RX_PERIOD).
 
 Emulating legacy Gazell roles
 =============================

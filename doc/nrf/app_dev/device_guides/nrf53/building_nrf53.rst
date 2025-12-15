@@ -19,7 +19,7 @@ The steps differ depending on whether you work with |VSC| or on the command line
 Using |VSC|
 ===========
 
-You can build and program separate images or combined images using the |nRFVSC|.
+You can build and program separate images or combined images using |nRFVSC|.
 
 .. tabs::
 
@@ -31,7 +31,7 @@ You can build and program separate images or combined images using the |nRFVSC|.
 
    .. group-tab:: Multi-image build
 
-      If you are working with Bluetooth LE, Thread, Zigbee, or Matter samples, the network core sample is built as a child image when you build the application core image (see :ref:`ug_nrf5340_multi_image` above).
+      If you are working with Bluetooth® LE, Thread, Zigbee, or Matter samples, the network core sample is built as a separate image when you build the application core image.
 
       Complete the following steps to build and program a multi-image build to the nRF5340 application core and network core:
 
@@ -44,19 +44,14 @@ Complete the following steps to program the sample or application onto nRF5340 D
 
 #. Connect the nRF5340 development kit to your PC using a USB cable.
 #. Make sure that the nRF5340 DK and the external debug probe are powered on.
-#. Click :guilabel:`Build` in the :guilabel:`Actions View` to start the build process.
+#. Click :guilabel:`Build` in the `Actions View`_ to start the build process.
 #. Click :guilabel:`Flash` in the :guilabel:`Actions View` to program the resulting image to your device.
 
 Using the command line
 ======================
 
 To build nRF5340 samples from the command line, use :ref:`west <zephyr:west>`.
-To program the nRF5340 DK from the command line, use either west (which uses nrfjprog that is part of the `nRF Command Line Tools`_) or :ref:`nRF Util <requirements_nrf_util>`.
-
-.. note::
-   Programming the nRF5340 DK from the command line with west requires the `nRF Command Line Tools`_ v10.12.0 or later.
-
-   |nrf_CLT_deprecation_note|
+To program the nRF5340 DK from the command line, use either west or :ref:`nRF Util <requirements_nrf_util>` (which is also used by west as the :ref:`default runner <programming_selecting_runner>`).
 
 .. tabs::
 
@@ -98,7 +93,7 @@ To program the nRF5340 DK from the command line, use either west (which uses nrf
                     * :file:`rpc_host`
                     * :file:`hci_rpsmg`
                     * :file:`802154_rpmsg`
-                    * :file:`multiprotocol_rpmsg`
+                    * :file:`ipc_radio`
 
             #. Navigate to the build folder of the application sample and run the following command to erase the flash memory of the application core and program the application sample:
 
@@ -132,9 +127,6 @@ To program the nRF5340 DK from the command line, use either west (which uses nrf
             .. code-block:: console
 
                west flash
-
-            .. note::
-                 The minimum supported version of nrfjprog for multi-image builds for different cores is 10.21.0.
 
          .. group-tab:: nRF Util
 

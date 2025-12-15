@@ -1,19 +1,43 @@
 common:
   sysbuild: true
-  timeout: 180
-  tags: pytest mcuboot kmu
+  tags:
+    - mcuboot
+    - kmu
+    - ci_tests_subsys_kmu
   platform_allow:
     - nrf54l15dk/nrf54l15/cpuapp
-  harness: pytest
-  harness_config:
-    pytest_dut_scope: session
-    pytest_root:
-      - "../pytest/test_kmu_with_mcuboot.py"
 tests:
-  mcuboot.kmu.west.provision.default_key: {}
-  mcuboot.kmu.west.provision.secondary_key:
+  mcuboot.kmu.west.provision.basic:
+    timeout: 180
+    platform_allow:
+      - nrf54lm20dk/nrf54lm20a/cpuapp
+      - nrf54lv10dk/nrf54lv10a/cpuapp
+    tags:
+      - pytest
+    harness: pytest
+    harness_config:
+      pytest_root:
+        - "../pytest/test_kmu_provision.py"
+  mcuboot.kmu.west_flash_default_provision:
+    platform_allow:
+      - nrf54lm20dk/nrf54lm20a/cpuapp
+      - nrf54lv10dk/nrf54lv10a/cpuapp
+    harness: console
+    harness_config:
+      type: one_line
+      regex:
+        - "Hello World! (.*)"
     extra_args:
-      - SB_EXTRA_CONF_FILE=sb_secondary_key.conf
-  mcuboot.kmu.west.provision.wrong_key:
+      - SB_CONFIG_MCUBOOT_GENERATE_DEFAULT_KMU_KEYFILE=y
+  mcuboot.kmu.west_flash_default_provision_with_b0:
+    tags:
+      - nsib
+    harness: console
+    harness_config:
+      type: one_line
+      regex:
+        - "Hello World! (.*)"
     extra_args:
-      - SB_EXTRA_CONF_FILE=sb_wrong_key.conf
+      - SB_CONFIG_SECURE_BOOT_APPCORE=y
+      - SB_CONFIG_SECURE_BOOT_GENERATE_DEFAULT_KMU_KEYFILE=y
+      - SB_CONFIG_MCUBOOT_GENERATE_DEFAULT_KMU_KEYFILE=y

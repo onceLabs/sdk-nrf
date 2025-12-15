@@ -444,6 +444,13 @@ For example:
 
       custom ltx *10* *1000*
 
+The statistics are shown in the following format:
+
+   .. parsed-literal::
+      :class: highlight
+
+      [packets]0x%x%x%x%x [acks]0x%x%x%x%x
+
 ltxend - Stop the burst transmission of packets
 ===============================================
 
@@ -925,9 +932,6 @@ Building and running
    This sample uses the :ref:`shell_ipc_readme` library to forward shell data through the physical UART interface of the application core.
    The Remote IPC shell sample is built and programmed automatically by default.
 
-.. note::
-   |54H_engb_2_8|
-
 .. _802154_phy_test_testing:
 
 Testing the sample
@@ -937,7 +941,8 @@ After programming the sample to your development kit, complete the following ste
 
 1. Connect the development kit to the computer using a USB cable.
    Use the development kit's programmer USB port (J2).
-   The kits are assigned a COM port (in Windows) or a ttyACM device (in Linux), visible in the Device Manager or in the :file:`/dev` directory.
+   The kits are assigned serial ports.
+   |serial_port_number_list|
 #. |connect_terminal|
 #. If the sample is configured to support both modes (the default setting), switch the development kit into CMD mode by sending the following command:
 
@@ -974,7 +979,8 @@ Performing radio tests without the serial interface
    The easiest way to achieve this is to flash both devices with the sample configured to support both modes (default setting).
 #. Connect both development kits to the computer using a USB cable.
 
-   The kits are assigned a COM port (in Windows) or a ttyACM device (in Linux), visible in the Device Manager or the :file:`/dev` directory.
+   The kits are assigned serial ports.
+   |serial_port_number_list|
 #. |connect_terminal|
 #. If the samples are configured to support both modes (the default setting), switch one of the development kits into CMD mode by sending the following command:
 

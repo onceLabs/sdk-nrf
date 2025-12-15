@@ -75,6 +75,9 @@ You can enable both methods after :ref:`building and running the sample <matter_
 Remote testing in a network
 ---------------------------
 
+.. |Bluetoothsc| replace:: Bluetooth®
+.. |WiFi| replace:: Wi-Fi®
+
 .. include:: ../light_bulb/README.rst
     :start-after: matter_light_bulb_sample_remote_testing_start
     :end-before: matter_light_bulb_sample_remote_testing_end
@@ -100,25 +103,9 @@ Matter window covering with Trusted Firmware-M
     :start-after: matter_template_build_with_tfm_start
     :end-before: matter_template_build_with_tfm_end
 
+.. |Bluetooth| replace:: Bluetooth
 
-Device Firmware Upgrade support
-===============================
-
-.. include:: ../lock/README.rst
-    :start-after: matter_door_lock_sample_build_with_dfu_start
-    :end-before: matter_door_lock_sample_build_with_dfu_end
-
-FEM support
-===========
-
-.. include:: /includes/sample_fem_support.txt
-
-Factory data support
-====================
-
-.. include:: ../lock/README.rst
-    :start-after: matter_door_lock_sample_factory_data_start
-    :end-before: matter_door_lock_sample_factory_data_end
+.. include:: /includes/advanced_conf_matter.txt
 
 User interface
 **************
@@ -211,6 +198,11 @@ Building and running
 
 .. include:: /includes/build_and_run.txt
 
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
+
 Selecting a configuration
 =========================
 
@@ -278,6 +270,9 @@ Enabling remote control
 =======================
 
 Remote control allows you to control the Matter window covering device from a Thread network.
+
+.. note::
+   |matter_unique_discriminator_note|
 
 `Commissioning the device`_ allows you to set up a testing environment and remotely control the sample over a Matter-enabled Thread network.
 

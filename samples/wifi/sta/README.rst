@@ -87,14 +87,14 @@ You can change the following default static configuration in the :file:`prj.conf
   CONFIG_NET_CONFIG_MY_IPV4_NETMASK="255.255.255.0"
   CONFIG_NET_CONFIG_MY_IPV4_GW="192.168.1.1"
 
+.. _wifi_station_sample_building_and_running:
+
 Building and running
 ********************
 
 .. |sample path| replace:: :file:`samples/wifi/sta`
 
 .. include:: /includes/build_and_run_ns.txt
-
-Currently, only the nRF7002 DK is supported.
 
 To build for the nRF7002 DK, use the ``nrf7002dk/nrf5340/cpuapp`` board target.
 The following is an example of the CLI command:
@@ -103,10 +103,7 @@ The following is an example of the CLI command:
 
    west build -b nrf7002dk/nrf5340/cpuapp
 
-
-.. note::
-   |54H_engb_2_8|
-
+.. include:: /includes/wifi_refer_sample_yaml_file.txt
 
 Testing
 =======
@@ -204,7 +201,7 @@ To test RPU recovery, you must build the sample with :kconfig:option:`CONFIG_SHE
 
    .. code-block:: console
 
-      wifi_util rpu_recovery_test
+      nrf70 util rpu_recovery_test
 
    If RPU recovery is triggered, you should see an output similar to the following:
 
@@ -220,9 +217,21 @@ The nRF5340 SoC is connected to the first PPK2 and the nRF7002 DK is connected t
 
 See `Measuring current`_ for more information about how to set up and measure the current consumption of both the nRF5340 SoC and the nRF7002 device.
 
-The average current consumption in an idle case can be around ~1-2 mA in the nRF5340 SoC and ~20 µA in the nRF7002 device.
+The average current consumption in an idle case can be around ~1-2 mA in the nRF5340 SoC and ~15 µA in the nRF7002 device.
 
 See :ref:`app_power_opt` for more information on power management testing and usage of the PPK2.
+
+.. _wifi_sta_performance_testing_memory_footprint:
+
+Performance testing and memory footprint analysis
+*************************************************
+
+The sample can be used to test the performance of the Wi-Fi connection.
+The performance tuning is done to achieve a trade-off between memory usage and performance.
+
+You can use the :file:`overlay-zperf.conf` file to run the performance test.
+The default build, without the overlay, is used for memory footprint testing and analysis.
+The overlay must be enabled to run the performance test corresponding to the memory footprints.
 
 Dependencies
 ************
@@ -231,4 +240,4 @@ This sample uses the following |NCS| libraries:
 
 * :ref:`nrf_security`
 * :ref:`lib_wifi_ready`
-* :ref:`lib_wifi_credentials`
+* :ref:`Wi-Fi credentials <zephyr:lib_wifi_credentials>`

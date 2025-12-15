@@ -11,10 +11,12 @@
 #include <cracen_psa.h>
 #include <cracen/interrupts.h>
 #include <cracen/lib_kmu.h>
+#include <cracen/statuscodes.h>
 
 #include "common.h"
 #include "microcode_binary.h"
 #include <nrf_security_mutexes.h>
+#include <sxsymcrypt/trng.h>
 
 #if !defined(CONFIG_BUILD_WITH_TFM)
 #define LOG_ERR_MSG(msg) LOG_ERR(msg)
@@ -59,9 +61,36 @@ void cracen_acquire(void)
 							     CRACEN_ENABLE_PKEIKG_Msk);
 		irq_enable(CRACEN_IRQn);
 		LOG_DBG_MSG("Powered on CRACEN.");
+
+#ifdef CONFIG_CRACEN_HW_VERSION_LITE
+		/* CRACEN Lite TRNG workaround. Configure TRNG test thresholds after power-on.
+		 * The IKG's internal PRNG directly accesses the TRNG hardware, but these
+		 * registers reset to incorrect default values when CRACEN is powered down.
+		 * We must reconfigure them every time CRACEN powers up to prevent entropy
+		 * errors in IKG operations.
+		 */
+		sx_trng_configure_cracen_lite_workaround();
+#endif /* CONFIG_CRACEN_HW_VERSION_LITE */
 	}
 
 	nrf_security_mutex_unlock(cracen_mutex);
+}
+
+static void cracen_disable_interrupts(void)
+{
+	uint32_t int_disable_mask = 0;
+
+	/* Disable IRQs in the ARM NVIC as the first operation to be
+	 * sure no IRQs fire while we are turning CRACEN off.
+	 */
+	irq_disable(CRACEN_IRQn);
+
+	int_disable_mask |= CRACEN_INTENCLR_CRYPTOMASTER_Msk;
+	int_disable_mask |= CRACEN_INTENCLR_RNG_Msk;
+	int_disable_mask |= CRACEN_INTENCLR_PKEIKG_Msk;
+
+	/* Disable IRQs at the CRACEN peripheral */
+	nrf_cracen_int_disable(NRF_CRACEN, int_disable_mask);
 }
 
 void cracen_release(void)
@@ -69,20 +98,9 @@ void cracen_release(void)
 	nrf_security_mutex_lock(cracen_mutex);
 
 	if (--users == 0) {
-		/* Disable IRQs in the ARM NVIC as the first operation to be
-		 * sure no IRQs fire while we are turning CRACEN off.
-		 */
-		irq_disable(CRACEN_IRQn);
-
-		uint32_t int_disable_mask = 0;
-
-		int_disable_mask |= CRACEN_INTENCLR_CRYPTOMASTER_Msk;
-		int_disable_mask |= CRACEN_INTENCLR_RNG_Msk;
-		int_disable_mask |= CRACEN_INTENCLR_PKEIKG_Msk;
-
-		/* Disable IRQs at the CRACEN peripheral */
-		nrf_cracen_int_disable(NRF_CRACEN, int_disable_mask);
-
+		if (IS_ENABLED(CONFIG_CRACEN_USE_INTERRUPTS)) {
+			cracen_disable_interrupts();
+		}
 		uint32_t enable_mask = 0;
 
 		enable_mask |= CRACEN_ENABLE_CRYPTOMASTER_Msk;
@@ -121,8 +139,9 @@ int cracen_init(void)
 	}
 
 	cracen_acquire();
-	cracen_interrupts_init();
-
+	if (IS_ENABLED(CONFIG_CRACEN_USE_INTERRUPTS)) {
+		cracen_interrupts_init();
+	}
 	if (IS_ENABLED(CONFIG_CRACEN_LOAD_MICROCODE)) {
 		/* NOTE: CRACEN needs power to load microcode */
 		LOG_DBG("Loading microcode for CRACEN PKE+IKG support");
@@ -135,6 +154,17 @@ int cracen_init(void)
 		status = silex_statuscodes_to_psa(err);
 		goto exit;
 	}
+
+#if defined(CONFIG_CRACEN_PROVISION_PROT_RAM_INV_SLOTS_ON_INIT)
+	status = cracen_provision_prot_ram_inv_slots();
+	if (status != PSA_SUCCESS) {
+		goto exit;
+	}
+#endif /* CONFIG_CRACEN_PROVISION_PROT_RAM_INV_SLOTS_ON_INIT */
+
+#if defined(CONFIG_PSA_NEED_CRACEN_KMU_DRIVER)
+	status = cracen_push_prot_ram_inv_slots();
+#endif
 
 exit:
 	cracen_release();

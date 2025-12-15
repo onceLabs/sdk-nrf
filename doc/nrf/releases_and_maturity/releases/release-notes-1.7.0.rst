@@ -23,7 +23,7 @@ Highlights
 
   * :ref:`direct_test_mode` and :ref:`radio_test` sample support.
   * Support for Bluetooth® LE, Thread, Zigbee, and multiprotocol applications and samples using :ref:`nrfxlib:mpsl`.
-  * Support for :ref:`nRF21540 development kit (DK) <nrf21540dk_nrf52840>`, :ref:`nRF21540 evaluation kit (EK) <ug_radio_fem_nrf21540ek>` and custom board configurations.
+  * Support for :zephyr:board:`nrf21540dk`, :ref:`nRF21540 evaluation kit (EK) <ug_radio_fem_nrf21540ek>` and custom board configurations.
 
 * Added Wi-Fi coexistence feature supported for development for Thread and Zigbee.
 * Added support for NFC and *pair before use* type of accessories to the Apple Find My add-on.
@@ -56,7 +56,7 @@ Supported modem firmware
 See `Modem firmware compatibility matrix`_ for an overview of which modem firmware versions have been tested with this version of the |NCS|.
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Known issues
 ************
@@ -104,22 +104,22 @@ nRF9160
     * Removed the function ``nrf_cloud_sensor_attach()``, the associated structure ``nrf_cloud_sa_param``, and the event ``NRF_CLOUD_EVT_SENSOR_ATTACHED``.
       These items provided no useful functionality.
 
-  * :ref:`serial_lte_modem` application:
+  * Serial LTE modem application:
 
     * Added IPv6 support to all SLM services.
     * Added the GNSS service to replace the existing GPS test functionality.
     * Added the optional support of location services from nRF Cloud, such as A-GPS, P-GPS, and cellular positioning.
     * Removed datatype in all sending AT commands.
       If no sending data is specified, switch data mode to receive and send any arbitrary data.
-    * Added the :ref:`slm_data_mode` documentation page to explain the data mode mechanism and how it works.
-    * Added the :ref:`SLM_AT_FOTA` documentation page to describe the FOTA service.
+    * Added the Running in data mode documentation page to explain the data mode mechanism and how it works.
+    * Added the FOTA AT commands documentation page to describe the FOTA service.
 
-  * :ref:`asset_tracker_v2` application:
+  * Asset Tracker v2 application:
 
     * Changed the custom module responsible for controlling the LEDs to the :ref:`LEDs module <caf_leds>` from :ref:`lib_caf`.
     * Added support for A-GPS when configuring the application for AWS IoT.
     * Added support for P-GPS when configuring the application for AWS IoT.
-    * Added a new :ref:`debug module <asset_tracker_v2_debug_module>` that implements support for `Memfault`_.
+    * Added a new debug module that implements support for `Memfault`_.
     * Added support for the :ref:`liblwm2m_carrier_readme` library.
 
   * :ref:`liblwm2m_carrier_readme` library:
@@ -137,10 +137,10 @@ nRF9160
 
 * Deprecated:
 
-  * nRF9160: Asset Tracker has been deprecated in favor of :ref:`asset_tracker_v2`.
+  * nRF9160: Asset Tracker has been deprecated in favor of Asset Tracker v2.
   * ``at_notif`` library has been deprecated in favor of the :ref:`at_monitor_readme` library.
   * ``at_cmd`` library has been deprecated in favor of Modem library's native AT interface.
-  * GPS driver has been deprecated in favor of the :ref:`nrfxlib:gnss_interface`.
+  * GPS driver has been deprecated in favor of the :ref:`GNSS interface <nrfxlib:gnss_interface>`.
 
 nRF5
 ====
@@ -198,7 +198,7 @@ Bluetooth mesh
 * Updated:
 
   * Updated the :ref:`bt_mesh_light_hsl_srv_readme` and the :ref:`bt_mesh_light_xyl_srv_readme` models to no longer extend the :ref:`bt_mesh_lightness_srv_readme` model, and instead get a pointer to this model in the initialization macro.
-  * Updated samples with support for the :ref:`zephyr:thingy53_nrf5340`.
+  * Updated samples with support for the :zephyr:board:`thingy53`.
   * Fixed an issue where beacons were stopped being sent after node reset.
   * Fixed an issue where the IV update procedure could be started immediately after the device has been provisioned.
   * Fixed multiple issues in the :ref:`bt_mesh_sensor_types_readme` module.
@@ -280,22 +280,22 @@ Zigbee
 
   * Added production support for :ref:`radio front-end module (FEM) <ug_radio_fem>` for nRF52 Series devices and nRF21540 EK.
   * Added development support for :ref:`radio front-end module (FEM) <ug_radio_fem>` for nRF53 Series devices and nRF21540 EK.
-  * Added development support for ``nrf5340dk_nrf5340_cpuapp`` to the :ref:`zigbee_ncp_sample` sample.
-  * :ref:`lib_zigbee_zcl_scenes` library with documentation.
+  * Added development support for ``nrf5340dk_nrf5340_cpuapp`` to the Zigbee NCP sample.
+  * Zigbee ZCL scene helper library with documentation.
     This library was separated from the Zigbee light bulb sample.
-  * :ref:`zigbee_template_sample` sample.
+  * Zigbee template sample.
     This minimal Zigbee router application can be used as the starting point for developing custom Zigbee devices.
-  * Added user guide about :ref:`ug_zigee_adding_clusters` that is based on the new template sample.
+  * Added user guide about adding ZCL clusters to application that is based on the new template sample.
   * Added API for vendor-specific NCP commands.
-    See the :ref:`Zigbee NCP sample <zigbee_ncp_vendor_specific_commands>` page for more information.
+    See the Zigbee NCP sample page for more information.
   * Added API for Zigbee command for getting active nodes.
 
 * Updated:
 
   * ZBOSS Zigbee stack to version 3.8.0.1+4.0.0.
-    See the :ref:`nrfxlib:zboss_changelog` in the nrfxlib documentation for detailed information.
-  * :ref:`ug_zigbee_tools_ncp_host` is now supported for production and updated to version 1.0.0.
-  * :ref:`zigbee_ug_logging_stack_logs` - Improved printing ZBOSS stack logs.
+    See the ZBOSS changelog in the nrfxlib documentation for detailed information.
+  * ZBOSS NCP host is now supported for production and updated to version 1.0.0.
+  * Stack logs - Improved printing ZBOSS stack logs.
     Added new backend options to print ZBOSS stack logs with option for using binary format.
   * Fixed the KRKNWK-9743 known issue where the timer could not be stopped in Zigbee routers and coordinators.
   * Fixed the KRKNWK-10490 known issue that would cause a deadlock in the NCP frame fragmentation logic.
@@ -487,12 +487,12 @@ In addition to documentation related to the changes listed above, the following 
 
   * Added the :ref:`ug_thingy53` user guide.
   * Added the :ref:`ug_nrf_cloud` user guide.
-  * Added :ref:`serial_lte_modem` application pages:
+  * Added Serial LTE modem application pages:
 
-    * :ref:`slm_data_mode` page
-    * :ref:`SLM_AT_FOTA` page
-    * :ref:`SLM_AT_SOCKET` page
-    * :ref:`SLM_AT_GNSS` page
+    *  Running in data mode page
+    * FOTA AT commands page
+    * Socket AT commands page
+    * GNSS AT command page
 
   * Added the :ref:`matter_weather_station_app` application page.
   * Added the :ref:`crypto_tls` sample page.
@@ -500,9 +500,9 @@ In addition to documentation related to the changes listed above, the following 
   * Added the :ref:`rscs_readme` library page.
   * Added documentation pages for the following Zigbee libraries:
 
-    * :ref:`lib_zigbee_osif`
-    * :ref:`lib_zigbee_zcl_scenes`
-    * :ref:`lib_zigbee_error_handler`
+    * Zigbee ZBOSS OSIF
+    * Zigbee ZCL scene helper
+    * Zigbee error handler
 
 * Updated pages:
 
@@ -515,7 +515,7 @@ In addition to documentation related to the changes listed above, the following 
 
   * :ref:`ug_app_dev` section pages:
 
-    * :ref:`ug_multi_image` - Updated with the section about Child image devicetree overlays.
+    * Multi-image builds - Updated with the section about Child image devicetree overlays.
     * :ref:`ug_radio_fem` - Updated for the nRF21540 release.
 
   * :ref:`ug_nrf91` user guide - Restructured into several subpages.
@@ -535,19 +535,19 @@ In addition to documentation related to the changes listed above, the following 
 
     * :ref:`ug_zigbee` pages:
 
-      * :ref:`ug_zigbee_configuring` - Updated the :ref:`zigbee_ug_logging` section.
-      * :ref:`zigbee_memory` - Updated the memory values for the latest release.
+      * Configuring Zigbee in nRF Connect SDK - Updated the Custom logging per module section.
+      * Zigbee memory requirements - Updated the memory values for the latest release.
 
   * :ref:`applications` section pages:
 
-    * :ref:`asset_tracker_v2` pages:
+    * Asset Tracker v2 pages:
 
       * Restructured the single application page into several subpages.
       * Updated with information about using the LwM2M carrier library.
       * Updated the device modes section.
       * Added links and information about A-GPS and P-GPS support with nRF Cloud.
 
-    * :ref:`serial_lte_modem` pages:
+    * Serial LTE modem pages:
 
       * Removed the GPS AT commands page.
 
@@ -570,7 +570,7 @@ In addition to documentation related to the changes listed above, the following 
 
     * :ref:`zigbee_samples`:
 
-      * :ref:`zigbee_ncp_sample` - Updated with information about logging ZBOSS traces and about vendor-specific commands.
+      * Zigbee NCP - Updated with information about logging ZBOSS traces and about vendor-specific commands.
 
   * :ref:`libraries` section pages:
 

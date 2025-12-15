@@ -16,7 +16,7 @@ See :ref:`ug_bootloader` for more information about the full bootloader chain.
 .. note::
 
    Currently, the NSIB does not support performing firmware updates over the SMP transport.
-   If the application using the NSIB requires SMP-based firmware updates, such as Bluetooth® LE DFU, :ref:`include MCUboot as a second-stage bootloader <ug_bootloader_adding_upgradable>`.
+   If the application using the NSIB requires SMP-based firmware updates, such as Bluetooth® LE DFU, :ref:`include MCUboot as a second-stage bootloader <ug_bootloader_adding_sysbuild_upgradable>`.
 
 .. _bootloader_rot:
 
@@ -101,7 +101,7 @@ The flash memory layout is defined by the :file:`samples/bootloader/pm.yml` file
 * *S1* - Slot 1.
 
 The default location for placing the next image in the boot chain is *S0*.
-This would result, for example, in a flash memory layout like the following, when using the ``nrf52840dk_nrf52840`` board:
+This would result, for example, in a flash memory layout like the following, when using the ``nrf52840dk/nrf52840`` board target:
 
 .. figure:: ../../doc/nrf/images/b0_flash_layout.svg
    :alt: B0 flash memory layout
@@ -119,14 +119,14 @@ Pre-signed variants
 
 When two slots are present, two images must be built.
 One that is executable from slot 0, and the other one from slot 1.
-Building the image for slot 1 is done by enabling the :kconfig:option:`CONFIG_BUILD_S1_VARIANT` option.
+Building the image for slot 1 is done by enabling the :kconfig:option:`SB_CONFIG_SECURE_BOOT_BUILD_S1_VARIANT_IMAGE` option.
 
 When the image for the next stage in the boot chain is upgraded, the new image is written to the slot with the oldest image version.
 See :ref:`bootloader_monotonic_counter` for more information about versioning.
 
 If this image is faulty and cannot be booted, the other partition will always hold a working image that is booted instead.
 
-When using the ``nrf52840dk_nrf52840`` board, this would produce a flash memory layout like the following:
+When using the ``nrf52840dk/nrf52840`` board target, this would produce a flash memory layout like the following:
 
 .. figure:: ../../doc/nrf/images/b0_mcuboot_flash_layout.svg
    :alt: B0 flash memory layout with MCUboot
@@ -157,8 +157,6 @@ Monotonic counter
    :start-after: bootloader_monotonic_counter_nsib_start
    :end-before: bootloader_monotonic_counter_nsib_end
 
-To set options for child images, such as NSIB and MCUboot, see the :ref:`ug_multi_image_variables` section.
-
 .. _bootloader_build_and_run:
 
 Building and running
@@ -169,48 +167,13 @@ Building and running
 .. include:: /includes/build_and_run.txt
 
 .. caution::
-   |NSIB| should be included as a child image in a multi-image build, rather than being built stand-alone.
+   |NSIB| should be included as an image in a project using sysbuild, rather than being built stand-alone.
    While it is technically possible to build the NSIB by itself and merge it into other application images, this process is not supported.
-   To reduce the development time and potential issues with this route, let the existing |NCS| infrastructure for multi-image builds handle the integration.
+   To reduce the development time and potential issues with this route, let the existing |NCS| infrastructure for sysbuild handle the integration.
 
-   The NSIB is automatically added as a child image when the :kconfig:option:`CONFIG_SECURE_BOOT` Kconfig option is set in the application.
+   The NSIB is automatically added as an image when the :kconfig:option:`SB_CONFIG_SECURE_BOOT_APPCORE` sysbuild Kconfig option is set.
 
-For building and running the NSIB with an application, see :ref:`ug_bootloader_adding_immutable`.
-
-Building and running using |VSC|
-================================
-
-.. include:: /includes/build_and_run_bootloader.txt
-
-To add the NSIB as a child image to your application, complete the following steps:
-
-1. :ref:`Create a private key in PEM format <ug_fw_update_keys>`.
-#. Enable the |NSIB| through Kconfig as follows:
-
-   a. Select :guilabel:`Kconfig` in the :guilabel:`Actions View` to open the nRF Kconfig tab.
-   #. Expand :guilabel:`Modules` > :guilabel:`nrf` > :guilabel:`Nordic nRF Connect` > :guilabel:`Bootloader` and set :guilabel:`Use Secure Bootloader` to enable :kconfig:option:`CONFIG_SECURE_BOOT`.
-   #. Expand :guilabel:`Use Secure Bootloader`.
-      Under :guilabel:`Private key PEM file` (:kconfig:option:`CONFIG_SB_SIGNING_KEY_FILE`), enter the path to the private key that you created.
-
-      You can also modify other additional configuration options, but that is not recommended.
-      The default settings are suitable for most use cases.
-
-      .. note::
-         If you need more flexibility with signing, or if you do not want the build system to handle your private key, choose :kconfig:option:`CONFIG_SB_SIGNING_CUSTOM`, and also specify :kconfig:option:`CONFIG_SB_SIGNING_COMMAND` and :kconfig:option:`CONFIG_SB_SIGNING_PUBLIC_KEY`.
-         You can use the :guilabel:`Search modules` bar in nRF Kconfig to find these options.
-         These options allow you to define the signing command.
-
-   #. Click :guilabel:`Save`.
-
-#. Select :guilabel:`Build` in the :guilabel:`Actions View` to start the build process.
-   The build process creates two images, one for the NSIB and one for the application, and merges them.
-
-#. Select :guilabel:`Flash` in the :guilabel:`Actions View` to program the resulting image to your device.
-
-Testing
-=======
-
-See :ref:`ug_bootloader_testing` for testing of the expected runtime behavior of the NSIB when built with an application.
+For building and running the NSIB with an application, see :ref:`ug_bootloader_adding_sysbuild_immutable`.
 
 Dependencies
 ************

@@ -5,7 +5,6 @@
 
 menuconfig MQTT_HELPER
 	bool "MQTT helper library"
-	select NET_SOCKETS_POSIX_NAMES if !POSIX_API
 	select MQTT_LIB
 	help
 	  Convenience library that simplifies Zephyr MQTT API and socket handling.
@@ -126,6 +125,6 @@ endif
 
 module = MQTT_HELPER
 module-str = MQTT helper library
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 endif # MQTT_HELPER

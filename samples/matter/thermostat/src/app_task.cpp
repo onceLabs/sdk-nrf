@@ -11,14 +11,10 @@
 
 #include "app/matter_init.h"
 #include "app/task_executor.h"
-
-#ifdef CONFIG_CHIP_OTA_REQUESTOR
-#include "dfu/ota/ota_util.h"
-#endif
+#include "clusters/identify.h"
 
 #include <app-common/zap-generated/attributes/Accessors.h>
-#include <app/clusters/identify-server/identify-server.h>
-#include <app/server/OnboardingCodesUtil.h>
+#include <setup_payload/OnboardingCodesUtil.h>
 
 #include <zephyr/logging/log.h>
 
@@ -32,22 +28,10 @@ namespace
 {
 constexpr EndpointId kThermostatEndpointId = 1;
 
-Identify sIdentify = { kThermostatEndpointId, AppTask::IdentifyStartHandler, AppTask::IdentifyStopHandler,
-		       Clusters::Identify::IdentifyTypeEnum::kVisibleIndicator };
+Nrf::Matter::IdentifyCluster sIdentifyCluster(kThermostatEndpointId);
 
 #define TEMPERATURE_BUTTON_MASK DK_BTN2_MSK
-} // namespace
-
-void AppTask::IdentifyStartHandler(Identify *)
-{
-	Nrf::PostTask(
-		[] { Nrf::GetBoard().GetLED(Nrf::DeviceLeds::LED2).Blink(Nrf::LedConsts::kIdentifyBlinkRate_ms); });
-}
-
-void AppTask::IdentifyStopHandler(Identify *)
-{
-	Nrf::PostTask([] { Nrf::GetBoard().GetLED(Nrf::DeviceLeds::LED2).Set(false); });
-}
+} /* namespace */
 
 void AppTask::ButtonEventHandler(Nrf::ButtonState state, Nrf::ButtonMask hasChanged)
 {
@@ -76,7 +60,7 @@ CHIP_ERROR AppTask::Init()
 		}
 		err = TemperatureManager::Instance().Init();
 		if (err != CHIP_NO_ERROR) {
-			LOG_ERR("TempMgr Init fail");
+			LOG_ERR("TemperatureManager Init fail");
 		}
 		return err;
 	} }));
@@ -89,6 +73,8 @@ CHIP_ERROR AppTask::Init()
 	/* Register Matter event handler that controls the connectivity status LED based on the captured Matter network
 	 * state. */
 	ReturnErrorOnFailure(Nrf::Matter::RegisterEventHandler(Nrf::Board::DefaultMatterEventHandler, 0));
+
+	ReturnErrorOnFailure(sIdentifyCluster.Init());
 
 	return Nrf::Matter::StartServer();
 }

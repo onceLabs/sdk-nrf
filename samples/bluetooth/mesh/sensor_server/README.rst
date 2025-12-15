@@ -1,13 +1,13 @@
 .. _bluetooth_mesh_sensor_server:
 
-Bluetooth Mesh: Sensor
-######################
+Bluetooth Mesh NLC: Ambient Light Sensor/Occupancy Sensor
+#########################################################
 
 .. contents::
    :local:
    :depth: 2
 
-The Bluetooth® Mesh sensor sample demonstrates how to set up a basic mesh Sensor Server model application that provides sensor data to one :ref:`bt_mesh_sensor_cli_readme` model.
+The Bluetooth® Mesh NLC Ambient Light Sensor/Occupancy Sensor sample demonstrates how to set up a basic mesh Sensor Server model application that provides sensor data to one :ref:`bt_mesh_sensor_cli_readme` model.
 Eight different sensor types are used to showcase different ways for the server to publish data.
 In addition, the samples demonstrate usage of both :ref:`single-channel sensor types and sensor series types <bt_mesh_sensor_types_channels>`, as well as how to add and write to a sensor setting.
 
@@ -128,7 +128,7 @@ The descriptor also specifies the temperature sensor's sampling type, which is :
 
 The :ref:`dk_buttons_and_leds_readme` library is used to detect button presses.
 
-The :ref:`Zephyr settings API <zephyr:settings_api>` is used to persistently store the following settings given that :kconfig:option:`CONFIG_BT_SETTING` is enabled:
+The :ref:`Zephyr settings API <zephyr:settings_api>` is used to persistently store the following settings given that :kconfig:option:`CONFIG_BT_SETTINGS` is enabled:
 
 * The temperature range used in the :c:var:`bt_mesh_sensor_present_dev_op_temp` sensor
 * The presence motion threshold used in the :c:var:`bt_mesh_sensor_presence_detected` sensor
@@ -208,6 +208,11 @@ Building and running
 
 .. include:: /includes/build_and_run_ns.txt
 
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
+
 .. _bluetooth_mesh_sensor_server_testing:
 
 Testing
@@ -257,6 +262,11 @@ The Sensor Setup Server models are now configured and able to receive sensor set
 .. note::
    To enable Sensor Server configuration by a Sensor Client, an application key must be bound to the Sensor Setup Server.
    This functionality must also be programmed in the :ref:`bt_mesh_sensor_cli_readme` device.
+
+External flash for settings partition
+=====================================
+
+.. include:: /includes/mesh_ext_flash_settings.txt
 
 Dependencies
 ************

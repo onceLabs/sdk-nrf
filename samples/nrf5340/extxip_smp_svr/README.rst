@@ -29,7 +29,7 @@ For more information about MCUmgr and SMP, see :ref:`device_mgmt`.
 
 The sample enables the splitting by:
 
-* Enabling the split XIP image feature through the :kconfig:option:`CONFIG_XIP_SPLIT_IMAGE` Kconfig option.
+* Enabling the split XIP image feature through the :kconfig:option:`SB_CONFIG_QSPI_XIP_SPLIT_IMAGE` sysbuild Kconfig option.
   This Kconfig option sets a build-system level support for image division and adapts the image-signing support for MCUboot.
 * Using the project's CMake file which describes relocation of certain libraries or objects to an external XIP area.
 * Using a linker script that describes the external QSPI area.
@@ -51,6 +51,9 @@ Building and running
 
 The |NCS| build system generates all essential binaries, including the application for internal and external QSPI flash, the networking stack, and MCUboot.
 The build process involves signing all the application binaries except for MCUboot which does not require signing in this configuration.
+
+.. note::
+   When building for the nRF5340 non-secure (TF-M) target, the direct-xip build is not supported.
 
 To upload MCUboot and a bundle of images to the nRF5340 SoC, use the ``west flash`` command.
 
@@ -106,7 +109,7 @@ See the Partition manager (PM) label for slot-to-``<image>`` translation:
 
 .. note::
 
-   The ``-e`` option means "no erase", and is provided to the MCUmgr to prevent it from sending the erase command to the target before updating the image.
+   The ``-e`` option means ``no erase``, and is provided to the MCUmgr to prevent it from sending the erase command to the target before updating the image.
    This option is always needed when ``-n`` is used for image selection, as the erase command is hardcoded to erase slot-1 (``image-1``), regardless of which slot is uploaded at the time.
 
 Upload the signed image

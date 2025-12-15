@@ -45,7 +45,6 @@ LOG_MODULE_REGISTER(nrf_cloud_coap_transport, CONFIG_NRF_CLOUD_COAP_LOG_LEVEL);
 /** @TODO: figure out whether to make this a Kconfig value or place in a header */
 #define CDDL_VERSION "1"
 #define MAX_COAP_PATH 256
-#define MAX_RETRIES 10
 #define JWT_BUF_SZ 700
 #define VER_STRING_FMT "mver=%s&cver=%s&dver=%s"
 #define VER_STRING_FMT2 "cver=" CDDL_VERSION "&dver=" BUILD_VERSION_STR
@@ -69,6 +68,8 @@ struct cc_xfer_data {
 static K_SEM_DEFINE(cb_sem, 0, 1);
 /* Semaphore to be used when doing authorization with an external coap_client */
 static K_SEM_DEFINE(ext_cc_sem, 0, 1);
+/* Mutex to be used when using the internal coap_client */
+static K_MUTEX_DEFINE(internal_transfer_mut);
 
 static struct nrf_cloud_coap_client internal_cc = {0};
 
@@ -188,16 +189,17 @@ static int add_creds(void)
 /**@brief Initialize the CoAP client */
 int nrf_cloud_coap_init(void)
 {
-	int err;
+	int err = 0;
 
 	(void)nrf_cloud_print_details();
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
 
 	internal_cc.authenticated = false;
 
 	if (!internal_cc.initialized) {
 		err = add_creds();
 		if (err) {
-			return err;
+			goto exit;
 		}
 
 		(void)nrf_cloud_codec_init(NULL);
@@ -205,16 +207,18 @@ int nrf_cloud_coap_init(void)
 #if defined(CONFIG_MODEM_INFO)
 		err = modem_info_init();
 		if (err) {
-			return err;
+			goto exit;
 		}
 #endif
 		err = nrf_cloud_coap_transport_init(&internal_cc);
 		if (err) {
-			return err;
+			goto exit;
 		}
 	}
 
-	return 0;
+exit:
+	k_mutex_unlock(&internal_transfer_mut);
+	return err;
 }
 
 static int update_configured_info_sections(const char * const app_ver)
@@ -281,7 +285,7 @@ static void update_control_section(void)
 
 	struct nrf_cloud_ctrl_data device_ctrl = {0};
 	struct nrf_cloud_data data_out = {0};
-	int err;
+	int err = 0;
 
 	/* Get the device control settings, encode it, and send to shadow */
 	nrf_cloud_device_control_get(&device_ctrl);
@@ -307,21 +311,23 @@ static void update_control_section(void)
 
 int nrf_cloud_coap_connect(const char * const app_ver)
 {
+	int err = 0;
+
 	if (!internal_cc.initialized) {
 		LOG_ERR("nRF Cloud CoAP library has not been initialized");
 		return -EACCES;
 	}
 
-	int err;
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
 
 	err = nrf_cloud_coap_transport_connect(&internal_cc);
 	if (err < 0) {
-		return err;
+		goto exit;
 	}
 
 	err = nrf_cloud_coap_transport_authenticate(&internal_cc);
 	if (err) {
-		return err;
+		goto exit;
 	}
 
 	/* On initial connect, set the control section in the shadow */
@@ -330,21 +336,37 @@ int nrf_cloud_coap_connect(const char * const app_ver)
 	/* On initial connect, update the configured info sections in the shadow */
 	err = update_configured_info_sections(app_ver);
 	if (err != -EIO) {
-		return 0;
+		err = 0;
+		goto exit;
 	}
 
 	nrf_cloud_coap_transport_disconnect(&internal_cc);
+
+exit:
+	k_mutex_unlock(&internal_transfer_mut);
 	return err;
 }
 
 int nrf_cloud_coap_pause(void)
 {
-	return nrf_cloud_coap_transport_pause(&internal_cc);
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
+	err = nrf_cloud_coap_transport_pause(&internal_cc);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 int nrf_cloud_coap_resume(void)
 {
-	return nrf_cloud_coap_transport_resume(&internal_cc);
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
+	err = nrf_cloud_coap_transport_resume(&internal_cc);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 static void client_callback(int16_t result_code, size_t offset, const uint8_t *payload, size_t len,
@@ -387,7 +409,6 @@ static void client_callback(int16_t result_code, size_t offset, const uint8_t *p
 	}
 }
 
-static K_SEM_DEFINE(serial_sem, 1, 1);
 
 static int client_transfer(enum coap_method method,
 			   const char *resource, const char *query,
@@ -402,11 +423,6 @@ static int client_transfer(enum coap_method method,
 		return -ENOBUFS;
 	}
 	__ASSERT_NO_MSG(resource != NULL);
-
-	/* Use the serial semaphore if this is the internal coap client */
-	if (is_internal(xfer->nrfc_cc)) {
-		k_sem_take(&serial_sem, K_FOREVER);
-	}
 
 	int err = 0;
 	int retry;
@@ -465,7 +481,7 @@ static int client_transfer(enum coap_method method,
 		/* -EAGAIN means the CoAP client is currently waiting for a response
 		 * to a previous request (likely started in a separate thread).
 		 */
-		if (retry++ > MAX_RETRIES) {
+		if (retry++ > CONFIG_NRF_CLOUD_COAP_MAX_RETRIES) {
 			LOG_ERR("Timeout waiting for CoAP client to be available");
 			err = -ETIMEDOUT;
 			goto transfer_end;
@@ -508,10 +524,8 @@ static int client_transfer(enum coap_method method,
 	}
 
 transfer_end:
-	if (is_internal(xfer->nrfc_cc)) {
-		k_sem_give(&serial_sem);
-	}
 	xfer_ctx_release(xfer);
+	coap_client_cancel_request(cc, &request);
 	if (err == -ETIMEDOUT && IS_ENABLED(CONFIG_NRF_CLOUD_COAP_DISCONNECT_ON_FAILED_REQUEST)) {
 		nrf_cloud_coap_disconnect();
 	}
@@ -524,10 +538,16 @@ int nrf_cloud_coap_get(const char *resource, const char *query,
 		       enum coap_content_format fmt_in, bool reliable,
 		       coap_client_response_cb_t cb, void *user)
 {
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
 	void *xfer = xfer_data_init(&internal_cc, cb, user, &cb_sem);
 
-	return client_transfer(COAP_METHOD_GET, resource, query,
-			       buf, len, fmt_out, fmt_in, true, reliable, xfer);
+	err = client_transfer(COAP_METHOD_GET, resource, query,
+			      buf, len, fmt_out, fmt_in, true, reliable, xfer);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 int nrf_cloud_coap_post(const char *resource, const char *query,
@@ -535,10 +555,16 @@ int nrf_cloud_coap_post(const char *resource, const char *query,
 			enum coap_content_format fmt, bool reliable,
 			coap_client_response_cb_t cb, void *user)
 {
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
 	void *xfer = xfer_data_init(&internal_cc, cb, user, &cb_sem);
 
-	return client_transfer(COAP_METHOD_POST, resource, query,
-			       buf, len, fmt, fmt, false, reliable, xfer);
+	err = client_transfer(COAP_METHOD_POST, resource, query,
+			      buf, len, fmt, fmt, false, reliable, xfer);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 int nrf_cloud_coap_put(const char *resource, const char *query,
@@ -546,10 +572,16 @@ int nrf_cloud_coap_put(const char *resource, const char *query,
 		       enum coap_content_format fmt, bool reliable,
 		       coap_client_response_cb_t cb, void *user)
 {
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
 	void *xfer = xfer_data_init(&internal_cc, cb, user, &cb_sem);
 
-	return client_transfer(COAP_METHOD_PUT, resource, query,
-			       buf, len, fmt, fmt, false, reliable, xfer);
+	err = client_transfer(COAP_METHOD_PUT, resource, query,
+			      buf, len, fmt, fmt, false, reliable, xfer);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 int nrf_cloud_coap_delete(const char *resource, const char *query,
@@ -557,10 +589,16 @@ int nrf_cloud_coap_delete(const char *resource, const char *query,
 			  enum coap_content_format fmt, bool reliable,
 			  coap_client_response_cb_t cb, void *user)
 {
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
 	void *xfer = xfer_data_init(&internal_cc, cb, user, &cb_sem);
 
-	return client_transfer(COAP_METHOD_DELETE, resource, query,
-			       buf, len, fmt, fmt, false, reliable, xfer);
+	err = client_transfer(COAP_METHOD_DELETE, resource, query,
+			      buf, len, fmt, fmt, false, reliable, xfer);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 int nrf_cloud_coap_fetch(const char *resource, const char *query,
@@ -569,10 +607,16 @@ int nrf_cloud_coap_fetch(const char *resource, const char *query,
 			 enum coap_content_format fmt_in, bool reliable,
 			 coap_client_response_cb_t cb, void *user)
 {
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
 	void *xfer = xfer_data_init(&internal_cc, cb, user, &cb_sem);
 
-	return client_transfer(COAP_METHOD_FETCH, resource, query,
-			       buf, len, fmt_out, fmt_in, true, reliable, xfer);
+	err = client_transfer(COAP_METHOD_FETCH, resource, query,
+			      buf, len, fmt_out, fmt_in, true, reliable, xfer);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 int nrf_cloud_coap_patch(const char *resource, const char *query,
@@ -580,10 +624,16 @@ int nrf_cloud_coap_patch(const char *resource, const char *query,
 			 enum coap_content_format fmt, bool reliable,
 			 coap_client_response_cb_t cb, void *user)
 {
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
 	void *xfer = xfer_data_init(&internal_cc, cb, user, &cb_sem);
 
-	return client_transfer(COAP_METHOD_PATCH, resource, query,
-			       buf, len, fmt, fmt, false, reliable, xfer);
+	err = client_transfer(COAP_METHOD_PATCH, resource, query,
+			      buf, len, fmt, fmt, false, reliable, xfer);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 static void auth_cb(int16_t result_code, size_t offset, const uint8_t *payload, size_t len,
@@ -613,7 +663,13 @@ static int nrf_cloud_coap_auth_post(struct nrf_cloud_coap_client *const client,
 
 int nrf_cloud_coap_disconnect(void)
 {
-	return nrf_cloud_coap_transport_disconnect(&internal_cc);
+	int err = 0;
+
+	k_mutex_lock(&internal_transfer_mut, K_FOREVER);
+	err = nrf_cloud_coap_transport_disconnect(&internal_cc);
+	k_mutex_unlock(&internal_transfer_mut);
+
+	return err;
 }
 
 int nrf_cloud_coap_transport_init(struct nrf_cloud_coap_client *const client)
@@ -650,12 +706,12 @@ int nrf_cloud_coap_transport_init(struct nrf_cloud_coap_client *const client)
 
 static int nrf_cloud_coap_connect_host_cb(struct sockaddr *const addr)
 {
-	int err;
+	int err = 0;
 	int sock;
 	size_t addr_size;
 
 	LOG_DBG("Creating socket type IPPROTO_DTLS_1_2");
-	sock = socket(addr->sa_family, SOCK_DGRAM, IPPROTO_DTLS_1_2);
+	sock = zsock_socket(addr->sa_family, SOCK_DGRAM, IPPROTO_DTLS_1_2);
 
 	if (sock < 0) {
 		LOG_DBG("Failed to create CoAP socket, errno: %d", errno);
@@ -677,7 +733,7 @@ static int nrf_cloud_coap_connect_host_cb(struct sockaddr *const addr)
 		addr_size = sizeof(struct sockaddr_in);
 	}
 
-	err = connect(sock, addr, addr_size);
+	err = zsock_connect(sock, addr, addr_size);
 	if (err) {
 		LOG_DBG("Connect failed, errno: %d", errno);
 		err = -ECONNREFUSED;
@@ -687,7 +743,7 @@ static int nrf_cloud_coap_connect_host_cb(struct sockaddr *const addr)
 out:
 	if (err) {
 		if (sock >= 0) {
-			close(sock);
+			zsock_close(sock);
 		}
 		return err;
 	}
@@ -697,7 +753,7 @@ out:
 
 int nrf_cloud_coap_transport_connect(struct nrf_cloud_coap_client *const client)
 {
-	int err;
+	int err = 0;
 	int tmp;
 	int sock;
 
@@ -711,15 +767,15 @@ int nrf_cloud_coap_transport_connect(struct nrf_cloud_coap_client *const client)
 		/* Could not resume. Try with a full handshake. */
 		tmp = client->sock;
 		client->sock = client->cc.fd = -1;
-		close(tmp);
+		zsock_close(tmp);
 	}
 
 	client->authenticated = false;
 
 	const char *const host_name = CONFIG_NRF_CLOUD_COAP_SERVER_HOSTNAME;
-	uint16_t port = htons(CONFIG_NRF_CLOUD_COAP_SERVER_PORT);
+	uint16_t port = CONFIG_NRF_CLOUD_COAP_SERVER_PORT;
 
-	struct addrinfo hints = {
+	struct zsock_addrinfo hints = {
 		.ai_socktype = SOCK_DGRAM
 	};
 	sock = nrf_cloud_connect_host(host_name, port, &hints, &nrf_cloud_coap_connect_host_cb);
@@ -750,7 +806,7 @@ int nrf_cloud_coap_transport_disconnect(struct nrf_cloud_coap_client *const clie
 	LOG_DBG("Cancelled requests");
 
 	int tmp;
-	int err;
+	int err = 0;
 
 	k_mutex_lock(&client->mutex, K_FOREVER);
 	client->cid_saved = false;
@@ -758,7 +814,7 @@ int nrf_cloud_coap_transport_disconnect(struct nrf_cloud_coap_client *const clie
 	client->paused = false;
 	tmp = client->sock;
 	client->sock = client->cc.fd = -1;
-	err = close(tmp);
+	err = zsock_close(tmp);
 	k_mutex_unlock(&client->mutex);
 
 	return err;
@@ -777,7 +833,7 @@ int nrf_cloud_coap_transport_authenticate(struct nrf_cloud_coap_client *const cl
 		return 0;
 	}
 
-	int err;
+	int err = 0;
 	char *jwt;
 
 #if defined(CONFIG_MODEM_INFO)
@@ -873,7 +929,7 @@ int nrf_cloud_coap_transport_pause(struct nrf_cloud_coap_client *const client)
 			client->paused = false;
 			tmp = client->sock;
 			client->sock = client->cc.fd = -1;
-			close(tmp);
+			zsock_close(tmp);
 			LOG_DBG("Closed socket and marked as unauthenticated.");
 		}
 	} else {
@@ -928,49 +984,33 @@ int nrf_cloud_coap_transport_resume(struct nrf_cloud_coap_client *const client)
 #define PROXY_URI_DL_HTTPS_LEN		(sizeof(PROXY_URI_DL_HTTPS) - 1)
 #define PROXY_URI_DL_SEP		"/"
 #define PROXY_URI_DL_SEP_LEN		(sizeof(PROXY_URI_DL_SEP) - 1)
-#define PROXY_URI_ADDED_LEN		(PROXY_URI_DL_HTTPS_LEN + PROXY_URI_DL_SEP_LEN)
 
-int nrf_cloud_coap_transport_proxy_dl_opts_get(struct coap_client_option *const opt_accept,
-					       struct coap_client_option *const opt_proxy_uri,
-					       char const *const host, char const *const path)
+int nrf_cloud_coap_transport_proxy_dl_uri_get(char *const uri, size_t uri_len,
+					      char const *const host, char const *const path)
 {
-	__ASSERT_NO_MSG(opt_accept != NULL);
-	__ASSERT_NO_MSG(opt_proxy_uri != NULL);
+	__ASSERT_NO_MSG(uri != NULL);
 	__ASSERT_NO_MSG(host != NULL);
 	__ASSERT_NO_MSG(path != NULL);
 
-	size_t uri_idx = 0;
 	size_t host_len = strlen(host);
 	size_t path_len = strlen(path);
 
-	opt_accept->code = COAP_OPTION_ACCEPT;
-	opt_accept->len = 1;
-	opt_accept->value[0] = COAP_CONTENT_FORMAT_TEXT_PLAIN;
+	const size_t needed_len =
+		PROXY_URI_DL_HTTPS_LEN + host_len + PROXY_URI_DL_SEP_LEN +  path_len;
 
-	opt_proxy_uri->code = COAP_OPTION_PROXY_URI;
-	opt_proxy_uri->len = host_len + path_len + PROXY_URI_ADDED_LEN;
-
-	if (opt_proxy_uri->len > CONFIG_COAP_EXTENDED_OPTIONS_LEN_VALUE) {
+	if (needed_len > uri_len) {
 		LOG_ERR("Host and path for CoAP proxy GET is too large: %u bytes",
-			opt_proxy_uri->len);
-		LOG_INF("Increase CONFIG_COAP_EXTENDED_OPTIONS_LEN_VALUE, current value: %d",
-			CONFIG_COAP_EXTENDED_OPTIONS_LEN_VALUE);
+			needed_len);
 		return -E2BIG;
 	}
 
 	/* We don't want a NULL terminated string, so just copy the data to create the full URI */
-	memcpy(&opt_proxy_uri->value[uri_idx], PROXY_URI_DL_HTTPS, PROXY_URI_DL_HTTPS_LEN);
-	uri_idx += PROXY_URI_DL_HTTPS_LEN;
+	memcpy(uri, PROXY_URI_DL_HTTPS, PROXY_URI_DL_HTTPS_LEN);
+	memcpy(&uri[PROXY_URI_DL_HTTPS_LEN], host, host_len);
+	memcpy(&uri[PROXY_URI_DL_HTTPS_LEN + host_len], PROXY_URI_DL_SEP, PROXY_URI_DL_SEP_LEN);
+	memcpy(&uri[PROXY_URI_DL_HTTPS_LEN + host_len + PROXY_URI_DL_SEP_LEN], path, path_len);
 
-	memcpy(&opt_proxy_uri->value[uri_idx], host, host_len);
-	uri_idx += host_len;
-
-	memcpy(&opt_proxy_uri->value[uri_idx], PROXY_URI_DL_SEP, PROXY_URI_DL_SEP_LEN);
-	uri_idx += PROXY_URI_DL_SEP_LEN;
-
-	memcpy(&opt_proxy_uri->value[uri_idx], path, path_len);
-
-	LOG_DBG("Proxy URI: %.*s", opt_proxy_uri->len, opt_proxy_uri->value);
+	LOG_DBG("Proxy URI: %.*s", needed_len, uri);
 
 	return 0;
 }

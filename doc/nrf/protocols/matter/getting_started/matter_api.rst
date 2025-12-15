@@ -114,7 +114,7 @@ The nRF Connect Matter API contains the following functions that can be used to 
 
   This function accepts an :c:struct:`InitData` argument that contains the implementation of all required Matter interfaces.
   If no argument is provided, this function uses the default-constructed :c:struct:`InitData` temporary object.
-  After this function is used, the :c:func:`StartServer()` function must be called to start the Matter thread, eventually execute the initialization, and wait to synchronize the caller's thread with the Matter thread.
+  After this function is used, the :c:func:`StartServer` function must be called to start the Matter thread, eventually execute the initialization, and wait to synchronize the caller's thread with the Matter thread.
 
 :c:func:`StartServer()`:
   This is a blocking function that starts the Matter thread and waits until all Matter server components are initialized.
@@ -132,7 +132,7 @@ Event handler API
 
 The Matter SDK provides a notification scheme based on the public events that are propagated from the Matter stack to the application layer.
 The nRF Connect Matter event handler API provides mechanisms to register and unregister custom functions that handle these events within an application.
-This module also includes a default handler that is used in nRF Connect SDK Matter samples and applications.
+This module also includes a default handler that is used in |NCS| Matter samples and applications.
 
 The specific Matter events that can be handled in the application are listed in the :file:`ncs/modules/lib/matter/src/include/platform/CHIPDeviceEvent.h` header file.
 The nRF Connect Matter API contains of the following functions that can be used to handle events:
@@ -147,7 +147,7 @@ The nRF Connect Matter API contains of the following functions that can be used 
 
 :c:func:`DefaultEventHandler()`:
   This is an nRF Connect Matter event handler function that is registered in the nRF Connect Matter Initialization API by default.
-  You can unregister this handler with the :c:func:`UnregisterEventHandler()` function in the application if needed.
+  You can unregister this handler with the :c:func:`UnregisterEventHandler` function in the application if needed.
 
 For more details regarding nRF Connect Matter event handler API, refer to the Doxygen commentary in the :file:`ncs/nrf/samples/matter/common/src/app/matter_event_handler.h` header file.
 
@@ -168,7 +168,7 @@ Combining both aforementioned nRF Connect Matter APIs, you can develop an applic
    {
          switch (event->Type) {
          case DeviceEventType::kCommissioningComplete:
-             /* Custom code, e.g. control LED */
+             /* Custom code, for example, control LED */
              break;
          }
    }
@@ -184,7 +184,7 @@ Combining both aforementioned nRF Connect Matter APIs, you can develop an applic
          /* Register custom Matter event handler. */
          ReturnErrorOnFailure(Nrf::Matter::RegisterEventHandler(CustomMatterEventHandler, 0));
 
-         /* Application specific initialization, e.g. hardware initialization.
+         /* Application specific initialization, for example, hardware initialization.
 
             ...
          */
@@ -204,17 +204,17 @@ The Matter SDK Data Model interacs with the user's code based on callbacks that 
 The generic callbacks that are common for Matter applications, regardless of the clusters configuration, are defined in the :file:`ncs/modules/lib/matter/src/app/util/generic-callbacks.h` header file.
 The weak implementations of these functions, that can be overwritten in the application, are provided in the :file:`ncs/modules/lib/matter/src/app/util/generic-callback-stubs.cpp` source file.
 
-For example, the :c:func:`MatterPostAttributeChangeCallback()` function is called by the Matter Data Model engine directly after an attribute value is changed.
+For example, the :c:func:`MatterPostAttributeChangeCallback` function is called by the Matter Data Model engine directly after an attribute value is changed.
 The value passed into this callback is the value to which the attribute was set by the framework.
 In addition to the value, this function is called with the attribute path ( of ``chip::app::ConcreteAttributePath`` type) that can be used to filter the cluster and particular attribute.
-The :c:func:`MatterPostAttributeChangeCallback()` function is useful if you need to provide the synchronization between the Data Model and the application state.
+The :c:func:`MatterPostAttributeChangeCallback` function is useful if you need to provide the synchronization between the Data Model and the application state.
 For instance, a Matter device that implements a light bulb may drive the state of the LED based on the ``On/Off`` attribute value.
 Every change of this attribute is reported by the aforementioned callback and thus can be captured in the application layer.
 
-In addition to the :c:func:`MatterPostAttributeChangeCallback()` function, Matter defines other generic callbacks that can be employed in different use cases.
-For example, the :c:func:`emberAfExternalAttributeReadCallback()` and :c:func:`emberAfExternalAttributeWriteCallback()` functions can be used to store and handle attributes externally, by bypassing the Matter Data Model framework.
+In addition to the :c:func:`MatterPostAttributeChangeCallback` function, Matter defines other generic callbacks that can be employed in different use cases.
+For example, the :c:func:`emberAfExternalAttributeReadCallback` and :c:func:`emberAfExternalAttributeWriteCallback` functions can be used to store and handle attributes externally, by bypassing the Matter Data Model framework.
 To learn the complete set of Matter generic callbacks, refer to the :file:`ncs/modules/lib/matter/src/app/util/generic-callbacks.h` header file and included Doxygen commentary.
-An example implementation of the :c:func:`MatterPostAttributeChangeCallback()` that can be used to control the Door Lock Matter device type is listed below:
+An example implementation of the :c:func:`MatterPostAttributeChangeCallback` that can be used to control the Door Lock Matter device type is listed below:
 
 .. code-block:: C++
 

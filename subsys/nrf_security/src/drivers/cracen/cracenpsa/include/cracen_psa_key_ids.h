@@ -13,10 +13,6 @@
 
 #define CRACEN_PROTECTED_RAM_AES_KEY0_ID ((uint32_t)0x7fffc004)
 
-#define CRACEN_IDENTITY_KEY_SLOT_NUMBER 0
-#define CRACEN_MKEK_SLOT_NUMBER		1
-#define CRACEN_MEXT_SLOT_NUMBER		2
-
 #define PSA_KEY_LOCATION_CRACEN ((psa_key_location_t)(0x800000 | ('N' << 8)))
 
 /*
@@ -24,5 +20,11 @@
  * In this state, once a key is deleted, its corresponding slot cannot be provisioned again.
  */
 #define CRACEN_KEY_PERSISTENCE_REVOKABLE 0x02
+
+/*
+ * Defines a persistence state where the key can't be erased
+ * In this state the key will only be erased if ERASEALL is available and run
+ */
+ #define CRACEN_KEY_PERSISTENCE_READ_ONLY 0x03
 
 #endif

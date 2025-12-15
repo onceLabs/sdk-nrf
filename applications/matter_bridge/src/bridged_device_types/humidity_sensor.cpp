@@ -10,7 +10,6 @@ namespace
 {
 DESCRIPTOR_CLUSTER_ATTRIBUTES(descriptorAttrs);
 BRIDGED_DEVICE_BASIC_INFORMATION_CLUSTER_ATTRIBUTES(bridgedDeviceBasicAttrs);
-IDENTIFY_CLUSTER_ATTRIBUTES(identifyAttrs);
 }; /* namespace */
 
 using namespace ::chip;
@@ -32,8 +31,7 @@ DECLARE_DYNAMIC_CLUSTER(Clusters::RelativeHumidityMeasurement::Id, humiSensorAtt
 	DECLARE_DYNAMIC_CLUSTER(Clusters::Descriptor::Id, descriptorAttrs, ZAP_CLUSTER_MASK(SERVER), nullptr, nullptr),
 	DECLARE_DYNAMIC_CLUSTER(Clusters::BridgedDeviceBasicInformation::Id, bridgedDeviceBasicAttrs,
 				ZAP_CLUSTER_MASK(SERVER), nullptr, nullptr),
-	DECLARE_DYNAMIC_CLUSTER(Clusters::Identify::Id, identifyAttrs, ZAP_CLUSTER_MASK(SERVER),
-				sIdentifyIncomingCommands, nullptr) DECLARE_DYNAMIC_CLUSTER_LIST_END;
+	DECLARE_DYNAMIC_CLUSTER_LIST_END;
 
 DECLARE_DYNAMIC_ENDPOINT(bridgedHumidityEndpoint, bridgedHumidityClusters);
 
@@ -46,7 +44,7 @@ static constexpr EmberAfDeviceType kBridgedHumidityDeviceTypes[] = {
 	  MatterBridgedDevice::kDefaultDynamicEndpointVersion }
 };
 
-static constexpr uint8_t kHumidityDataVersionSize = ArraySize(bridgedHumidityClusters);
+static constexpr uint8_t kHumidityDataVersionSize = MATTER_ARRAY_SIZE(bridgedHumidityClusters);
 
 HumiditySensorDevice::HumiditySensorDevice(const char *uniqueID, const char *nodeLabel)
 	: MatterBridgedDevice(uniqueID, nodeLabel)

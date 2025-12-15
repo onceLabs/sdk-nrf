@@ -47,7 +47,7 @@ This version of the |NCS| has been tested with the following modem firmware for 
 * mfw_nrf9160_1.2.2
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Changelog
 *********
@@ -65,7 +65,7 @@ nRF9160
   * nRF9160: Azure FOTA sample - This sample demonstrates how to perform an over-the-air firmware update of an nRF9160-based device using the Azure FOTA and Azure IoT Hub libraries.
   * :ref:`aws_iot` sample - This sample demonstrates the communication of an nRF9160-based device with the AWS IoT message broker over MQTT.
   * :ref:`udp` low power sample - This sample demonstrates the sequential transmission of UDP packets to a predetermined server identified by an IP address and a port.
-  * :ref:`download_sample` sample - This sample demonstrates how to download files over the Internet from HTTP(S) and CoAP(S) servers.
+  * :ref:`download_sample` sample - This sample demonstrates how to download files over the Internet from HTTP, HTTPS, CoAP, and CoAPS servers.
 
 * Updated:
 
@@ -90,7 +90,7 @@ nRF9160
     * Improved the handling of configuration file.
     * Added an option to configure Bluetooth device name.
 
-  * :ref:`lib_download_client` library:
+  * Download client library:
 
     * Added CoAP block-wise transfer support, which can be enabled with :kconfig:option:`CONFIG_COAP`.
     * Updated functions that end with ``_connect()`` and ``_start()`` to parse complete URLs, with port and schema.
@@ -160,7 +160,7 @@ nRF9160
     * Added bootstrap procedure support to the sample.
     * Enabled the usage of the :ref:`lib_dfu_target` library for firmware updates, which allows to update both the application and the modem firmware.
 
-* :ref:`serial_lte_modem` application:
+* Serial LTE modem application:
 
     * Added support for the MQTT username and password.
     * Added reading of status of TCP proxy server/client when it is not started or connected yet.
@@ -348,17 +348,17 @@ Zigbee
 
 * Added:
 
-  * :ref:`lib_zigbee_fota` (DFU) support for nRF52840.
-  * Support for Command Line Interface (:ref:`lib_zigbee_shell`).
+  * Zigbee FOTA (DFU) support for nRF52840.
+  * Support for Command Line Interface.
     This is a port from the nRF5 SDK for Thread and Zigbee.
-  * Support for :ref:`Network Co-Processor (NCP) architecture <ug_zigbee_platform_design_ncp>`.
+  * Support for Network Co-Processor (NCP) architecture.
     The NCP host package for Zigbee can be downloaded from https://developer.nordicsemi.com/
 
 * Updated:
 
-  * :ref:`zigbee_light_switch_sample` sample with :ref:`multiprotocol extension <zigbee_light_switch_sample_nus>` based on Bluetooth LE :ref:`nus_service_readme`.
-  * Updated :ref:`zboss` to version ``v3_3_0_5+10_06_2020``.
-    See :ref:`nrfxlib:zboss_changelog` for detailed information.
+  * The Zigbee light switch sample with multiprotocol extension based on Bluetooth LE :ref:`nus_service_readme`.
+  * Updated ZBOSS to version ``v3_3_0_5+10_06_2020``.
+    See ZBOSS changelog for detailed information.
 
 Common
 ======
@@ -447,7 +447,7 @@ MCUboot
 * Updated MCUboot to facilitate using it as the second stage bootloader:
 
   * Added minimal configuration overlay file for MCUboot that makes it fit within 16 kB when MCUboot is used as the second stage bootloader.
-    Updated :ref:`documentation <ug_bootloader_adding>` with specific instructions on how and when to use this configuration.
+    Updated the documentation on adding bootloader with specific instructions on how and when to use this configuration.
 
 sdk-mcuboot
 -----------
@@ -483,7 +483,7 @@ Build system
   * Added a warning if no static partition manager configuration is provided when one image (or more) is not built from source in a multi-image build.
 
 * Enabled choosing a build strategy for Zephyr's :zephyr:code-sample:`bluetooth_hci_ipc` sample when it is built as a child image.
-  See :ref:`ug_multi_image` for details.
+  See multi-image builds for details.
 * Improved multi-core builds by disassociating domain names from board names.
 * Bugfixes:
 
@@ -564,8 +564,8 @@ nRF9160
 -------
 
 * :ref:`ug_nrf9160` - updated the :ref:`nrf9160_ug_band_lock` section; also updated with information about certification of different modem firmware versions and added a link to nRF9160 compatibility matrix
-* :ref:`serial_lte_modem` - updated and extended with testing instructions and AT command reference
-* :ref:`lte_sensor_gateway` - updated with information about how to use low power UART for communicating with the controller
+* Serial LTE modem - updated and extended with testing instructions and AT command reference
+* LTE Sensor Gateway - updated with information about how to use low power UART for communicating with the controller
 * nRF9160: Asset Tracker - added a note about external antenna performance and updated the dependencies section with the listing of modules abstracted using LwM2M carrier OS abstraction layer
 * :ref:`lwm2m_client` - updated with sections about DTLS support and bootstrap support
 * :ref:`lwm2m_carrier`  - updated the dependencies section with the listing of modules abstracted via LwM2M carrier OS abstraction layer
@@ -612,15 +612,15 @@ Thread
 Zigbee
 ------
 
-* :ref:`lib_zigbee_signal_handler` - added
-* :ref:`zigbee_light_switch_sample` - added a note about :file:`overlay.conf`
+* Zigbee default signal handler - added
+* Zigbee light switch sample - added a note about :file:`overlay.conf`
 * :ref:`ug_zigbee` - updated by reorganizing structure and adding new pages
 
   * Zigbee overview - added as a separate page (was a section of :ref:`ug_zigbee`)
-  * :ref:`ug_zigbee_architectures` - added
-  * :ref:`ug_zigbee_configuring` - added as a separate page (was a section of :ref:`ug_zigbee`)
-  * :ref:`ug_zigbee_configuring_libraries` - added
-  * :ref:`ug_zigbee_tools` - added as a separate page (was a section of :ref:`ug_zigbee`)
+  * Zigbee Architectures - added
+  * Configuring Zigbee in the |NCS| - added as a separate page (was a section of :ref:`ug_zigbee`)
+  * Configuring Zigbee libraries in the |NCS| - added
+  * Zigbee tools - added as a separate page (was a section of :ref:`ug_zigbee`)
 
 NFC
 ---
@@ -637,7 +637,7 @@ Libraries
 * :ref:`shell_bt_nus_readme` - updated to show how to run the :file:`shell_bt_nus.py` script
 * :ref:`lib_eth_rtt` - added
 * :ref:`lib_aws_iot` - updated with additional information about enabling connection polling
-* :ref:`lib_download_client` - moved :ref:`cert_dwload` to :ref:`modem_key_mgmt`
+* Download client - moved :ref:`cert_dwload` to :ref:`modem_key_mgmt`
 * :ref:`lib_nrf_cloud` - updated cloud API usage section
 * :ref:`lib_at_host` - added
 

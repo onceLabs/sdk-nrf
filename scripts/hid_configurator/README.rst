@@ -81,16 +81,6 @@ Complete the following steps:
 
    For more detailed information about LED stream functionality, see the `Playing LED stream`_ section.
 
-#. If you want to perform :ref:`ug_nrf54h20_suit_dfu`, you must also install the SUIT generator Python package.
-   The package source files are available in the :file:`ncs/modules/lib/suit-generator` directory of the |NCS|.
-   Run the following commands in the package source directory to install the SUIT generator package and the required dependencies:
-
-   .. parsed-literal::
-      :class: highlight
-
-      py -3 -m pip install -r requirements.txt
-      py -3 -m pip install .
-
 .. note::
    Currently, the ``imgtool`` from PyPI does not support pure ED25519 signature (used by nRF54L-based devices that enable MCUboot hardware cryptography).
    This may result in rejecting proper DFU images (``DFU image is invalid``).
@@ -121,27 +111,13 @@ Complete the following steps:
        In versions earlier than 5.44, the HID device attached by BlueZ could obtain wrong VID and PID values (ignoring values in Device Information Service), which would stop HIDAPI from opening the device.
        In versions earlier than 5.56, the HID device attached by BlueZ might provide incomplete HID feature report on get operation.
 
-#. If you do not want to use the root access to run the Python script, copy the provided udev rule from the :file:`99-hid.rules` file to the :file:`/etc/udev/rules.d` and reconnect the device.
-#. If you want to connect to a device with a different Vendor or Product ID other than the one specified in the file, use one of the following options:
+#. If you do not want to use the root access to run the Python script, copy the provided udev rule from the :file:`60-hid.rules` file to the :file:`/etc/udev/rules.d` and reconnect the device.
+#. If you want to connect to a device with Vendor ID other than the one specified in the file (other than Nordic Semiconductor's Vendor ID of ``1915``), use one of the following options:
 
    * Run the script with the root permission.
-   * Complete the following steps to run the script without root permission:
-
-     a. Add a new entry to the :file:`99-hid.rules` file with your Vendor and Product ID.
-     #. Copy the provided udev rule from the :file:`99-hid.rules` file to the :file:`/etc/udev/rules.d`.
-     #. Reconnect the device.
-
-   Vendor and Product ID can be specified in the configuration file related to the nRF Desktop application.
-   The following examples shows the entry to add to the :file:`99-hid.rules` file to add device connected with USB and Bluetooth:
-
-   .. parsed-literal::
-      :class: highlight
-
-      Device connected using USB:
-      ATTRS{idVendor}=="my Vendor ID", ATTRS{idProduct}=="my Product ID", MODE="0666", SYMLINK+="nrf52-desktop-my-dev-name"
-
-      Device connected using Bluetooth:
-      ATTRS{name}=="Name of my Bluetooth device ", SUBSYSTEMS=="input", MODE="0666", SYMLINK+="nrf52-desktop-my-dev-name"
+   * Add entries for your Vendor ID (and optionally Product ID) to the :file:`60-hid.rules` file.
+     Use the existing entries as a base.
+     Make sure to reconnect the HID device after updating the file.
 
 #. If you want to display an LED stream based on sound data, you must also install the additional requirements using the following commands:
 
@@ -152,16 +128,6 @@ Complete the following steps:
       pip3 install --user -r requirements_music_led_stream.txt
 
    For more detailed information about LED stream functionality, see the `Playing LED stream`_ section.
-
-#. If you want to perform :ref:`ug_nrf54h20_suit_dfu`, you must also install the SUIT generator Python package.
-   The package source files are available in the :file:`ncs/modules/lib/suit-generator` directory of the |NCS|.
-   Run the following commands in the package source directory to install the SUIT generator package and the required dependencies:
-
-   .. parsed-literal::
-      :class: highlight
-
-      pip3 install --user -r requirements.txt
-      pip3 install --user .
 
 .. note::
    Currently, the ``imgtool`` from PyPI does not support pure ED25519 signature (used by nRF54L-based devices that enable MCUboot hardware cryptography).
@@ -318,10 +284,7 @@ If the process is to be continued, the script uploads the image data to the devi
 When the upload is completed, the script reboots the device.
 
 Customize the command with path to the DFU update file (``UPDATE_IMAGE_PATH``).
-The used file type depends on the following devices:
-
-* nRF52, nRF53 and nRF54L Series use the :file:`dfu_application.zip` file.
-* nRF54H Series use the :file:`*.suit` file.
+The script uses the :file:`dfu_application.zip` file.
 
 For details about update image generation in the nRF Desktop application, see :ref:`nrf_desktop_bootloader_background_dfu`.
 

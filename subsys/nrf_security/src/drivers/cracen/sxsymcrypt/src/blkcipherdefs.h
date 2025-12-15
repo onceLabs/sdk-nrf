@@ -31,10 +31,18 @@ struct sx_blkcipher_cmdma_tags {
 };
 
 struct sx_blkcipher_cmdma_cfg {
-	uint32_t encr;
-	uint32_t decr;
 	const struct sx_blkcipher_cmdma_tags *dmatags;
+	uint8_t decr;
+	uint8_t ctxsave;
+	uint8_t ctxload;
+	uint8_t mode;
+	uint8_t inminsz;
+	uint8_t granularity;
+	uint8_t blocksz;
+	uint8_t statesz;
+
 };
 
-#define OFFSET_EXTRAMEM(c) (sizeof((c)->dma.dmamem) + sizeof((c)->allindescs))
+#define OFFSET_EXTRAMEM(c) (sizeof((c)->dma.dmamem) + sizeof((c)->descs))
+
 #endif

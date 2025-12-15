@@ -56,12 +56,13 @@ BUILD_ASSERT(false, "nRF Cloud assistance and SUPL library cannot be enabled at 
 #endif
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS) || defined(CONFIG_NRF_CLOUD_PGPS)
-/* Verify that MQTT, REST or COAP is enabled */
+/* Verify that nRF Cloud MQTT, REST or COAP, or LwM2M is enabled */
 BUILD_ASSERT(IS_ENABLED(CONFIG_NRF_CLOUD_MQTT) ||
 	     IS_ENABLED(CONFIG_NRF_CLOUD_REST) ||
-	     IS_ENABLED(CONFIG_NRF_CLOUD_COAP),
+	     IS_ENABLED(CONFIG_NRF_CLOUD_COAP) ||
+	     IS_ENABLED(CONFIG_MOSH_CLOUD_LWM2M),
 	     "CONFIG_NRF_CLOUD_MQTT, CONFIG_NRF_CLOUD_REST or CONFIG_NRF_CLOUD_COAP "
-	     "transport must be enabled");
+	     "transport, or CONFIG_MOSH_CLOUD_LWM2M must be enabled");
 #endif
 
 #define GNSS_DATA_HANDLER_THREAD_STACK_SIZE 1536
@@ -102,7 +103,7 @@ static bool agnss_inject_int = true;
 
 #if defined(CONFIG_NRF_CLOUD_AGNSS) && !defined(CONFIG_NRF_CLOUD_MQTT) && \
 	!defined(CONFIG_LWM2M_CLIENT_UTILS_LOCATION_ASSIST_AGNSS)
-static char agnss_data_buf[3500];
+static char agnss_data_buf[NRF_CLOUD_AGNSS_MAX_DATA_SIZE];
 #endif
 
 #if defined(CONFIG_NRF_CLOUD_PGPS)
@@ -941,17 +942,20 @@ static void get_pgps_data_work_fn(struct k_work *work)
 	err = nrf_cloud_rest_pgps_data_get(&rest_ctx, &request);
 #elif defined(CONFIG_NRF_CLOUD_COAP)
 	struct nrf_cloud_pgps_result file_location = {0};
+
 	static char host[64];
 	static char path[128];
 
 	memset(host, 0, sizeof(host));
 	memset(path, 0, sizeof(path));
+
 	file_location.host = host;
 	file_location.host_sz = sizeof(host);
 	file_location.path = path;
 	file_location.path_sz = sizeof(path);
 
 	err = nrf_cloud_coap_pgps_url_get(&request, &file_location);
+
 #endif
 	if (err) {
 		mosh_error("GNSS: Failed to get P-GPS data, error: %d", err);

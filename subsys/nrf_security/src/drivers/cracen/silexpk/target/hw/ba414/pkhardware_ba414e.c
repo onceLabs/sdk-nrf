@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+#include <zephyr/kernel.h>
+
 #include <cracen/membarriers.h>
 
 #include <stdint.h>
 #include <assert.h>
-
-#include <zephyr/sys/util.h>
 
 #include <silexpk/core.h>
 #include "regs_addr.h"
@@ -24,6 +24,9 @@
 #include <silexpk/cmddefs/rsa.h>
 #include <silexpk/cmddefs/modmath.h>
 #include <silexpk/blinding.h>
+#include "../ik/regs_addr.h"
+#include "../ik/ikhardware.h"
+#include <hal/nrf_cracen.h>
 
 /** Select which operand slots to use in crypto-RAM
  *
@@ -54,9 +57,9 @@ int sx_pk_get_opsize(sx_pk_req *req)
 void sx_pk_write_curve(sx_pk_req *req, const struct sx_pk_ecurve *curve)
 {
 	int i;
-	char *dst = req->cryptoram;
+	uint8_t *dst = req->cryptoram;
 	int slot_size = req->slot_sz;
-	const char *src = curve->params;
+	const uint8_t *src = curve->params;
 
 	if (curve->curveflags & PK_OP_FLAGS_SELCUR_MASK) {
 		/* Predefined curves have curve parameters hardcoded in hardware
@@ -82,17 +85,17 @@ void sx_pk_write_curve_gen(sx_pk_req *pk, const struct sx_pk_ecurve *curve, stru
 			   struct sx_pk_slot py)
 {
 	(void)pk;
-	const char *src = curve->params + curve->sz * 2;
+	const uint8_t *src = curve->params + curve->sz * 2;
 
 	sx_wrpkmem(px.addr, src, curve->sz);
 	src += curve->sz;
 	sx_wrpkmem(py.addr, src, curve->sz);
 }
 
-const char **sx_pk_get_output_ops(sx_pk_req *req)
+const uint8_t **sx_pk_get_output_ops(sx_pk_req *req)
 {
 	int slots = req->cmd->outslots;
-	char *cryptoram = req->cryptoram;
+	uint8_t *cryptoram = req->cryptoram;
 	int slot_size = req->slot_sz;
 	unsigned int i = 0;
 
@@ -129,16 +132,20 @@ static void write_command(sx_pk_req *req, int op_size, uint32_t flags)
 
 static void sx_pk_blind(sx_pk_req *req, sx_pk_blind_factor factor)
 {
-	/* Casting the factor into char*. This way the LSB
+	/* Casting the factor into uint8_t*. This way the LSB
 	 * can be changed regardless of the CPU endianness
 	 */
-	char *p = (char *)(&factor);
+	uint8_t *p = (uint8_t *)(&factor);
 	int slot_sz = req->slot_sz;
-	char *cryptoram = req->cryptoram + slot_sz * 16;
+	uint8_t *cryptoram = req->cryptoram + slot_sz * 16;
 	const int blind_sz = sizeof(factor);
 
+	/* Force lsb bit to guarantee odd random value. Force bits 63 & 62 to 0 and
+	 * bit 61 to 1 to guarantee constant time execution on hardware.
+	 */
 	if (req->cmd->cmdcode & SX_PK_OP_FLAGS_BIGENDIAN) {
-		/* Force lsb bit to guarantee odd random value */
+		p[0] &= 0x3F;
+		p[0] |= 0x20;
 		p[7] |= 1;
 		/* In big endian mode, the operands should be put at the end
 		 * of the slot.
@@ -146,8 +153,9 @@ static void sx_pk_blind(sx_pk_req *req, sx_pk_blind_factor factor)
 		sx_clrpkmem(cryptoram - req->op_size, req->op_size - blind_sz);
 		cryptoram -= blind_sz;
 	} else {
-		/* Force lsb bit to guarantee odd random value */
 		p[0] |= 1;
+		p[7] &= 0x3F;
+		p[7] |= 0x20;
 		cryptoram -= slot_sz;
 		sx_clrpkmem(cryptoram + blind_sz, req->op_size - blind_sz);
 	}
@@ -158,7 +166,7 @@ int sx_pk_list_ecc_inslots(sx_pk_req *req, const struct sx_pk_ecurve *curve, int
 			   struct sx_pk_slot *inputs)
 {
 	int slots = req->cmd->inslots;
-	char *cryptoram = req->cryptoram;
+	uint8_t *cryptoram = req->cryptoram;
 	int slot_size = req->slot_sz;
 	int i = 0;
 	const struct sx_pk_capabilities *caps;
@@ -224,7 +232,7 @@ static int sx_pk_gfcmd_opsize(const struct sx_pk_cmd_def *cmd, const int *opsize
 int sx_pk_list_gfp_inslots(sx_pk_req *req, const int *opsizes, struct sx_pk_slot *inputs)
 {
 	int slots = req->cmd->inslots;
-	char *cryptoram = req->cryptoram;
+	uint8_t *cryptoram = req->cryptoram;
 	int slot_size = req->slot_sz;
 	int i = 0;
 	const struct sx_pk_capabilities *caps;
@@ -280,4 +288,54 @@ int sx_pk_list_gfp_inslots(sx_pk_req *req, const int *opsizes, struct sx_pk_slot
 	}
 
 	return 0;
+}
+
+static void run_ik_cmd(sx_pk_req *req)
+{
+	sx_pk_wrreg(&req->regs, IK_REG_PK_CONTROL,
+		    IK_PK_CONTROL_START_OP | IK_PK_CONTROL_CLEAR_IRQ);
+
+	if (IS_ENABLED(CONFIG_PSA_NEED_CRACEN_IKG_INTERRUPT_WORKAROUND)) {
+		/* Workaround to handle IKG freezing on CRACEN lite.
+		 * THE PKE-IKG interrupt can not be cleared from software, but can
+		 * be cleared by hardware when in PK mode.
+		 * So the interrupt is disabled after leaving PK mode and enabled
+		 * when entering.
+		 */
+		if (req->cmd != SX_PK_CMD_IK_EXIT) {
+			nrf_cracen_int_enable(NRF_CRACEN, CRACEN_INTENCLR_PKEIKG_Msk);
+		}
+	}
+}
+
+void sx_pk_run(sx_pk_req *req)
+{
+	/* Selection of operands ignore by hardware if in IK mode */
+	sx_pk_select_ops(req);
+	wmb(); /* comment for compliance */
+
+	if (IS_ENABLED(CONFIG_CRACEN_IKG)) {
+		if (sx_pk_is_ik_cmd(req)) {
+			return run_ik_cmd(req);
+		}
+	}
+
+	sx_pk_wrreg(&req->regs, PK_REG_CONTROL,
+			PK_RB_CONTROL_START_OP | PK_RB_CONTROL_CLEAR_IRQ);
+
+}
+
+int sx_pk_get_status(sx_pk_req *req)
+{
+	rmb(); /* comment for compliance */
+
+#if defined(CONFIG_CRACEN_IKG)
+	if (sx_pk_is_ik_cmd(req)) {
+		return sx_ik_read_status(req);
+	}
+#endif
+
+	uint32_t status = sx_pk_rdreg(&req->regs, PK_REG_STATUS);
+
+	return convert_ba414_status(status);
 }

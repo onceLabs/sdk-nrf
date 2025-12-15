@@ -13,7 +13,7 @@ if MODEM_BATTERY
 
 config MODEM_BATTERY_LOW_LEVEL
 	int "Modem battery low level voltage threshold (mV)"
-	range 3100 3500
+	range 3100 5000
 	default 3300
 
 choice MODEM_BATTERY_POFWARN
@@ -44,6 +44,6 @@ config MODEM_BATTERY_POFWARN_VOLTAGE
 module = MODEM_BATTERY
 module-dep = LOG
 module-str = Modem battery library
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 endif # MODEM_BATTERY

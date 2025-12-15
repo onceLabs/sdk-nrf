@@ -219,27 +219,29 @@ The nRF Desktop mouse sends HID input reports to the host after the host connect
 
 The :ref:`nrf_desktop_motion` sensor sampling is synchronized with sending the HID mouse input reports to the host.
 
-The :ref:`nrf_desktop_wheel` and :ref:`caf_buttons` provide data to the :ref:`nrf_desktop_hid_state` when the mouse wheel is used or a button is pressed, respectively.
+The :ref:`nrf_desktop_wheel` and :ref:`caf_buttons` provide data to the :ref:`nrf_desktop_hid_provider_mouse` when the mouse wheel is used or a button is pressed, respectively.
 These inputs are not synchronized with the HID report transmission to the host.
 
 When the mouse is constantly in use, the motion module is kept in the fetching state.
 In this state, the nRF Desktop mouse forwards the data from the motion sensor to the host in the following way:
 
-1. USB state (or Bluetooth HIDS) sends a HID mouse report to the host and submits ``hid_report_sent_event``.
+1. USB state (or Bluetooth HIDS) sends a HID mouse report to the host and submits a :c:struct:`hid_report_sent_event`.
 #. The event triggers sampling of the motion sensor.
 #. A dedicated thread is used to fetch the sample from the sensor.
-#. After the sample is fetched, the thread forwards it to the :ref:`nrf_desktop_hid_state` as ``motion_event``.
-#. The |hid_state| updates the HID report data, generates new HID input report, and submits it as ``hid_report_event``.
+#. After the sample is fetched, the thread forwards it to the :ref:`nrf_desktop_hid_provider_mouse` as a :c:struct:`motion_event`.
+#. The HID provider mouse module updates the HID report data and notifies the HID state module (:c:member:`hid_state_api.trigger_report_send`).
+   The HID state module instantly asks the HID provider mouse module to provide a HID mouse input report (:c:member:`hid_report_provider_api.send_report`).
+   While handling the request, the HID provider mouse generates and submits the HID mouse input report as a :c:struct:`hid_report_event`.
 #. The HID report data is forwarded to the host either by the :ref:`nrf_desktop_usb_state` or by the :ref:`nrf_desktop_hids`.
    The USB state has precedence if the USB is connected.
-#. When the HID input report is sent to the host, ``hid_report_sent_event`` is submitted.
+#. When the HID input report is sent to the host, a :c:struct:`hid_report_sent_event` is submitted.
    The motion sensor sample is triggered and the sequence repeats.
 
-If the device is connected through Bluetooth LE or the device is connected through USB and :ref:`nrf_desktop_usb_state_sof_synchronization` is enabled, the :ref:`nrf_desktop_hid_state` uses a pipeline that consists of two HID reports that it creates upon receiving the first ``motion_event``.
-The |hid_state| submits two ``hid_report_event`` events.
+If the device is connected through Bluetooth LE or the device is connected through USB and :ref:`nrf_desktop_usb_state_sof_synchronization` is enabled, the :ref:`nrf_desktop_hid_provider_mouse` uses a pipeline that consists of two HID reports that it creates upon receiving the first :c:struct:`motion_event`.
+In response to two requests from the HID state module, the HID provider mouse module submits two :c:struct:`hid_report_event` events to generate the pipeline.
 Sending the first event to the host triggers the motion sensor sample.
 
-For the Bluetooth connections, submitting ``hid_report_sent_event`` is delayed by one Bluetooth connection interval.
+For the Bluetooth connections, submitting the :c:struct:`hid_report_sent_event` is delayed by one Bluetooth connection interval.
 Because of this delay, the :ref:`nrf_desktop_hids` requires a pipeline of two sequential HID reports to make sure that data is sent on every connection event.
 Such a solution is necessary to achieve a high report rate.
 For :ref:`nrf_desktop_usb_state_sof_synchronization`, the pipeline of two sequential HID reports is necessary to ensure that a USB peripheral can provide HID data on every USB poll.
@@ -298,7 +300,7 @@ The report is used by the :ref:`nrf_desktop_config_channel`.
 
 .. note::
    The nRF Desktop also uses a dedicated HID output report to forward the :ref:`nrf_desktop_config_channel` data through the nRF Desktop dongle.
-   This report is handled using the configuration channel's infrastructure and you can enable it using the :ref:`CONFIG_DESKTOP_CONFIG_CHANNEL_OUT_REPORT <config_desktop_app_options>` Kconfig option.
+   This report is handled using the configuration channel's infrastructure and you can enable it using the :option:`CONFIG_DESKTOP_CONFIG_CHANNEL_OUT_REPORT` Kconfig option.
    See the Kconfig option's help for details about the report.
 
 HID protocols
@@ -339,7 +341,7 @@ Depending on the development kit you use, you need to select the respective conf
 
       .. table-from-rows:: /includes/sample_board_rows.txt
          :header: heading
-         :rows: nrf52dmouse_nrf52832, nrf52810dmouse_nrf52810
+         :rows: nrf52dmouse_nrf52832
 
    .. tab:: Keyboard
 
@@ -366,7 +368,7 @@ Depending on the development kit you use, you need to select the respective conf
 
       .. table-from-rows:: /includes/sample_board_rows.txt
          :header: heading
-         :rows: nrf52840dk_nrf52840, nrf52833dk_nrf52833, nrf52833dk_nrf52820, nrf5340dk_nrf5340_cpuapp, nrf54l15dk_nrf54l15_cpuapp, nrf54h20dk_nrf54h20_cpuapp
+         :rows: nrf52840dk_nrf52840, nrf52833dk_nrf52833, nrf52833dk_nrf52820, nrf5340dk_nrf5340_cpuapp, nrf54l15dk_nrf54l15_cpuapp, nrf54l15dk_nrf54l10_cpuapp, nrf54l15dk_nrf54l05_cpuapp, nrf54lm20dk_nrf54lm20a_cpuapp, nrf54h20dk_nrf54h20_cpuapp
 
       Depending on the configuration, a DK may act either as mouse, keyboard or dongle.
       For information about supported configurations for each board, see the :ref:`nrf_desktop_board_configuration_files` section.
@@ -447,6 +449,10 @@ The application supports the following build types:
      - ``release_4llpmconn``
      - ``nrf52840dongle/nrf52840``
      - Release version of the application with the support for up to four simultaneous Bluetooth LE connections, in Low Latency Packet Mode.
+   * - LLVM
+     - ``llvm``
+     - ``nrf54lm20dk/nrf54lm20a/cpuapp``
+     - Debug version of the application with the support for the ``llvm`` toolchain.
 
 .. note::
     Bootloader-enabled configurations with support for :ref:`serial recovery DFU <nrf_desktop_bootloader_serial_dfu>` or :ref:`background DFU <nrf_desktop_bootloader_background_dfu>` are set as default if they fit in the non-volatile memory.
@@ -578,7 +584,7 @@ The peripheral supports one wireless connection at a time, but it can be bonded 
    See the :ref:`nrf_desktop_bluetooth_guide_fast_pair` section for details.
 
 The nRF Desktop Bluetooth Central device scans for all bonded peripherals that are not connected.
-Right after entering the scanning state, the scanning operation is uninterruptible for a predefined time (:kconfig:option:`CONFIG_DESKTOP_BLE_FORCED_SCAN_DURATION_S`) to speed up connection establishment with Bluetooth Peripherals.
+Right after entering the scanning state, the scanning operation is uninterruptible for a predefined time (:option:`CONFIG_DESKTOP_BLE_FORCED_SCAN_DURATION_S`) to speed up connection establishment with Bluetooth Peripherals.
 After the timeout, the scanning is interrupted when any device connected to the dongle through Bluetooth becomes active.
 A connected peripheral is considered active when it provides HID input reports.
 Continuing the scanning in such scenario would cause report rate drop.
@@ -633,7 +639,9 @@ The assignments of hardware interface elements depend on the device type.
             * Middle position: Select the Bluetooth LE peers.
             * Bottom position: Mouse turned off.
 
-          When the dongle peer is selected, the peer control is disabled until the switch is set to another position.
+          By default, when the dongle peer is selected, the peer control is disabled until the switch is set to another position.
+          You can enable the dongle peer erase in the configuration.
+          The feature is enabled in the :ref:`Fast Pair <nrf_desktop_bluetooth_guide_fast_pair>` configurations, because the dongle peer is intended to be used for all of the peers that are not Fast Pair Seekers.
 
       Peer control button
           * The button is located on the left side of the mouse, in the thumb area.
@@ -654,7 +662,7 @@ The assignments of hardware interface elements depend on the device type.
                **LED1** stops blinking.
 
                .. note::
-                   |led_note|
+                  |led_note|
 
           * Long-press to initialize the peer erase.
             When **LED1** starts blinking rapidly, double-press to confirm the operation.
@@ -694,13 +702,13 @@ The assignments of hardware interface elements depend on the device type.
 
           1. Short-press to toggle between available peers.
              **LED1** blinks rapidly for each peer.
-             The amount of blinks corresponds to the number assigned to a peer: one blink for peer 1, two blinks for peer 2, and so on.
+             The amount of blinks corresponds to the number assigned to a peer (for example, one blink for peer 1, two blinks for peer 2), increasing incrementally with each peer.
           #. Double-press to confirm the peer selection.
              The peer is changed after the confirmation.
              **LED1** becomes solid for a short time and then turns itself off.
 
              .. note::
-                  |led_note|
+                |led_note|
 
         * Long-press to initialize the peer erase.
           When **LED1** starts blinking rapidly, double-press to confirm the operation.
@@ -726,9 +734,67 @@ The assignments of hardware interface elements depend on the device type.
           After the forced scan timeout, the scan is interrupted if another peripheral connected to the dongle is active.
 
           .. note::
-              |led_note|
+             |led_note|
 
         * |nRF_Desktop_cancel_operation|
+
+   .. tab:: nRF54 DK
+
+      The following predefined button is assigned to peer control operations for an nRF54 Series DK.
+
+      Button 0
+         * If the DK acts as a dongle:
+
+            * Long-press the **Button 0** to initialize peer erase.
+              When **LED1** starts blinking rapidly, double-press to confirm the operation.
+              After the confirmation, all the Bluetooth bonds are removed for the dongle.
+            * Short-press to start scanning for both bonded and non-bonded Bluetooth Peripherals.
+              After the forced scan timeout, the scan is interrupted if another peripheral connected to the dongle is active.
+
+              .. note::
+                 |led_note|
+
+            * |nRF_Desktop_cancel_operation|
+
+         * If the DK acts as a peripheral:
+
+            * Press the **Button 0** before the DK is powered up with the on/off switch.
+              Long-press to initialize and confirm the peer erase.
+              |nRF_Desktop_confirmation_effect|
+
+              .. note::
+                 |led_note|
+
+            * |nRF_Desktop_cancel_operation|
+
+   .. tab:: nRF52 and nRF53 DKs
+
+      The following predefined button is assigned to peer control operations for an nRF52 or nRF53 Series DK.
+
+      Button 1
+         * If the DK acts as a dongle:
+
+            * Long-press the **Button 1** to initialize peer erase.
+              When **LED2** starts blinking rapidly, double-press to confirm the operation.
+              After the confirmation, all the Bluetooth bonds are removed for the dongle.
+            * Short-press to start scanning for both bonded and non-bonded Bluetooth Peripherals.
+              After the forced scan timeout, the scan is interrupted if another peripheral connected to the dongle is active.
+
+              .. note::
+                 |led_note|
+
+         * |nRF_Desktop_cancel_operation|
+
+      * If the DK acts as a peripheral:
+
+         * Press the **Button 1** before the DK is powered up with the on/off switch.
+           Long-press to initialize and confirm the peer erase.
+           |nRF_Desktop_confirmation_effect|
+
+           .. note::
+              |led_note|
+
+         * |nRF_Desktop_cancel_operation|
 
 ..
 
@@ -755,6 +821,14 @@ This system state LED is kept lit when the device is active.
 
       **LED1** is used for the system state indication.
       It is located in the bottom right corner of the dongle, next to the USB connector.
+
+   .. tab:: nRF54 DK
+
+      **LED0** is used for the system state indication.
+
+   .. tab:: nRF52 and nRF53 DKs
+
+      **LED1** is used for the system state indication.
 
 ..
 
@@ -900,9 +974,6 @@ The nRF Desktop application is built the same way to any other |NCS| application
 .. note::
    Information about the known issues in nRF Desktop can be found in |NCS|'s :ref:`release_notes` and on the :ref:`known_issues` page.
 
-.. note::
-   |54H_engb_2_8|
-
 .. _nrf_desktop_selecting_build_types:
 
 Selecting a build type
@@ -912,15 +983,14 @@ Before you start testing the application, you can select one of the :ref:`nrf_de
 See :ref:`app_build_file_suffixes` and :ref:`cmake_options` for information about how to select a build type.
 
 .. note::
-   If nRF Desktop is built with `Fast Pair`_ support, you must provide Fast Pair Model ID and Anti Spoofing private key as CMake options.
-   You can use either your own provisioning data or the provisioning data obtained by Nordic Semiconductor for development purposes.
-   The following debug devices are meant to be used with the nRF Desktop and have been registered:
+   An nRF Desktop device with `Fast Pair`_ support by default uses the debug Fast Pair Model ID and Anti Spoofing private key obtained by Nordic Semiconductor for development purposes.
+   The following debug Fast Pair Model IDs were registered to be used with the nRF Desktop application:
 
    * NCS keyboard - The Fast Pair Provider meant to be used with keyboards:
 
       * Device Name: NCS keyboard
       * Model ID: ``0x52FF02``
-      * Anti-Spoofing Private Key (base64, uncompressed): ``8E8ulwhSIp/skZeg27xmWv2SxRxTOagypHrf2OdrhGY=``
+      * Anti-Spoofing Private Key (Base64, uncompressed): ``8E8ulwhSIp/skZeg27xmWv2SxRxTOagypHrf2OdrhGY=``
       * Device Type: Input Device
       * Notification Type: Fast Pair
       * Data-Only connection: true
@@ -930,7 +1000,7 @@ See :ref:`app_build_file_suffixes` and :ref:`cmake_options` for information abou
 
       * Device Name: NCS gaming mouse
       * Model ID: ``0x8E717D``
-      * Anti-Spoofing Private Key (base64, uncompressed): ``dZxFzP7X9CcfLPC0apyRkmgsh3n2EbWo9NFNXfVuxAM=``
+      * Anti-Spoofing Private Key (Base64, uncompressed): ``dZxFzP7X9CcfLPC0apyRkmgsh3n2EbWo9NFNXfVuxAM=``
       * Device Type: Mouse
       * Notification Type: Fast Pair
       * Data-Only connection: true
@@ -956,14 +1026,31 @@ nRF54L MCUboot provisioning
 ===========================
 
 nRF54L-based nRF Desktop devices enable hardware cryptography for the MCUboot bootloader.
-The public key that MCUboot uses to validate the application image is securely stored in the hardware Key Management Unit (KMU).
-In this use case, the application image is automatically signed by the |NCS| build system.
-However, the public key is not automatically provisioned to the device when programming the bootloader and the application images using the ``west flash`` command.
+To implement the secure boot feature, the bootloader requires a set of private and public keys.
+The private key is used to sign the application image.
+The public key is generated from the private key and is used by MCUboot to validate the application image.
+The public key is securely stored in the Key Management Unit (KMU) hardware peripheral of the nRF54L device.
 
-To provision the MCUboot keys, use the ``west ncs-provision`` command before programming the bootloader and application images.
-Make sure that the provisioned public key is generated from the private key that was used to sign the application image.
+In this application, the application image is automatically signed with a private key by the |NCS| build system.
 The private keys are stored in the application configuration directory of the board.
-Path to the private key is defined by the ``SB_CONFIG_BOOT_SIGNATURE_KEY_FILE`` sysbuild Kconfig option.
+Path to the private key is defined by the :kconfig:option:`SB_CONFIG_BOOT_SIGNATURE_KEY_FILE` sysbuild Kconfig option.
+
+To store the public key in the KMU, it must first be provisioned.
+This provisioning step can be performed automatically by the west runner, provided that a :file:`keyfile.json` file is present in the build directory.
+In this application, the :file:`keyfile.json` file is automatically generated using the :kconfig:option:`SB_CONFIG_MCUBOOT_GENERATE_DEFAULT_KMU_KEYFILE` Kconfig option.
+This option uses the private key specified by the :kconfig:option:`SB_CONFIG_BOOT_SIGNATURE_KEY_FILE` sysbuild Kconfig option to generate the required file during the build process.
+
+To trigger KMU provisioning during flashing, use the ``west flash`` command with either the ``--erase`` or ``--recover`` flag.
+This ensures that both the firmware and the MCUboot public key are correctly programmed onto the target device using the KMU-based key storage.
+Use the following command to perform the operation:
+
+.. parsed-literal::
+   :class: highlight
+
+   west flash --recover
+
+Alternatively, you can perform the provisioning operation manually with the ``west ncs-provision upload`` command and then flash the device with the ``west flash`` command.
+
 You only need to provision one public key to an nRF Desktop device.
 For details, see :ref:`provisioning KMU for nRF54L devices <ug_nrf54l_developing_provision_kmu>`.
 
@@ -976,7 +1063,12 @@ Testing
 =======
 
 You can build and test the application in various configurations.
-The following procedure refers to the scenario where the gaming mouse (nRF52840 Gaming Mouse) and the keyboard (nRF52832 Desktop Keyboard) are connected simultaneously to the dongle (nRF52840 USB Dongle).
+
+.. note::
+   The following procedure refers to the scenario where the gaming mouse (nRF52840 Gaming Mouse) and the keyboard (nRF52832 Desktop Keyboard) are connected simultaneously to the dongle (nRF52840 USB Dongle).
+
+   You can perform similar tests with nRF52, nRF53, or nRF54 Series DKs.
+   Depending on the selected build type, the DK can act either as HID peripheral or HID dongle.
 
 After building the application with or without :ref:`specifying the build type <nrf_desktop_selecting_build_types>`, test the nRF Desktop application by performing the following steps:
 
@@ -1001,7 +1093,7 @@ After building the application with or without :ref:`specifying the build type <
    .. note::
       When a :ref:`configuration with debug features <nrf_desktop_requirements_build_types>` is enabled, for example logger and assertions, the gaming mouse report rate can be significantly lower.
 
-      Make sure that you use the ``release``configurations before testing the mouse report rate.
+      Make sure that you use the ``release`` configurations before testing the mouse report rate.
       For the ``release`` configurations, you should observe a 500-Hz report rate when both the mouse and the keyboard are connected and a 1000-Hz rate when only the mouse is connected.
 
 #. Switch the Bluetooth peer on the gaming mouse by pressing the **Precise Aim** button (see `User interface`_).
@@ -1038,6 +1130,11 @@ Building information
 
 Use the configuration with the ``release`` file suffix for the HID report rate measurement.
 Debug features, such as logging or assertions, decrease the application performance.
+
+.. note::
+   You can run the application code from RAM instead of NVM to improve performance as code execution from the RAM is generally faster than from the NVM.
+   You can configure MCUboot to use the RAM load mode to run the whole application image from RAM.
+   For details, see the :ref:`nrf_desktop_configuring_mcuboot_bootloader_ram_load` section.
 
 Use the nRF Desktop configuration that acts as a HID mouse reference design for the report rate measurement, as the motion data polling is synchronized with sending HID reports.
 

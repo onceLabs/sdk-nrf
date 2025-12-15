@@ -9,12 +9,17 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/__assert.h>
+#include <zephyr/drivers/clock_control/nrf_clock_control.h>
 #include <mpsl.h>
 #include <mpsl_timeslot.h>
 #include <mpsl/mpsl_assert.h>
 #include <mpsl/mpsl_work.h>
 #include "multithreading_lock.h"
 #include <nrfx.h>
+#if defined(NRF_TRUSTZONE_NONSECURE)
+#include "tfm_platform_api.h"
+#include "tfm_ioctl_core_api.h"
+#endif
 #if IS_ENABLED(CONFIG_SOC_COMPATIBLE_NRF54LX)
 #include <nrfx_power.h>
 #endif
@@ -26,15 +31,19 @@
 #endif
 
 #if IS_ENABLED(CONFIG_MPSL_USE_ZEPHYR_PM)
-#include <mpsl/mpsl_pm_utils.h>
+#include "../pm/mpsl_pm_utils.h"
 #endif
+
+#if IS_ENABLED(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
+#include "../clock_ctrl/mpsl_clock_ctrl.h"
+#endif /* CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
 
 LOG_MODULE_REGISTER(mpsl_init, CONFIG_MPSL_LOG_LEVEL);
 
 #if defined(CONFIG_MPSL_CALIBRATION_PERIOD)
 static void mpsl_calibration_work_handler(struct k_work *work);
 static K_WORK_DELAYABLE_DEFINE(calibration_work, mpsl_calibration_work_handler);
-#endif /* CONFIG_CLOCK_CONTROL_NRF_K32SRC_RC && !CONFIG_SOC_SERIES_NRF54HX */
+#endif /* CONFIG_MPSL_CALIBRATION_PERIOD */
 
 extern void rtc_pretick_rtc0_isr_hook(void);
 
@@ -45,11 +54,28 @@ extern void rtc_pretick_rtc0_isr_hook(void);
 	#endif
 #endif
 
-#if !defined(CONFIG_SOC_SERIES_NRF54HX) && !defined(CONFIG_SOC_COMPATIBLE_NRF54LX)
+#if IS_ENABLED(CONFIG_COUNTER)
+#if IS_ENABLED(CONFIG_SOC_COMPATIBLE_NRF52X) || IS_ENABLED(CONFIG_SOC_NRF5340_CPUNET)
+BUILD_ASSERT(!DT_NODE_HAS_STATUS_OKAY(DT_NODELABEL(rtc0)),
+	     "MPSL reserves RTC0 on this SoC.");
+BUILD_ASSERT(!DT_NODE_HAS_STATUS_OKAY(DT_NODELABEL(timer0)),
+	     "MPSL reserves TIMER0 on this SoC.");
+#elif IS_ENABLED(CONFIG_SOC_COMPATIBLE_NRF54LX) || IS_ENABLED(CONFIG_SOC_SERIES_NRF71X)
+BUILD_ASSERT(!DT_NODE_HAS_STATUS_OKAY(DT_NODELABEL(timer10)),
+	     "MPSL reserves TIMER10 on this SoC.");
+#elif IS_ENABLED(CONFIG_SOC_SERIES_NRF54HX)
+BUILD_ASSERT(!DT_NODE_HAS_STATUS_OKAY(DT_NODELABEL(timer020)),
+	     "MPSL reserves TIMER020 on this SoC.");
+#else
+#error
+#endif
+#endif /* IS_ENABLED(CONFIG_COUNTER) */
+
+#if defined(CONFIG_SOC_COMPATIBLE_NRF52X) || defined(CONFIG_SOC_COMPATIBLE_NRF53X)
 #define MPSL_TIMER_IRQn TIMER0_IRQn
 #define MPSL_RTC_IRQn RTC0_IRQn
 #define MPSL_RADIO_IRQn RADIO_IRQn
-#elif defined(CONFIG_SOC_COMPATIBLE_NRF54LX)
+#elif defined(CONFIG_SOC_COMPATIBLE_NRF54LX) || defined(CONFIG_SOC_SERIES_NRF71X)
 #define MPSL_TIMER_IRQn TIMER10_IRQn
 #define MPSL_RTC_IRQn GRTC_3_IRQn
 #define MPSL_RADIO_IRQn RADIO_0_IRQn
@@ -62,11 +88,13 @@ extern void rtc_pretick_rtc0_isr_hook(void);
 #if defined(CONFIG_SOC_SERIES_NRF54HX)
 /* Basic build time sanity checking */
 #define MPSL_RESERVED_GRTC_CHANNELS ((1U << 8) | (1U << 9) | (1U << 10) | (1U << 11) | (1U << 12))
-#elif defined(CONFIG_SOC_COMPATIBLE_NRF54LX)
+#elif defined(CONFIG_SOC_COMPATIBLE_NRF54LX) || defined(CONFIG_SOC_SERIES_NRF71X)
 #define MPSL_RESERVED_GRTC_CHANNELS ((1U << 7) | (1U << 8) | (1U << 9) | (1U << 10) | (1U << 11))
 #endif
 
-#if defined(CONFIG_SOC_SERIES_NRF54HX) || defined(CONFIG_SOC_COMPATIBLE_NRF54LX)
+#if defined(CONFIG_SOC_SERIES_NRF54HX) || \
+	defined(CONFIG_SOC_COMPATIBLE_NRF54LX) || \
+	defined(CONFIG_SOC_SERIES_NRF71X)
 
 BUILD_ASSERT(MPSL_RTC_IRQn != DT_IRQN(DT_NODELABEL(grtc)), "MPSL requires a dedicated GRTC IRQ");
 
@@ -140,6 +168,16 @@ BUILD_ASSERT((IPCT_SOURCE_CHANNELS & MPSL_RESERVED_IPCT_SOURCE_CHANNELS) ==
 	     "The required IPCT source channels are not reserved");
 
 #endif
+
+#if defined(CONFIG_SOC_SERIES_NRF54LX)
+BUILD_ASSERT(NRF_CONFIG_CPU_FREQ_MHZ == 128, "Currently mpsl only works when frequency is 128MHz");
+#endif
+
+#if IS_ENABLED(CONFIG_NRF_GRTC_TIMER) && !defined(CONFIG_SOC_SERIES_NRF54HX)
+BUILD_ASSERT(IS_ENABLED(CONFIG_NRF_GRTC_TIMER_AUTO_KEEP_ALIVE),
+	     "MPSL requires NRF_GRTC_TIMER_AUTO_KEEP_ALIVE to be enabled when using GRTC timer");
+#endif
+
 #define MPSL_LOW_PRIO (4)
 
 #if IS_ENABLED(CONFIG_ZERO_LATENCY_IRQS)
@@ -194,8 +232,6 @@ static void mpsl_timer0_isr_wrapper(const void *args)
 	ARG_UNUSED(args);
 
 	MPSL_IRQ_TIMER0_Handler();
-
-	ISR_DIRECT_PM();
 }
 
 static void mpsl_rtc0_isr_wrapper(const void *args)
@@ -208,8 +244,6 @@ static void mpsl_rtc0_isr_wrapper(const void *args)
 	}
 
 	MPSL_IRQ_RTC0_Handler();
-
-	ISR_DIRECT_PM();
 }
 
 static void mpsl_radio_isr_wrapper(const void *args)
@@ -217,8 +251,6 @@ static void mpsl_radio_isr_wrapper(const void *args)
 	ARG_UNUSED(args);
 
 	MPSL_IRQ_RADIO_Handler();
-
-	ISR_DIRECT_PM();
 }
 
 static void mpsl_lib_irq_disable(void)
@@ -249,12 +281,7 @@ ISR_DIRECT_DECLARE(mpsl_timer0_isr_wrapper)
 {
 	MPSL_IRQ_TIMER0_Handler();
 
-	ISR_DIRECT_PM();
-
-	/* We may need to reschedule in case a radio timeslot callback
-	 * accesses zephyr primitives.
-	 */
-	return 1;
+	return 0;
 }
 
 ISR_DIRECT_DECLARE(mpsl_rtc0_isr_wrapper)
@@ -265,11 +292,6 @@ ISR_DIRECT_DECLARE(mpsl_rtc0_isr_wrapper)
 	}
 	MPSL_IRQ_RTC0_Handler();
 
-	ISR_DIRECT_PM();
-
-	/* No need for rescheduling, because the interrupt handler
-	 * does not access zephyr primitives.
-	 */
 	return 0;
 }
 
@@ -277,12 +299,7 @@ ISR_DIRECT_DECLARE(mpsl_radio_isr_wrapper)
 {
 	MPSL_IRQ_RADIO_Handler();
 
-	ISR_DIRECT_PM();
-
-	/* We may need to reschedule in case a radio timeslot callback
-	 * accesses zephyr primitives.
-	 */
-	return 1;
+	return 0;
 }
 #endif /* IS_ENABLED(CONFIG_MPSL_DYNAMIC_INTERRUPTS) */
 
@@ -295,22 +312,28 @@ void m_assert_handler(const char *const file, const uint32_t line)
 #else /* !IS_ENABLED(CONFIG_MPSL_ASSERT_HANDLER) */
 static void m_assert_handler(const char *const file, const uint32_t line)
 {
+	volatile char assert_file_id[11] = { 0 };
+	volatile uint32_t assert_line = line;
+
+	strncpy((char *)assert_file_id, file, sizeof(assert_file_id) - 1);
+
 #if defined(CONFIG_ASSERT) && defined(CONFIG_ASSERT_VERBOSE) && !defined(CONFIG_ASSERT_NO_MSG_INFO)
-	__ASSERT(false, "MPSL ASSERT: %s, %d\n", file, line);
+	__ASSERT(false, "MPSL ASSERT: %s, %d\n", (char *)assert_file_id, assert_line);
 #elif defined(CONFIG_LOG)
-	LOG_ERR("MPSL ASSERT: %s, %d", file, line);
+	LOG_ERR("MPSL ASSERT: %s, %d", (char *)assert_file_id, assert_line);
 	k_oops();
 #elif defined(CONFIG_PRINTK)
-	printk("MPSL ASSERT: %s, %d\n", file, line);
+	printk("MPSL ASSERT: %s, %d\n", (char *)assert_file_id, assert_line);
 	printk("\n");
 	k_oops();
 #else
+	(void)assert_line;
 	k_oops();
 #endif
 }
 #endif /* IS_ENABLED(CONFIG_MPSL_ASSERT_HANDLER) */
 
-#if !defined(CONFIG_SOC_SERIES_NRF54HX)
+#if !defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
 static uint8_t m_config_clock_source_get(void)
 {
 #ifdef CONFIG_CLOCK_CONTROL_NRF_K32SRC_RC
@@ -328,7 +351,7 @@ static uint8_t m_config_clock_source_get(void)
 	return 0;
 #endif
 }
-#endif /* !CONFIG_SOC_SERIES_NRF54HX */
+#endif /* !CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
 
 #if defined(CONFIG_MPSL_CALIBRATION_PERIOD)
 static atomic_t do_calibration;
@@ -346,23 +369,25 @@ static void mpsl_calibration_work_handler(struct k_work *work)
 	mpsl_work_schedule(&calibration_work,
 			   K_MSEC(CONFIG_MPSL_CALIBRATION_PERIOD));
 }
-#endif /* CONFIG_CLOCK_CONTROL_NRF_K32SRC_RC && !CONFIG_SOC_SERIES_NRF54HX */
+#endif /* CONFIG_MPSL_CALIBRATION_PERIOD */
 
 static int32_t mpsl_lib_init_internal(void)
 {
 	int err = 0;
+#if !defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
 	mpsl_clock_lfclk_cfg_t clock_cfg;
+#endif /* CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
 
-#ifdef CONFIG_MPSL_TRIGGER_IPC_TASK_ON_RTC_START
+#if defined(CONFIG_MPSL_TRIGGER_IPC_TASK_ON_RTC_START)
 	nrf_ipc_send_config_set(NRF_IPC,
 		CONFIG_MPSL_TRIGGER_IPC_TASK_ON_RTC_START_CHANNEL,
 		(1UL << CONFIG_MPSL_TRIGGER_IPC_TASK_ON_RTC_START_CHANNEL));
 	mpsl_clock_task_trigger_on_rtc_start_set(
 		(uint32_t)&NRF_IPC->TASKS_SEND[CONFIG_MPSL_TRIGGER_IPC_TASK_ON_RTC_START_CHANNEL]);
-#endif
+#endif /* CONFIG_MPSL_TRIGGER_IPC_TASK_ON_RTC_START */
 
 	/* TODO: Clock config should be adapted in the future to new architecture. */
-#if !defined(CONFIG_SOC_SERIES_NRF54HX)
+#if !defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
 	clock_cfg.source = m_config_clock_source_get();
 	clock_cfg.accuracy_ppm = CONFIG_CLOCK_CONTROL_NRF_ACCURACY;
 	clock_cfg.skip_wait_lfclk_started =
@@ -382,15 +407,22 @@ static int32_t mpsl_lib_init_internal(void)
 #else
 	clock_cfg.rc_ctiv = 0;
 	clock_cfg.rc_temp_ctiv = 0;
-#endif
-#else
-	/* For now just set the values to 0 to avoid "use of uninitialized variable" warnings.
-	 * MPSL assumes the clocks are always available and does currently not implement
-	 * clock handling on these platforms. The LFCLK is expected to have an accuracy of
-	 * 500ppm or better regardless of the value passed in clock_cfg.
-	 */
-	memset(&clock_cfg, 0, sizeof(clock_cfg));
-#endif
+#endif /* CONFIG_CLOCK_CONTROL_NRF_K32SRC_RC */
+#endif /* !CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
+
+#if defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
+	err = mpsl_clock_ctrl_init();
+	if (err) {
+		return err;
+	}
+#endif /* CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
+
+#if defined(CONFIG_MPSL_USE_ZEPHYR_PM)
+	err = mpsl_pm_utils_init();
+	if (err) {
+		return err;
+	}
+#endif /* CONFIG_MPSL_USE_ZEPHYR_PM */
 
 #if defined(CONFIG_SOC_SERIES_NRF54HX)
 	/* Secure domain no longer enables DPPI channels for local domains,
@@ -399,17 +431,22 @@ static int32_t mpsl_lib_init_internal(void)
 	nrf_dppi_channels_enable(NRF_DPPIC130, DPPI_SINK_CHANNELS);
 	nrf_dppi_channels_enable(NRF_DPPIC132, DPPI_SOURCE_CHANNELS);
 #endif
+#if defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
+	err = mpsl_init(NULL, CONFIG_MPSL_LOW_PRIO_IRQN, m_assert_handler);
+#else
 	err = mpsl_init(&clock_cfg, CONFIG_MPSL_LOW_PRIO_IRQN, m_assert_handler);
+#endif /* CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
 	if (err) {
 		return err;
 	}
 
+#if !defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
+#if defined(CONFIG_CLOCK_CONTROL_NRF) && DT_NODE_EXISTS(DT_NODELABEL(hfxo))
+	mpsl_clock_hfclk_latency_set(z_nrf_clock_bt_ctlr_hf_get_startup_time_us());
+#else
 	mpsl_clock_hfclk_latency_set(CONFIG_MPSL_HFCLK_LATENCY);
-
-	if (IS_ENABLED(CONFIG_SOC_NRF_FORCE_CONSTLAT) &&
-		!IS_ENABLED(CONFIG_SOC_COMPATIBLE_NRF54LX)) {
-		mpsl_pan_rfu();
-	}
+#endif /* CONFIG_CLOCK_CONTROL_NRF && DT_NODE_EXISTS(DT_NODELABEL(hfxo)) */
+#endif /* !CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
 
 #if MPSL_TIMESLOT_SESSION_COUNT > 0
 	err = mpsl_timeslot_session_count_set((void *) timeslot_context,
@@ -417,6 +454,19 @@ static int32_t mpsl_lib_init_internal(void)
 	if (err) {
 		return err;
 	}
+#endif /* MPSL_TIMESLOT_SESSION_COUNT > 0 */
+#if defined(NRF_TRUSTZONE_NONSECURE) && \
+	defined(CONFIG_MPSL_FORCE_RRAM_ON_ALL_THE_TIME)
+	uint32_t result_out;
+	uint32_t result = tfm_platform_mem_write32((uint32_t)&NRF_RRAMC_S->POWER.LOWPOWERCONFIG,
+		RRAMC_POWER_LOWPOWERCONFIG_MODE_Standby << RRAMC_POWER_LOWPOWERCONFIG_MODE_Pos,
+		RRAMC_POWER_LOWPOWERCONFIG_MODE_Msk,
+		&result_out);
+	(void) result_out;
+	(void) result;
+	  __ASSERT(result == TFM_PLATFORM_ERR_SUCCESS,
+			   "tfm_platform_mem_write32 failed %i\n", result);
+	  __ASSERT(result_out == 0, "tfm_platform_mem_write32 failed %i\n", result_out);
 #endif
 
 	return 0;
@@ -431,26 +481,16 @@ static int mpsl_lib_init_sys(void)
 		return err;
 	}
 
-#if IS_ENABLED(CONFIG_MPSL_USE_ZEPHYR_PM)
-	mpsl_pm_utils_init();
-#endif
-
 #if IS_ENABLED(CONFIG_MPSL_DYNAMIC_INTERRUPTS)
 	/* Ensure IRQs are disabled before attaching. */
 	mpsl_lib_irq_disable();
 
-	/* We may need to reschedule in case a radio timeslot callback
-	 * accesses Zephyr primitives.
-	 * The RTC0 interrupt handler does not access zephyr primitives,
-	 * however, as this decision needs to be made during build-time,
-	 * rescheduling is performed to account for user-provided handlers.
-	 */
 	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(MPSL_TIMER_IRQn, MPSL_HIGH_IRQ_PRIORITY, IRQ_CONNECT_FLAGS,
-				       reschedule);
+				       no_reschedule);
 	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(MPSL_RTC_IRQn, MPSL_HIGH_IRQ_PRIORITY, IRQ_CONNECT_FLAGS,
-				       reschedule);
+				       no_reschedule);
 	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(MPSL_RADIO_IRQn, MPSL_HIGH_IRQ_PRIORITY, IRQ_CONNECT_FLAGS,
-				       reschedule);
+				       no_reschedule);
 
 	mpsl_lib_irq_connect();
 #else /* !IS_ENABLED(CONFIG_MPSL_DYNAMIC_INTERRUPTS) */
@@ -481,7 +521,7 @@ static int mpsl_low_prio_init(void)
 	atomic_set(&do_calibration, 1);
 	mpsl_work_schedule(&calibration_work,
 			   K_MSEC(CONFIG_MPSL_CALIBRATION_PERIOD));
-#endif /* CONFIG_CLOCK_CONTROL_NRF_K32SRC_RC && !CONFIG_SOC_SERIES_NRF54HX */
+#endif /* CONFIG_MPSL_CALIBRATION_PERIOD */
 
 	return 0;
 }
@@ -498,6 +538,12 @@ int32_t mpsl_lib_init(void)
 
 	mpsl_lib_irq_connect();
 
+#if defined(CONFIG_MPSL_CALIBRATION_PERIOD)
+	atomic_set(&do_calibration, 1);
+	mpsl_work_schedule(&calibration_work,
+			   K_MSEC(CONFIG_MPSL_CALIBRATION_PERIOD));
+#endif /* CONFIG_MPSL_CALIBRATION_PERIOD */
+
 	return 0;
 #else /* !IS_ENABLED(CONFIG_MPSL_DYNAMIC_INTERRUPTS) */
 	return -NRF_EPERM;
@@ -507,13 +553,31 @@ int32_t mpsl_lib_init(void)
 int32_t mpsl_lib_uninit(void)
 {
 #if IS_ENABLED(CONFIG_MPSL_DYNAMIC_INTERRUPTS)
+#if defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL) || defined(CONFIG_MPSL_USE_ZEPHYR_PM)
+	int err;
+#endif /* CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL || CONFIG_MPSL_USE_ZEPHYR_PM */
+
 #if defined(CONFIG_MPSL_CALIBRATION_PERIOD)
 	atomic_set(&do_calibration, 0);
-#endif /* CONFIG_CLOCK_CONTROL_NRF_K32SRC_RC && !CONFIG_SOC_SERIES_NRF54HX */
+#endif /* CONFIG_MPSL_CALIBRATION_PERIOD */
 
 	mpsl_lib_irq_disable();
 
 	mpsl_uninit();
+
+#if defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
+	err = mpsl_clock_ctrl_uninit();
+	if (err) {
+		return err;
+	}
+#endif /* CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
+
+#if defined(CONFIG_MPSL_USE_ZEPHYR_PM)
+	err = mpsl_pm_utils_uninit();
+	if (err) {
+		return err;
+	}
+#endif /* CONFIG_MPSL_USE_ZEPHYR_PM */
 
 	return 0;
 #else /* !IS_ENABLED(CONFIG_MPSL_DYNAMIC_INTERRUPTS) */
@@ -541,6 +605,17 @@ void mpsl_lowpower_request_callback(void)
 }
 #endif /* defined(CONFIG_SOC_COMPATIBLE_NRF54LX) */
 
-SYS_INIT(mpsl_lib_init_sys, PRE_KERNEL_1, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
-SYS_INIT(mpsl_low_prio_init, POST_KERNEL,
-	 CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
+#if defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL)
+#define MPSL_INIT_LEVEL POST_KERNEL
+#else
+#define MPSL_INIT_LEVEL PRE_KERNEL_1
+#endif /* CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL */
+
+#if defined(CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL) && \
+	defined(CONFIG_NRFS_BACKEND_IPC_SERVICE_INIT_PRIO)
+BUILD_ASSERT(CONFIG_MPSL_INIT_PRIORITY > CONFIG_NRFS_BACKEND_IPC_SERVICE_INIT_PRIO,
+			 "MPSL must be initialized after NRFS IPC");
+#endif /* CONFIG_MPSL_USE_EXTERNAL_CLOCK_CONTROL && CONFIG_NRFS_BACKEND_IPC_SERVICE_INIT_PRIO */
+
+SYS_INIT(mpsl_lib_init_sys, MPSL_INIT_LEVEL, CONFIG_MPSL_INIT_PRIORITY);
+SYS_INIT(mpsl_low_prio_init, POST_KERNEL, CONFIG_MPSL_INIT_PRIORITY);

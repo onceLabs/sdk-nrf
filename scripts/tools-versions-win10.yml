@@ -1,7 +1,9 @@
+# On Windows hardcoded version of gn is used: 2223 (6e8e0d6d4a15)
+
 python:
   version: 3.12.4
 git:
-  version: 2.37.3.windows.1
+  version: 2.52.0.windows.1
 cmake:
   version: 3.21.0
 ninja:
@@ -11,7 +13,7 @@ gperf:
 dtc:
   version: 1.4.7-1
 west:
-  version: 1.2.0
+  version: 1.4.0
 nanopb:
   version: 0.4.6
 zephyr-sdk:
@@ -23,3 +25,7 @@ doxygen:
   version: 1.12.0
 pip:
   version: 24.2
+nrfutil:
+  version: 8.1.1
+  subcommands:
+    device: 2.15.2

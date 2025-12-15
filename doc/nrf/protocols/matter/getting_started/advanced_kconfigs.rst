@@ -17,10 +17,10 @@ These macros cannot be altered using dedicated Kconfig options.
 
 .. _ug_matter_configuring_optional_ble_advertising:
 
-Bluetooth LE advertising
-========================
+Bluetooth® LE advertising
+=========================
 
-The Matter specification requires the accessory device to advertise Matter service over Bluetooth® Low Energy (LE) for commissioning purposes.
+The Matter specification requires the accessory device to advertise Matter service over Bluetooth Low Energy (LE) for commissioning purposes.
 By default, the Bluetooth LE advertising start has to be requested by the application (for example, as a result of a button press) and lasts for a maximum duration of 15 minutes.
 This is appropriate for a device with high security requirements that should not advertise its service without a direct trigger, for example a door lock.
 
@@ -39,7 +39,7 @@ Commissioning with NFC
 
 You can configure the Matter protocol to use NFC tag for commissioning, instead of the default QR code.
 
-To enable NFC for commissioning and share the onboarding payload in an NFC tag, set the :kconfig:option:`CONFIG_CHIP_NFC_COMMISSIONING` Kconfig option.
+To enable NFC for sharing the onboarding payload in an NFC tag, set the :kconfig:option:`CONFIG_CHIP_NFC_ONBOARDING_PAYLOAD` Kconfig option.
 
 .. _ug_matter_configuring_optional_persistent_subscriptions:
 
@@ -72,6 +72,9 @@ Logging configuration
 Logging is handled with the :kconfig:option:`CONFIG_LOG` option.
 This option enables logging for both the stack and Zephyr's :ref:`zephyr:logging_api` API.
 
+Logging level configuration
+---------------------------
+
 Zephyr allows you to configure log levels of different software modules independently.
 To change the log level configuration for the Matter module, set one of the available options:
 
@@ -82,6 +85,56 @@ To change the log level configuration for the Matter module, set one of the avai
 
 .. note::
     :kconfig:option:`CONFIG_MATTER_LOG_LEVEL_WRN` is not used in Matter.
+
+Detailed message logging
+------------------------
+
+You can enable detailed logging of Matter interaction messages using the :kconfig:option:`CONFIG_CHIP_IM_PRETTY_PRINT` Kconfig option.
+
+When enabled, this option increases the verbosity of the logs by including protocol-level details such as:
+
+* Cluster ID
+* Endpoint ID
+* Attribute ID or Command ID
+* Payload contents for interaction messages (for example Read Request or Invoke Request)
+
+This is particularly useful for debugging and understanding communication flows within the Matter data model.
+
+The following is an example log output showing a ``ConnectNetwork`` command (0x06) from the Network Commissioning cluster (0x31), sent with a ``NetworkID`` of ``0x1111111122222222``.
+
+.. code-block:: text
+
+   [DMG]InvokeRequestMessage =
+   [DMG]{
+   [DMG] suppressResponse = false,
+   [DMG] timedRequest = false,
+   [DMG] InvokeRequests =
+   [DMG] [
+   [DMG]         CommandDataIB =
+   [DMG]         {
+   [DMG]                 CommandPathIB =
+   [DMG]                 {
+   [DMG]                         EndpointId = 0x0,
+   [DMG]                         ClusterId = 0x31,
+   [DMG]                         CommandId = 0x6,
+   [DMG]                 },
+   [DMG]
+   [DMG]                 CommandFields =
+   [DMG]                 {
+   [DMG]                         0x0 = [
+   [DMG]                                         0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x22, 0x22,
+   [DMG]                         ] (8 bytes)
+   [DMG]                         0x1 = lu (unsigned),
+   [DMG]                 },
+   [DMG]         },
+   [DMG]
+   [DMG] ],
+   [DMG]
+   [DMG] InteractionModelRevision = 11
+   [DMG]},
+
+.. note::
+    This option requires the debug log level :kconfig:option:`CONFIG_MATTER_LOG_LEVEL_DBG` to be enabled and :kconfig:option:`CONFIG_CHIP_LOG_SIZE_OPTIMIZATION` to be disabled.
 
 .. _ug_matter_configuring_optional_shell:
 
@@ -128,6 +181,11 @@ Some of these can be configured using the Kconfig options listed below:
   This allows filtering of the discovery results to find the nodes that match the device type.
 * :kconfig:option:`CONFIG_CHIP_ROTATING_DEVICE_ID` enables an optional rotating device identifier feature that provides an additional unique identifier for each device.
   This identifier is similar to the serial number, but it additionally changes at predefined times to protect against long-term tracking of the device.
+* :kconfig:option:`CONFIG_CHIP_DEVICE_DISCRIMINATOR` sets the Bluetooth LE discriminator of the device.
+  In each sample, it is set to the same value by default (hexadecimal: ``0xF00``; decimal: ``3840``).
+  Without changing the discriminator only one uncommissioned device can be powered up at the same time.
+  If multiple devices with the same discriminator are powered simultaneously, the Matter controller will commission a random device.
+  To avoid confusion, keep only a single uncommissioned device powered up, or assign a unique discriminator to each device.
 
 .. _ug_matter_configuring_ffs:
 
@@ -155,7 +213,7 @@ For more information about the factory data generation, see the :ref:`Matter Dev
 
 To read more about the FFS technology and its compatibility with Matter, see the following pages in the Amazon developer documentation:
 
-* `Matter Simple Setup for Wi-Fi Overview`_
+* `Matter Simple Setup for Wi-Fi® Overview <Matter Simple Setup for Wi-Fi Overview_>`_
 * `Matter Simple Setup for Thread Overview`_
 
 Reaction to the last Matter fabric removal
@@ -169,25 +227,25 @@ When the device leaves the last fabric, one of several reactions can be set to h
 
 To enable one of the reactions to the last fabric removal, set the corresponding Kconfig option to ``y``:
 
-* :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_NONE` - Do not react to the last fabric removal.
+* :ref:`CONFIG_CHIP_LAST_FABRIC_REMOVED_NONE` - Do not react to the last fabric removal.
   The device will keep all saved data and network credentials, and will not reboot.
-* :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_ONLY` - Remove all saved network credentials.
+* :ref:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_ONLY` - Remove all saved network credentials.
   The device will remove all saved network credentials, keep application-specific non-volatile data, and will not reboot.
-* :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_PAIRING_START` - Remove all saved network credentials and start Bluetooth LE advertising.
+* :ref:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_PAIRING_START` - Remove all saved network credentials and start Bluetooth LE advertising.
   The device will remove all saved network credentials, keep application-specific non-volatile data, and start advertising Bluetooth LE Matter service.
   After that, it will be ready for commissioning to Matter over Bluetooth LE.
-* :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_REBOOT` - Remove all saved network credentials and reboot the device.
+* :ref:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_REBOOT` - Remove all saved network credentials and reboot the device.
   This option is selected by default.
 
   When the :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS` Kconfig option is also set to ``y``, the device will also remove all non-volatile data stored on the device, including application-specific entries.
   This means the device is restored to the factory settings.
 
-To create a delay between  the chosen reaction and the last fabric being removed, set the :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ACTION_DELAY` Kconfig option to a specific time in milliseconds.
+To create a delay between  the chosen reaction and the last fabric being removed, set the :ref:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ACTION_DELAY` Kconfig option to a specific time in milliseconds.
 By default this Kconfig option is set to 1 second.
 
 .. note::
   The :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS` Kconfig option is set to ``y`` by default.
-  To disable removing application-specific non-volatile data when the :kconfig:option:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_REBOOT` Kconfig option is selected, set the :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS` Kconfig option to ``n``.
+  To disable removing application-specific non-volatile data when the :ref:`CONFIG_CHIP_LAST_FABRIC_REMOVED_ERASE_AND_REBOOT` Kconfig option is selected, set the :kconfig:option:`CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS` Kconfig option to ``n``.
 
 .. _ug_matter_configuring_read_client:
 
@@ -318,11 +376,59 @@ Deferred logs mode (:kconfig:option:`CONFIG_LOG_MODE_DEFERRED`) is enabled becau
   You cannot set the :ref:`CONFIG_NCS_SAMPLE_MATTER_DIAGNOSTIC_LOGS<CONFIG_NCS_SAMPLE_MATTER_DIAGNOSTIC_LOGS>` Kconfig option separately without adding the devicetree overlays contained in the snippet.
   Instead, if you want to use just some of the diagnostic logs functionality, use the snippet and set the Kconfig options for the other functionalities to ``n``.
 
-To use the snippet when building a sample, add ``-D<project_name>_SNIPPET=matter-diagnostic-logs`` to the west arguments list.
+To use the snippet when building a sample, add ``-D<project_name>_SNIPPET=diagnostic-logs`` to the west arguments list.
 
 Example for the ``nrf52840dk/nrf52840`` board target and the :ref:`matter_lock_sample` sample:
 
 .. parsed-literal::
    :class: highlight
 
-   west build -b nrf52840dk/nrf52840 -- -Dlock_SNIPPET=matter-diagnostic-logs
+   west build -b nrf52840dk/nrf52840 -- -Dlock_SNIPPET=diagnostic-logs
+
+.. _ug_matter_debug_snippet:
+
+Debug snippet
+=============
+
+The Matter debug snippet allows you to enable additional debug features while using Matter samples.
+
+The following features are enabled when using this snippet:
+
+  * UART speed is increased to 1 Mbit/s.
+  * Log buffer size is set to high value to allow showing all logs.
+  * Deferred mode of logging.
+  * Increased verbosity of Matter logs.
+  * OpenThread is built from sources.
+  * OpenThread shell is enabled.
+  * OpenThread logging level is set to INFO.
+  * Full shell functionalities.
+  * Logging source code location on VerifyOrDie failure that occurs in the Matter stack.
+
+To use the snippet when building a sample, add ``-D<project_name>_SNIPPET=matter-debug`` to the west arguments list.
+
+For example, for the ``nrf52840dk/nrf52840`` board target and the :ref:`matter_lock_sample` sample, use the following command:
+
+.. parsed-literal::
+   :class: highlight
+
+   west build -b nrf52840dk/nrf52840 -- -Dlock_SNIPPET=matter-debug
+
+.. note::
+
+  You can increase the UART speed using this snippet only for Nordic Development Kits.
+  If you want to use the snippet for your custom board, you need to adjust the UART speed manually.
+
+.. _ug_matter_networking_selection:
+
+Networking layer selection
+==========================
+
+The |NCS| supports two networking architectures for the Matter protocol:
+
+* The Zephyr networking layer, which is enabled by default for Matter over Wi-Fi.
+  You can also enable this architecture for Matter over Thread by setting the :kconfig:option:`CONFIG_CHIP_USE_ZEPHYR_NETWORKING` Kconfig option to ``y``.
+* The APIs of the OpenThread stack and the IEEE 802.15.4 radio driver, which are enabled by default for Matter over Thread.
+  This architecture is not supported for Matter over Wi-Fi.
+  To enable it, set the :kconfig:option:`CONFIG_CHIP_USE_OPENTHREAD_ENDPOINT` Kconfig option to ``y``.
+
+To learn more about the available architectures and suitable use cases for the presented options, see the :ref:`openthread_stack_architecture` user guide.

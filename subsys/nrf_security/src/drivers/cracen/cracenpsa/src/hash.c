@@ -8,18 +8,19 @@
 
 #include <psa/crypto.h>
 #include <psa/crypto_values.h>
-#include <sicrypto/hash.h>
 #include <string.h>
 #include <sxsymcrypt/hash.h>
 #include <sxsymcrypt/internal.h>
-#include <sxsymcrypt/sha1.h>
-#include <sxsymcrypt/sha2.h>
-#include <sxsymcrypt/sha3.h>
+#include <sxsymcrypt/hashdefs.h>
 #include <cracen/statuscodes.h>
 #include <zephyr/sys/__assert.h>
 #include "common.h"
 #include <cracen/mem_helpers.h>
 #include "cracen_psa_primitives.h"
+
+_Static_assert(SX_HASH_MAX_ENABLED_BLOCK_SIZE != 1,
+	       "To compile this file you need at least one hash algorithm enabled in the driver "
+	       "using the PSA_WANT_* configs.");
 
 psa_status_t cracen_hash_compute(psa_algorithm_t alg, const uint8_t *input, size_t input_length,
 				 uint8_t *hash, size_t hash_size, size_t *hash_length)
@@ -45,12 +46,12 @@ psa_status_t cracen_hash_compute(psa_algorithm_t alg, const uint8_t *input, size
 		return silex_statuscodes_to_psa(sx_status);
 	}
 
-	sx_status = sx_hash_feed(&c, (char *)input, input_length);
+	sx_status = sx_hash_feed(&c, input, input_length);
 	if (sx_status) {
 		return silex_statuscodes_to_psa(sx_status);
 	}
 
-	sx_status = sx_hash_digest(&c, (char *)hash);
+	sx_status = sx_hash_digest(&c, hash);
 	if (sx_status) {
 		return silex_statuscodes_to_psa(sx_status);
 	}

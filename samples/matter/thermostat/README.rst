@@ -8,7 +8,7 @@ Matter: Thermostat
    :depth: 2
 
 This thermostat sample demonstrates the usage of the :ref:`Matter <ug_matter>` application layer to build a thermostat device for monitoring temperature values and controlling the temperature.
-This device works as a Matter accessory device, meaning it can be paired and controlled remotely over a Matter network built on top of a low-power, 802.15.4 Thread network or on top of a Wi-Fi network.
+This device works as a Matter accessory device, meaning it can be paired and controlled remotely over a Matter network built on top of a low-power, 802.15.4 Thread network or on top of a Wi-Fi® network.
 In case of Thread, this device works as a Thread :ref:`Minimal End Device <thread_ot_device_types>`.
 Support for both Thread and Wi-Fi is mutually exclusive and depends on the hardware platform, so only one protocol can be supported for a specific Matter device.
 
@@ -36,7 +36,7 @@ IPv6 network support
 The development kits for this sample offer the following IPv6 network support for Matter:
 
 * Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, and ``nrf54l15dk/nrf54l15/cpuapp``.
-* Matter over Wi-Fi is supported for ``nrf5340dk/nrf5340/cpuapp`` with the ``nrf7002_ek`` shield attached or for ``nrf7002dk/nrf5340/cpuapp``.
+* Matter over Wi-Fi is supported for ``nrf5340dk/nrf5340/cpuapp`` with the ``nrf7002_ek`` shield attached, ``nrf7002dk/nrf5340/cpuapp``, or ``nrf54lm20dk/nrf54lm20a/cpuapp`` with the ``nrf7002eb2`` shield attached.
 
 Overview
 ********
@@ -119,28 +119,22 @@ Matter thermostat with Trusted Firmware-M
     :start-after: matter_template_build_with_tfm_start
     :end-before: matter_template_build_with_tfm_end
 
-Device Firmware Upgrade support
-===============================
+.. |Bluetooth| replace:: Bluetooth
 
-.. include:: ../lock/README.rst
-    :start-after: matter_door_lock_sample_build_with_dfu_start
-    :end-before: matter_door_lock_sample_build_with_dfu_end
+.. include:: /includes/advanced_conf_matter.txt
 
 .. _matter_thermostat_network_mode:
 
 Remote testing in a network
 ===========================
 
+.. |Bluetoothsc| replace:: Bluetooth
+.. |WiFi| replace:: Wi-Fi
+
 .. include:: ../light_bulb/README.rst
     :start-after: matter_light_bulb_sample_remote_testing_start
     :end-before: matter_light_bulb_sample_remote_testing_end
 
-Factory data support
-====================
-
-.. include:: ../lock/README.rst
-    :start-after: matter_door_lock_sample_factory_data_start
-    :end-before: matter_door_lock_sample_factory_data_end
 
 User interface
 **************
@@ -185,6 +179,26 @@ Building and running
 .. |sample path| replace:: :file:`samples/matter/thermostat`
 
 .. include:: /includes/build_and_run.txt
+
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
+
+Building the Matter over Wi-Fi sample variant on nRF5340 DK with nRF7002 EK shield
+==================================================================================
+
+.. include:: /includes/matter_building_nrf5340dk_70ek
+
+Building the Matter over Wi-Fi sample variant on nRF54LM20 DK with nRF7002-EB II shield
+=======================================================================================
+
+.. include:: /includes/matter_building_nrf54lm20dk_7002eb2
+
+Flashing the Matter over Wi-Fi sample variant
+=============================================
+
+.. include:: /includes/matter_sample_wifi_flash.txt
 
 Selecting a build type
 ======================
@@ -277,6 +291,9 @@ Enabling remote control
 =======================
 
 Remote control allows you to control the Matter thermostat device from an IPv6 network.
+
+.. note::
+   |matter_unique_discriminator_note|
 
 .. include:: ../lock/README.rst
     :start-after: matter_door_lock_sample_remote_control_start

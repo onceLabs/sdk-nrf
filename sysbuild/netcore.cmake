@@ -21,6 +21,12 @@ if(SB_CONFIG_SUPPORT_NETCORE AND NOT SB_CONFIG_NETCORE_NONE AND DEFINED SB_CONFI
     BOARD ${board_target_netcore}
     BOARD_REVISION ${BOARD_REVISION}
   )
+  if(SB_CONFIG_BOOTLOADER_MCUBOOT AND SB_CONFIG_SOC_NRF54H20)
+    set_target_properties(${SB_CONFIG_NETCORE_IMAGE_NAME} PROPERTIES
+      IMAGE_CONF_SCRIPT ${ZEPHYR_BASE}/share/sysbuild/image_configurations/MAIN_image_default.cmake
+    )
+    UpdateableImage_Add(APPLICATION ${SB_CONFIG_NETCORE_IMAGE_NAME})
+  endif()
 
   if(NOT "${SB_CONFIG_NETCORE_IMAGE_DOMAIN}" IN_LIST PM_DOMAINS)
     list(APPEND PM_DOMAINS ${SB_CONFIG_NETCORE_IMAGE_DOMAIN})
@@ -68,4 +74,10 @@ if(SB_CONFIG_SUPPORT_NETCORE AND NOT SB_CONFIG_NETCORE_NONE AND DEFINED SB_CONFI
   endif()
 
   set_property(GLOBAL PROPERTY PM_DOMAINS ${PM_DOMAINS})
+
+  if(SB_CONFIG_BOARD_NRF5340BSIM_NRF5340_CPUAPP)
+    native_simulator_set_child_images(${DEFAULT_IMAGE} ${SB_CONFIG_NETCORE_IMAGE_NAME})
+    native_simulator_set_primary_mcu_index(${DEFAULT_IMAGE} ${SB_CONFIG_NETCORE_IMAGE_NAME})
+    native_simulator_set_final_executable(${DEFAULT_IMAGE})
+  endif()
 endif()

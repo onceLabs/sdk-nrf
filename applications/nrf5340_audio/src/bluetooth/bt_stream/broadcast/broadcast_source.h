@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+/** @file
+ * @addtogroup audio_app_bt_stream
+ * @{
+ * @defgroup broadcast_source Functions for broadcast source functionality.
+ * @{
+ * @brief Helper functions to manage broadcast source functionality.
+ */
+
 #ifndef _BROADCAST_SOURCE_H_
 #define _BROADCAST_SOURCE_H_
 
@@ -222,14 +230,14 @@ int broadcast_source_id_get(uint8_t big_index, uint32_t *broadcast_id);
 /**
  * @brief	Broadcast the Bluetooth LE Audio data.
  *
+ * @param[in]	audio_frame	Pointer to the audio buffer.
  * @param[in]	big_index	Index of the Broadcast Isochronous Group (BIG) to broadcast.
  * @param[in]	subgroup_index	Index of the subgroup to broadcast.
- * @param[in]	enc_audio	Encoded audio struct.
  *
  * @return	0 for success, error otherwise.
  */
-int broadcast_source_send(uint8_t big_index, uint8_t subgroup_index,
-			  struct le_audio_encoded_audio enc_audio);
+int broadcast_source_send(struct net_buf const *const audio_frame, uint8_t big_index,
+			  uint8_t subgroup_index);
 
 /**
  * @brief	Disable the LE Audio broadcast (BIS) source.
@@ -262,5 +270,10 @@ void broadcast_source_default_create(struct broadcast_source_big *broadcast_para
  */
 int broadcast_source_enable(struct broadcast_source_big const *const broadcast_param,
 			    uint8_t big_index);
+
+/**
+ * @}
+ * @}
+ */
 
 #endif /* _BROADCAST_SOURCE_H_ */

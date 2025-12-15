@@ -145,18 +145,18 @@ When the Firmware Distribution Server starts applying the transferred image, the
 After applying the new firmware, the Firmware Distribution Server will immediately request firmware ID of the currently running firmware on the Target nodes to confirm that the new firmware has been applied successfully.
 Depending on the :c:enum:`bt_mesh_dfu_effect` value received from the Target nodes after the DFU transfer is started, the following cases are possible:
 
-* If the image effect for a particular Target node is :c:enum:`BT_MESH_DFU_EFFECT_UNPROV`, the Firmware Distribution Server doesn't expect any reply from that Target node.
-  If the Distributor doesn't receive any reply, it will repeat the request several times.
+* If the image effect for a particular Target node is :c:enum:`BT_MESH_DFU_EFFECT_UNPROV`, the Firmware Distribution Server does not expect any reply from that Target node.
+  If the Distributor does not receive any reply, it will repeat the request several times.
   If the Distributor eventually receives a reply, the DFU for this particular Target node is considered unsuccessful.
   Otherwise, the DFU is considered successful.
 * In all other cases, the Distributor expects a reply from the Target node with the firmware ID equal to the firmware ID of the transferred image.
-  If the Target node responds with a different firmware ID or doesn't respond at all after several requests, the DFU for this particular Target node is considered unsuccessful.
+  If the Target node responds with a different firmware ID or does not respond at all after several requests, the DFU for this particular Target node is considered unsuccessful.
   Otherwise, the DFU is considered successful.
 
 The DFU ends after the Distributor stops polling the Target nodes.
 If the DFU completes successfully for at least one Target node, the firmware distribution is considered as successful.
 In this case, the distribution phase is set to :c:enum:`BT_MESH_DFD_PHASE_COMPLETED`.
-If the DFU doesn't complete successfully, the distribution phase is set to :c:enum:`BT_MESH_DFD_PHASE_FAILED`.
+If the DFU does not complete successfully, the distribution phase is set to :c:enum:`BT_MESH_DFD_PHASE_FAILED`.
 
 Cancelling the distribution
 ***************************
@@ -198,14 +198,31 @@ Using the DFU metadata extraction script is the most efficient way of generating
 Automated metadata generation
 =============================
 
-By enabling the ``SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA`` option in sysbuild, the metadata will be automatically parsed from the ``.elf`` and ``.config`` files.
+By enabling the :kconfig:option:`SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA` option in sysbuild, the metadata will be automatically parsed from the ``.elf`` and ``.config`` files.
 The parsed data is stored in the :file:`ble_mesh_metadata.json` file.
 The file is placed in the :file:`dfu_application.zip` archive in the build folder of the application.
-Additionally, the metadata string required by the ``mesh models dfu slot add`` command will be printed in the command line window when the application is built::
+Additionally, the metadata string and, optionally, the firmware ID required by the ``mesh models dfu slot add`` command are printed in the command-line window when the application is built::
 
   Bluetooth Mesh Composition metadata generated:
     Encoded metadata: 020000000000000094cf24017c26f3710100
+    Firmware ID: 59000200000000000000
     Full metadata written to: APPLICATION_FOLDER\build\zephyr\dfu_application.zip
+
+You can generate the Firmware ID using one of the following options:
+
+* To use a user-supplied hex-string as the Firmware ID, enable the :kconfig:option:`SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA_FWID_CUSTOM` option.
+  This is the default behavior.
+
+  * If this option is selected, the :kconfig:option:`SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA_FWID_CUSTOM_HEX` option must be set to a valid Firmware ID.
+    At minimum, it should include a Company ID in little-endian order.
+    The rest of the string is vendor-specific version information.
+  * When using the :ref:`zephyr:bluetooth_mesh_dfd_srv` for distribution, the number of bytes in the Firmware ID of images used during distribution must not exceed the value of the :kconfig:option:`CONFIG_BT_MESH_DFU_FWID_MAXLEN` Kconfig option set on the distributor node.
+
+* To use a Firmware ID consisting of the values of the :kconfig:option:`CONFIG_BT_COMPANY_ID` and the :kconfig:option:`CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION` Kconfig options, enable the :kconfig:option:`SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA_FWID_MCUBOOT_VERSION` option.
+
+.. note::
+   The Firmware ID (FWID) specified in the JSON file must match the ``fwid`` used when initializing the :ref:`zephyr:bluetooth_mesh_dfu_srv`.
+   This ensures that after the firmware update is applied, the node will respond with the correct Current Firmware ID in the Firmware Update Information Status message.
 
 .. note::
    It is required that the Composition Data is declared with the ``const`` qualifier.
@@ -251,8 +268,9 @@ For this particular example, the following output is generated:
             }
           ]
         },
-        "composition_hash": "0x71f3267c",
-        "encoded_metadata": "020000000000000094cf24017c26f3710100"
+        "composition_hash": 1911760508,
+        "encoded_metadata": "020000000000000094cf24017c26f3710100",
+        "firmware_id": "59000200000000000000"
       }
 
 Manual metadata generation

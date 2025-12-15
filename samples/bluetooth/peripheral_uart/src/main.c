@@ -12,7 +12,6 @@
 #include <zephyr/types.h>
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/uart.h>
-#include <zephyr/usb/usb_device.h>
 
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
@@ -59,6 +58,7 @@ static K_SEM_DEFINE(ble_init_ok, 0, 1);
 
 static struct bt_conn *current_conn;
 static struct bt_conn *auth_conn;
+static struct k_work adv_work;
 
 static const struct device *uart = DEVICE_DT_GET(DT_CHOSEN(nordic_nus_uart));
 static struct k_work_delayable uart_work;
@@ -242,14 +242,6 @@ static int uart_init(void)
 		return -ENODEV;
 	}
 
-	if (IS_ENABLED(CONFIG_USB_DEVICE_STACK)) {
-		err = usb_enable(NULL);
-		if (err && (err != -EALREADY)) {
-			LOG_ERR("Failed to enable USB");
-			return err;
-		}
-	}
-
 	rx = k_malloc(sizeof(*rx));
 	if (rx) {
 		rx->len = 0;
@@ -300,7 +292,7 @@ static int uart_init(void)
 
 	if (tx) {
 		pos = snprintf(tx->data, sizeof(tx->data),
-			       "Starting Nordic UART service example\r\n");
+			       "Starting Nordic UART service sample\r\n");
 
 		if ((pos < 0) || (pos >= sizeof(tx->data))) {
 			k_free(rx);
@@ -331,6 +323,23 @@ static int uart_init(void)
 	}
 
 	return err;
+}
+
+static void adv_work_handler(struct k_work *work)
+{
+	int err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+
+	if (err) {
+		LOG_ERR("Advertising failed to start (err %d)", err);
+		return;
+	}
+
+	LOG_INF("Advertising successfully started");
+}
+
+static void advertising_start(void)
+{
+	k_work_submit(&adv_work);
 }
 
 static void connected(struct bt_conn *conn, uint8_t err)
@@ -370,6 +379,12 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	}
 }
 
+static void recycled_cb(void)
+{
+	LOG_INF("Connection object available from previous conn. Disconnect is complete!");
+	advertising_start();
+}
+
 #ifdef CONFIG_BT_NUS_SECURITY_ENABLED
 static void security_changed(struct bt_conn *conn, bt_security_t level,
 			     enum bt_security_err err)
@@ -388,8 +403,9 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 #endif
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
-	.connected    = connected,
-	.disconnected = disconnected,
+	.connected        = connected,
+	.disconnected     = disconnected,
+	.recycled         = recycled_cb,
 #ifdef CONFIG_BT_NUS_SECURITY_ENABLED
 	.security_changed = security_changed,
 #endif
@@ -591,13 +607,13 @@ int main(void)
 	if (IS_ENABLED(CONFIG_BT_NUS_SECURITY_ENABLED)) {
 		err = bt_conn_auth_cb_register(&conn_auth_callbacks);
 		if (err) {
-			printk("Failed to register authorization callbacks.\n");
+			LOG_ERR("Failed to register authorization callbacks. (err: %d)", err);
 			return 0;
 		}
 
 		err = bt_conn_auth_info_cb_register(&conn_auth_info_callbacks);
 		if (err) {
-			printk("Failed to register authorization info callbacks.\n");
+			LOG_ERR("Failed to register authorization info callbacks. (err: %d)", err);
 			return 0;
 		}
 	}
@@ -621,12 +637,8 @@ int main(void)
 		return 0;
 	}
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN, ad, ARRAY_SIZE(ad), sd,
-			      ARRAY_SIZE(sd));
-	if (err) {
-		LOG_ERR("Advertising failed to start (err %d)", err);
-		return 0;
-	}
+	k_work_init(&adv_work, adv_work_handler);
+	advertising_start();
 
 	for (;;) {
 		dk_set_led(RUN_STATUS_LED, (++blink_status) % 2);

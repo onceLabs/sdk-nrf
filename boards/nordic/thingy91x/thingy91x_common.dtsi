@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <dt-bindings/regulator/npm1300.h>
-#include <dt-bindings/regulator/npm6001.h>
+#include <zephyr/dt-bindings/regulator/npm13xx.h>
+#include <zephyr/dt-bindings/regulator/npm6001.h>
 
 &i2c2 {
 	compatible = "nordic,nrf-twim";
@@ -60,18 +60,18 @@
 			reg_3v3: BUCK2 {
 				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
-				enable-gpios = <&gpios_pmic 2 GPIO_ACTIVE_HIGH>;
+				enable-gpio-config = <2 GPIO_ACTIVE_HIGH>;
 			};
 			/* LDO1 is used as a load switch pulling the nPM6001 enable line to VSYS */
 			ldsw_nPM6001_en: LDO1 {
-				regulator-initial-mode = <NPM1300_LDSW_MODE_LDSW>;
-				regulator-allowed-modes = <NPM1300_LDSW_MODE_LDSW>;
+				regulator-initial-mode = <NPM13XX_LDSW_MODE_LDSW>;
+				regulator-allowed-modes = <NPM13XX_LDSW_MODE_LDSW>;
 				regulator-boot-off;
 			};
 			/* LDO2 is used as a load switch for sensor power supply */
 			ldsw_sensors: LDO2 {
-				regulator-initial-mode = <NPM1300_LDSW_MODE_LDSW>;
-				regulator-allowed-modes = <NPM1300_LDSW_MODE_LDSW>;
+				regulator-initial-mode = <NPM13XX_LDSW_MODE_LDSW>;
+				regulator-allowed-modes = <NPM13XX_LDSW_MODE_LDSW>;
 				regulator-boot-on;
 			};
 		};
@@ -83,7 +83,7 @@
 			/* Battery specs from LiPol LP803448 datasheet (Dwg. nr. FD_3245_70) */
 			term-microvolt = <4200000>;
 			current-microamp = <675000>; /* 0.5C charging current */
-			dischg-limit-microamp = <1340000>; /* Maximum value for PMIC */
+			dischg-limit-microamp = <1000000>; /* Maximum value for PMIC */
 			thermistor-cold-millidegrees = <0>;
 			thermistor-cool-millidegrees = <0>;
 			thermistor-warm-millidegrees = <45000>;

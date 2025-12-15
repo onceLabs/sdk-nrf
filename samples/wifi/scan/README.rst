@@ -76,8 +76,7 @@ The following are examples of the CLI commands:
 
    west build -b nrf7002dk/nrf5340/cpuapp -- -DCONFIG_WIFI_MGMT_RAW_SCAN_RESULTS=y
 
-.. note::
-   |54H_engb_2_8|
+.. include:: /includes/wifi_refer_sample_yaml_file.txt
 
 Testing
 =======

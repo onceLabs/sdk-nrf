@@ -1,15 +1,17 @@
 common:
   sysbuild: true
-  tags: ci_tests_benchmarks_current_consumption ppk_power_measure
-
+  tags:
+    - ci_tests_benchmarks_current_consumption
+    - ppk_power_measure
 tests:
   benchmarks.current_consumption.multicore_system_off:
     platform_allow:
       - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54lm20dk/nrf54lm20a/cpuapp
+      - nrf54lv10dk/nrf54lv10a/cpuapp
     integration_platforms:
-      - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54lm20dk/nrf54lm20a/cpuapp
     extra_args:
-      - SB_CONF_FILE=sysbuild/nrf54l15dk_nrf54l15_cpuflpr.conf
       - SB_CONFIG_PARTITION_MANAGER=n
     harness: pytest
     harness_config:

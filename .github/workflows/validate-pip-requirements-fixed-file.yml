@@ -10,15 +10,16 @@ on:
       - 'scripts/requirements*.txt'
       - '.github/workflows/validate-pip-requirements-fixed-file.yml'
 
+permissions:
+  contents: read
 
 jobs:
   check-requirements:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout sources
         uses: nrfconnect/action-checkout-west-update@main
         with:
-          git-ref: ${{ github.event.pull_request.head.sha }}
           west-update-args: '--narrow mcuboot zephyr'
 
       - name: Get python version
@@ -29,9 +30,15 @@ jobs:
           echo "python_version=$PYTHON_VERSION" >> $GITHUB_OUTPUT
 
       - name: Setup python version
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
         with:
           python-version: '${{ steps.pyv.outputs.python_version }}'
+
+      - name: Cache pip
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip
 
       - name: Setup environment
         working-directory: ncs
@@ -61,8 +68,8 @@ jobs:
             workon pip-fixed-venv  > /dev/null 2>&1
 
             pip3 install \
-              --extra-index-url https://files.nordicsemi.com/artifactory/api/pypi/nordic-pypi/simple \
-              pip-compile-cross-platform==1.4.2+nordic.2 --upgrade > /dev/null 2>&1
+              --index-url https://files.nordicsemi.com/artifactory/api/pypi/nordic-pypi/simple \
+              pip-compile-cross-platform==1.4.2+nordic.3 --upgrade > /dev/null 2>&1
             pip-compile-cross-platform \
               bootloader/mcuboot/scripts/requirements.txt \
               zephyr/scripts/requirements.txt \
@@ -71,7 +78,8 @@ jobs:
               nrf/scripts/requirements-extra.txt \
               nrf/scripts/requirements.txt \
               --output-file nrf/scripts/requirements-fixed.txt \
-              --min-python-version 3.10
+              --min-python-version 3.12 \
+              --index-url https://files.nordicsemi.com/artifactory/api/pypi/nordic-pypi/simple
 
             deactivate
             rmvirtualenv pip-fixed-venv

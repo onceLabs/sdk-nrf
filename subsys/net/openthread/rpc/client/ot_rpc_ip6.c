@@ -7,13 +7,15 @@
 #include <ot_rpc_ids.h>
 #include <ot_rpc_types.h>
 #include <ot_rpc_common.h>
+#include <ot_rpc_macros.h>
+#include <ot_rpc_os.h>
 #include <nrf_rpc/nrf_rpc_serialize.h>
-
-#include <zephyr/sys/util_macro.h>
 
 #include <nrf_rpc_cbor.h>
 
 #include <openthread/ip6.h>
+
+#include <stdio.h>
 
 #define OT_RPC_MAX_NUM_UNICAST_ADDRESSES   8
 #define OT_RPC_MAX_NUM_MULTICAST_ADDRESSES 8
@@ -25,7 +27,7 @@ const otNetifAddress *otIp6GetUnicastAddresses(otInstance *aInstance)
 	size_t count = 0;
 	static otNetifAddress addrs[OT_RPC_MAX_NUM_UNICAST_ADDRESSES];
 
-	ARG_UNUSED(aInstance);
+	OT_RPC_UNUSED(aInstance);
 
 	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 0);
 
@@ -36,7 +38,7 @@ const otNetifAddress *otIp6GetUnicastAddresses(otInstance *aInstance)
 		struct zcbor_string ipv6_addr;
 		uint16_t flags;
 
-		if (count >= ARRAY_SIZE(addrs)) {
+		if (count >= OT_RPC_ARRAY_SIZE(addrs)) {
 			rc = -ENOBUFS;
 			break;
 		}
@@ -89,7 +91,7 @@ const otNetifMulticastAddress *otIp6GetMulticastAddresses(otInstance *aInstance)
 	struct zcbor_string ipv6_addr;
 	static otNetifMulticastAddress addrs[OT_RPC_MAX_NUM_MULTICAST_ADDRESSES];
 
-	ARG_UNUSED(aInstance);
+	OT_RPC_UNUSED(aInstance);
 
 	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 0);
 
@@ -98,7 +100,7 @@ const otNetifMulticastAddress *otIp6GetMulticastAddresses(otInstance *aInstance)
 	while (zcbor_bstr_decode(ctx.zs, &ipv6_addr)) {
 		otNetifMulticastAddress *addr;
 
-		if (count >= ARRAY_SIZE(addrs)) {
+		if (count >= OT_RPC_ARRAY_SIZE(addrs)) {
 			rc = -ENOBUFS;
 			break;
 		}
@@ -129,7 +131,7 @@ otError otIp6SetEnabled(otInstance *aInstance, bool aEnabled)
 	struct nrf_rpc_cbor_ctx ctx;
 	otError error;
 
-	ARG_UNUSED(aInstance);
+	OT_RPC_UNUSED(aInstance);
 
 	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 1);
 	nrf_rpc_encode_bool(&ctx, aEnabled);
@@ -144,7 +146,7 @@ bool otIp6IsEnabled(otInstance *aInstance)
 	struct nrf_rpc_cbor_ctx ctx;
 	bool enabled;
 
-	ARG_UNUSED(aInstance);
+	OT_RPC_UNUSED(aInstance);
 
 	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 0);
 
@@ -164,7 +166,7 @@ otError otIp6SubscribeMulticastAddress(otInstance *aInstance, const otIp6Address
 	struct nrf_rpc_cbor_ctx ctx;
 	otError error;
 
-	ARG_UNUSED(aInstance);
+	OT_RPC_UNUSED(aInstance);
 
 	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 1 + OT_IP6_ADDRESS_SIZE);
 	nrf_rpc_encode_buffer(&ctx, (const char *)aAddress, OT_IP6_ADDRESS_SIZE);
@@ -179,7 +181,7 @@ otError otIp6UnsubscribeMulticastAddress(otInstance *aInstance, const otIp6Addre
 	struct nrf_rpc_cbor_ctx ctx;
 	otError error;
 
-	ARG_UNUSED(aInstance);
+	OT_RPC_UNUSED(aInstance);
 
 	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 1 + OT_IP6_ADDRESS_SIZE);
 
@@ -188,4 +190,17 @@ otError otIp6UnsubscribeMulticastAddress(otInstance *aInstance, const otIp6Addre
 				ot_rpc_decode_error, &error);
 
 	return error;
+}
+
+void otIp6AddressToString(const otIp6Address *aAddress, char *aBuffer, uint16_t aSize)
+{
+	snprintf(aBuffer, aSize, "%x:%x:%x:%x:%x:%x:%x:%x",
+		 ot_rpc_os_htons(aAddress->mFields.m16[0]),
+		 ot_rpc_os_htons(aAddress->mFields.m16[1]),
+		 ot_rpc_os_htons(aAddress->mFields.m16[2]),
+		 ot_rpc_os_htons(aAddress->mFields.m16[3]),
+		 ot_rpc_os_htons(aAddress->mFields.m16[4]),
+		 ot_rpc_os_htons(aAddress->mFields.m16[5]),
+		 ot_rpc_os_htons(aAddress->mFields.m16[6]),
+		 ot_rpc_os_htons(aAddress->mFields.m16[7]));
 }

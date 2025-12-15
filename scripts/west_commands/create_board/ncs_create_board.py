@@ -1,20 +1,25 @@
 # Copyright (c) 2024 Nordic Semiconductor ASA
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
-from pathlib import Path
 import json
 import shutil
+import sys
+from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader
-from west.commands import WestCommand
-from west import log
-from yaml import load
 import jsonschema
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+from west.commands import WestCommand
+from yaml import load
 
 try:
     from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
+
+sys.path.append(str(Path(__file__).parents[1]))
+import utils
+
+utils.install_json_excepthook()
 
 
 SCRIPT_DIR = Path(__file__).absolute().parent
@@ -46,14 +51,19 @@ class NcsCreateBoard(WestCommand):
         return parser
 
     def do_run(self, args, unknown_args):
-        with open(SCHEMA, "r") as f:
+        with open(SCHEMA) as f:
             schema = json.loads(f.read())
 
         if args.json_schema:
+            schema = {
+                "schema": schema,
+                "state": None,
+            }
+
             print(json.dumps(schema))
             return
 
-        with open(CONFIG, "r") as f:
+        with open(CONFIG) as f:
             config = load(f, Loader=Loader)
 
         # validate input
@@ -62,7 +72,7 @@ class NcsCreateBoard(WestCommand):
         try:
             jsonschema.validate(input, schema)
         except jsonschema.ValidationError as e:
-            raise Exception("Board configuration is not valid") from e
+            raise ValueError("Board configuration is not valid") from e
 
         soc_parts = input["soc"].split("-")
         req_soc = soc_parts[0].lower()
@@ -81,8 +91,7 @@ class NcsCreateBoard(WestCommand):
                     break
 
         if not series:
-            log.err(f"Invalid/unsupported SoC: {req_soc}")
-            return
+            raise ValueError(f"Invalid/unsupported SoC: {req_soc}")
 
         targets = []
         for variant in soc["variants"]:
@@ -125,8 +134,7 @@ class NcsCreateBoard(WestCommand):
                 break
 
         if not targets:
-            log.err(f"Invalid/unsupported variant: {req_variant}")
-            return
+            raise ValueError(f"Invalid/unsupported variant: {req_variant}")
 
         # prepare Jinja environment
         env = Environment(
@@ -164,12 +172,15 @@ class NcsCreateBoard(WestCommand):
             f.write(tmpl.render())
 
         tmpl = env.get_template("board.yml.jinja2")
-        with open(out_dir / f"board.yml", "w") as f:
+        with open(out_dir / "board.yml", "w") as f:
             f.write(tmpl.render())
 
-        tmpl = env.get_template("Kconfig.defconfig.jinja2")
-        with open(out_dir / f"Kconfig.defconfig", "w") as f:
-            f.write(tmpl.render(config))
+        try:
+            tmpl = env.get_template("Kconfig.defconfig.jinja2")
+            with open(out_dir / "Kconfig.defconfig", "w") as f:
+                f.write(tmpl.render(config))
+        except TemplateNotFound:
+            pass
 
         # nrf53 specific files
         if series == "nrf53":
@@ -204,8 +215,10 @@ class NcsCreateBoard(WestCommand):
             with open(out_dir / f"{name}.dts", "w") as f:
                 f.write(tmpl.render(target=target))
 
-            tmpl = env.get_template("board_twister.yml.jinja2")
-            with open(out_dir / f"{name}.yml", "w") as f:
+            tmpl = env.get_template("board_twister.yaml.jinja2")
+            with open(out_dir / f"{name}.yaml", "w") as f:
                 f.write(tmpl.render(target=target))
 
-        print(f"Board {input['board']} created successfully")
+        # return post-commands
+        commands = []
+        print(json.dumps({"commands": commands}))

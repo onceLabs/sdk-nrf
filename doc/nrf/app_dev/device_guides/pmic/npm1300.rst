@@ -45,34 +45,38 @@ The following boards in the `Zephyr`_ open source project and in the |NCS| are c
      - | `Product Specification <nRF9160 Product Specification_>`_
        | :ref:`Getting started <ug_nrf9160_gs>`
        | `User Guide <nRF9160 DK Hardware_>`_
-   * - :ref:`zephyr:nrf54h20dk_nrf54h20`
+   * - :zephyr:board:`nrf54h20dk`
      - nPM1300 EK
      - PCA10175
-     - | ``nrf54h20dk_nrf54h20_cpuapp``
-       | ``nrf54h20dk_nrf54h20_cpurad``
-       | ``nrf54h20dk_nrf54h20_cpuppr``
-     - | `Objective Product Specification <nRF54H20 Objective Product Specification 0.3.1_>`_
-       | :ref:`Getting started <ug_nrf54h20_gs>`
-   * - :ref:`zephyr:nrf54l15dk_nrf54l15`
+     - | ``nrf54h20dk/nrf54h20/cpuapp``
+       | ``nrf54h20dk/nrf54h20/cpurad``
+       | ``nrf54h20dk/nrf54h20/cpuppr``
+     - | :ref:`Getting started with the nRF54H20 DK <ug_nrf54h20_gs>`
+   * - :zephyr:board:`nrf54l15dk`
      - nPM1300 EK
      - PCA10156
      - | ``nrf54l15dk/nrf54l15/cpuapp``
      - --
-   * - :ref:`zephyr:nrf5340dk_nrf5340`
+   * - :zephyr:board:`nrf54lm20dk`
+     - nPM1300 EK
+     - PCA10184
+     - | ``nrf54lm20dk/nrf54lm20a/cpuapp``
+     - --
+   * - :zephyr:board:`nrf5340dk`
      - nPM1300 EK
      - PCA10095
      - ``nrf5340dk/nrf5340/cpuapp``
      - | `Product Specification <nRF5340 Product Specification_>`_
        | `Quick Start app`_
        | `User Guide <nRF5340 DK User Guide_>`_
-   * - :ref:`zephyr:nrf52840dk_nrf52840`
+   * - :zephyr:board:`nrf52840dk`
      - nPM1300 EK
      - PCA10056
      - ``nrf52840dk/nrf52840``
      - | `Product Specification <nRF52840 Product Specification_>`_
        | `Quick Start app`_
        | `User Guide <nRF52840 DK User Guide_>`_
-   * - :ref:`zephyr:nrf52dk_nrf52832`
+   * - :zephyr:board:`nrf52dk`
      - nPM1300 EK
      - PCA10040
      - ``nrf52dk/nrf52832``
@@ -122,7 +126,7 @@ Connecting the development kit to nPM1300
 =========================================
 
 If you are using the nRF5340 DK, follow the steps in `Use the nPM1300 EK with an nRF5340 DK`_ in the `nPM1300 EK User Guide`_.
-For other Nordic Semiconductor kits, use the wiring steps in the documentation for :ref:`pmic_samples` as reference (:ref:`wiring for the Fuel gauge sample <npm1300_fuel_gauge_wiring>` and :ref:`wiring for the One button sample <npm1300_one_button_wiring>`, respectively).
+For other Nordic Semiconductor kits, use the wiring steps in the documentation for :ref:`pmic_samples` as reference (:ref:`wiring for the Fuel gauge sample <npm13xx_fuel_gauge_wiring>` and :ref:`wiring for the One button sample <npm13xx_one_button_wiring>`, respectively).
 
 If you are using custom hardware, the wiring process is similar to the `one for the nRF5340 DK <Use the nPM1300 EK with an nRF5340 DK_>`_, but board-specific steps will be different.
 

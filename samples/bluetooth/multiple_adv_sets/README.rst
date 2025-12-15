@@ -67,8 +67,10 @@ Building and running
 
 .. include:: /includes/build_and_run_ns.txt
 
-.. note::
-   |54H_engb_2_8|
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
 
 .. _multiple_adv_sets_testing:
 

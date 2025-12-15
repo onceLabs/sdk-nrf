@@ -4,8 +4,8 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
-import re
 import argparse
+import re
 
 # Tests for validating the regexes are located tests/unity/wrap
 
@@ -34,6 +34,12 @@ def header_prepare(in_file, out_file, out_wrap_file):
         r'((?:\w+[*\s]+)+z_impl_\w+?\(.*?\))\n\{.+?\n\}',
         re.M | re.S)
     content = static_inline_pattern.sub(r"", content)
+
+    # rewrite SVCALL to normal function declaration
+    svcall_pattern = re.compile(
+        r'SVCALL\(\w+, (\w+), (\w+\([^)]*\))\);',
+        re.M)
+    content = svcall_pattern.sub(r"\1 \2;", content)
 
     # change static inline functions to normal function declaration
     static_inline_pattern = re.compile(

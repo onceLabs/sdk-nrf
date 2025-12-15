@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-# Build Oberon PSA crypto driver 
+# Build Oberon PSA crypto driver
 set(drivers_path ${OBERON_PSA_CORE_PATH}/oberon/drivers)
 
 target_include_directories(psa_crypto_library_config
@@ -21,6 +21,7 @@ list(APPEND src_crypto_oberon
   ${drivers_path}/oberon_spake2p.c
   ${drivers_path}/oberon_srp.c
   ${drivers_path}/oberon_rsa.c
+  ${drivers_path}/oberon_wpa3_sae.c
 )
 
 append_with_prefix_ifdef(CONFIG_PSA_NEED_OBERON_KEY_MANAGEMENT_DRIVER        src_crypto_oberon ${drivers_path} oberon_key_management.c)
@@ -35,21 +36,21 @@ append_with_prefix_ifdef(CONFIG_PSA_NEED_OBERON_ASYMMETRIC_SIGNATURE_DRIVER  src
 append_with_prefix_ifdef(CONFIG_PSA_NEED_OBERON_ASYMMETRIC_ENCRYPTION_DRIVER src_crypto_oberon ${drivers_path} oberon_asymmetric_encrypt.c)
 append_with_prefix_ifdef(CONFIG_PSA_NEED_OBERON_CTR_DRBG_DRIVER              src_crypto_oberon ${drivers_path} oberon_ctr_drbg.c)
 append_with_prefix_ifdef(CONFIG_PSA_NEED_OBERON_HMAC_DRBG_DRIVER             src_crypto_oberon ${drivers_path} oberon_hmac_drbg.c)
+append_with_prefix_ifdef(CONFIG_PSA_NEED_OBERON_KEY_WRAP_DRIVER              src_crypto_oberon ${drivers_path} oberon_key_wrap.c)
 
 add_library(oberon_psa_driver STATIC
   ${src_crypto_oberon}
 )
 
-# Turn off warnings that Oberon are systematically
-# triggering. Oberon is testing this deliverable before we get it so
-# we don't need to re-test it with gcc warnings.
-target_compile_options(oberon_psa_driver
-  PRIVATE
-    -Wno-uninitialized
-    -Wno-maybe-uninitialized
-    -Wno-unused-variable
-    -Wno-unused-function
-)
+# Clang does not support -Wno-maybe-uninitialized so the following
+# warning option is only used for GNU (GCC)
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  target_compile_options(oberon_psa_driver
+    PRIVATE
+      -Wno-maybe-uninitialized
+  )
+endif()
+
 
 target_include_directories(oberon_psa_driver
   PRIVATE
@@ -63,6 +64,9 @@ target_link_libraries(oberon_psa_driver
     psa_interface
 )
 
+if(CONFIG_PSA_NEED_CRACEN_TRNG_DRIVER)
+  add_subdirectory(cracen_trng)
+endif()
 
 # Link to imported libraries for Oberon APIs.
 target_link_libraries(oberon_psa_driver
@@ -71,8 +75,8 @@ target_link_libraries(oberon_psa_driver
     mbedcrypto_oberon_imported
 )
 
-# Link oberon_psa_core with this driver
-target_link_libraries(oberon_psa_core
+# Link psa_core with this driver
+target_link_libraries(psa_core
   PRIVATE
     oberon_psa_driver
 )

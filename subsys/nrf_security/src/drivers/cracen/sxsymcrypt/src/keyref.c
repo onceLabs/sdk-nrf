@@ -6,16 +6,16 @@
 
 #include "../include/sxsymcrypt/keyref.h"
 
-struct sxkeyref sx_keyref_load_material(size_t keysz, const char *keymaterial)
+struct sxkeyref sx_keyref_load_material(size_t keysz, const uint8_t *keymaterial)
 {
-	struct sxkeyref k;
+	struct sxkeyref keyref;
 
-	k.key = keymaterial;
-	k.sz = keysz;
-	k.cfg = 0;
-	k.prepare_key = 0;
-	k.clean_key = 0;
-	k.user_data = 0;
+	keyref.key = keymaterial;
+	keyref.sz = keysz;
+	keyref.cfg = 0;
+	keyref.prepare_key = 0;
+	keyref.clean_key = 0;
+	keyref.user_data = 0;
 
-	return k;
+	return keyref;
 }

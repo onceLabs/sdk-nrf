@@ -3,13 +3,14 @@
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 
-from intelhex import IntelHex
 import argparse
-import re
-import sys
 import base64
 import math
+import re
+import sys
 from hashlib import sha256
+
+from intelhex import IntelHex
 
 _FAST_PAIR_MAGIC = (0xFA, 0x57, 0xFA, 0x57)
 _ANTI_SPOOFING_KEY_LEN = 32
@@ -72,7 +73,7 @@ def parse_arguments():
     p.add_argument("-m", "--model_id", type=str, required=True,
                    help="Model ID (in format 0xXXXXXX)")
     p.add_argument("-k", "--anti_spoofing_key", type=str, required=True,
-                   help="Anti Spoofing Key (base64 encoded)")
+                   help="Anti Spoofing Key (Base64 encoded)")
 
     return p.parse_args()
 
@@ -85,6 +86,6 @@ if __name__ == "__main__":
                                        args.anti_spoofing_key)
         print("Successfully generated Fast Pair provisioning data")
     except Exception as e:
-        print("Exception: {}".format(e))
+        print(f"Exception: {e}")
         print("Failed to generate Fast Pair provisioning data")
         sys.exit(1)

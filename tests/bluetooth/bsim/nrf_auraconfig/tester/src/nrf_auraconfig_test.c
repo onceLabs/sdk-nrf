@@ -90,7 +90,7 @@ static const struct bt_audio_codec_cap codec_cap = BT_AUDIO_CODEC_CAP_LC3(
 static const uint32_t bis_index_mask = BIT_MASK(ARRAY_SIZE(streams) + 1U);
 static uint32_t requested_bis_sync;
 static uint32_t bis_index_bitfield;
-static uint8_t sink_broadcast_code[BT_AUDIO_BROADCAST_CODE_SIZE];
+static uint8_t sink_broadcast_code[BT_ISO_BROADCAST_CODE_SIZE];
 
 static char broadcast_name_target[ADV_NAME_MAX + 1];
 
@@ -639,6 +639,17 @@ static int init(void)
 	}
 
 	LOG_DBG("Bluetooth initialized");
+
+	const struct bt_pacs_register_param pacs_param = {
+		.snk_pac = true,
+		.snk_loc = true,
+	};
+
+	err = bt_pacs_register(&pacs_param);
+	if (err) {
+		LOG_ERR("Could not register PACS (err %d)\n", err);
+		return err;
+	}
 
 	err = bt_pacs_cap_register(BT_AUDIO_DIR_SINK, &cap);
 	if (err) {

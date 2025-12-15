@@ -6,12 +6,10 @@
 
 from os import PathLike
 from pathlib import Path
-from typing import Tuple, Optional
 
 from sphinx.application import Sphinx
 from sphinx.cmd.build import get_parser
 from west.manifest import Manifest
-
 
 _NRF_BASE = Path(__file__).parents[2]
 """NCS Repository root"""
@@ -24,7 +22,7 @@ ALL_DOCSETS = {
     "nrfxlib": ("nrfxlib", "README", "nrfxlib"),
     "zephyr": ("Zephyr Project", "index", "zephyr"),
     "mcuboot": ("MCUboot", "wrapper", "mcuboot"),
-    "tfm": ("Trusted Firmware-M", "index", "trusted-firmware-m"),
+    "tfm": ("Trusted Firmware-M", "wrapper", "trusted-firmware-m"),
     "matter": ("Matter", "index", "matter"),
     "kconfig": ("Kconfig Reference", "index", None),
 }
@@ -102,7 +100,7 @@ def get_srcdir(docset: str) -> PathLike:
     return get_builddir() / docset / "src"
 
 
-def get_intersphinx_mapping(docset: str) -> Optional[Tuple[str, str]]: # pylint: disable=unsubscriptable-object
+def get_intersphinx_mapping(docset: str) -> tuple[str, str] | None:
     """Obtain intersphinx configuration for a given docset.
 
     Args:

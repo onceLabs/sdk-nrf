@@ -1,6 +1,6 @@
 .. _ncs_release_notes_changelog:
 
-Changelog for |NCS| v2.8.99
+Changelog for |NCS| v3.2.99
 ###########################
 
 .. contents::
@@ -16,14 +16,14 @@ The most relevant changes that are present on the main branch of the |NCS|, as c
 
    When adding a new PR, decide whether it needs an entry in the changelog.
    If it does, update this page.
-   Add the sections you need, as only a handful of sections is kept when the changelog is cleaned.
-   "Protocols" section serves as a highlight section for all protocol-related changes, including those made to samples, libraries, and so on.
+   Add the sections you need, as only a handful of sections are kept when the changelog is cleaned.
+   The "Protocols" section serves as a highlight section for all protocol-related changes, including those made to samples, libraries, and other components that implement or support protocol functionality.
 
 Known issues
 ************
 
 Known issues are only tracked for the latest official release.
-See :ref:`known_issues` for the list of issues valid for the latest release.
+See `known issues for nRF Connect SDK v3.2.0`_ for the list of issues valid for the latest release.
 
 Changelog
 *********
@@ -60,12 +60,12 @@ Developing with nRF70 Series
 
 |no_changes_yet_note|
 
-Working with nRF54H Series
-==========================
+Developing with nRF54L Series
+=============================
 
 |no_changes_yet_note|
 
-Developing with nRF54L Series
+Developing with nRF54H Series
 =============================
 
 |no_changes_yet_note|
@@ -80,8 +80,18 @@ Developing with nRF52 Series
 
 |no_changes_yet_note|
 
-Developing with Front-End Modules
-=================================
+Developing with Thingy:91 X
+===========================
+
+|no_changes_yet_note|
+
+Developing with Thingy:91
+=========================
+
+|no_changes_yet_note|
+
+Developing with Thingy:53
+=========================
 
 |no_changes_yet_note|
 
@@ -90,25 +100,30 @@ Developing with PMICs
 
 |no_changes_yet_note|
 
+Developing with Front-End Modules
+=================================
+
+|no_changes_yet_note|
+
+Developing with custom boards
+=============================
+
+|no_changes_yet_note|
+
 Security
 ========
 
-|no_changes_yet_note|
+* Added support for the WPA3-SAE and WPA3-SAE-PT in the :ref:`CRACEN driver <crypto_drivers_cracen>`.
 
 Protocols
 =========
 
 |no_changes_yet_note|
 
-Amazon Sidewalk
----------------
-
-|no_changes_yet_note|
-
 Bluetooth® LE
 -------------
 
-* Updated the Bluetooth LE SoftDevice Controller driver to make the :c:func:`hci_vs_sdc_llpm_mode_set` function return an error if Low Latency Packet Mode (LLPM) is not supported or not enabled in the Bluetooth LE Controller driver configuration (:kconfig:option:`CONFIG_BT_CTLR_SDC_LLPM`).
+|no_changes_yet_note|
 
 Bluetooth Mesh
 --------------
@@ -124,6 +139,8 @@ Enhanced ShockBurst (ESB)
 -------------------------
 
 |no_changes_yet_note|
+
+* Fixed invalid radio configuration for legacy ESB protocol.
 
 Gazell
 ------
@@ -150,32 +167,22 @@ Thread
 
 |no_changes_yet_note|
 
-Zigbee
+Wi-Fi®
 ------
-
-|no_changes_yet_note|
-
-Wi-Fi
------
 
 |no_changes_yet_note|
 
 Applications
 ============
 
-This section provides detailed lists of changes by :ref:`application <applications>`.
+nRF5340 Audio
+-------------
 
-Machine learning
-----------------
+* Added dynamic configuration of the number of channels for the encoder based on the configured audio locations.
+  The number of channels is set during runtime using the :c:func:`audio_system_encoder_num_ch_set` function.
+  This allows configuring mono or stereo encoding depending on the configured audio locations, potentially saving CPU and memory resources.
 
-* Updated the application to enable the :ref:`Zephyr Memory Storage (ZMS) <zephyr:zms_api>` file system for the :ref:`zephyr:nrf54h20dk_nrf54h20` board.
-
-Asset Tracker v2
-----------------
-
-|no_changes_yet_note|
-
-Connectivity Bridge
+Connectivity bridge
 -------------------
 
 |no_changes_yet_note|
@@ -183,9 +190,9 @@ Connectivity Bridge
 IPC radio firmware
 ------------------
 
-* Updated the application to enable the :ref:`Zephyr Memory Storage (ZMS) <zephyr:zms_api>` file system in all devices that contain MRAM, such as the nRF54H Series devices.
+|no_changes_yet_note|
 
-Matter Bridge
+Matter bridge
 -------------
 
 |no_changes_yet_note|
@@ -198,15 +205,11 @@ nRF5340 Audio
 nRF Desktop
 -----------
 
-|no_changes_yet_note|
+* Updated the :option:`CONFIG_DESKTOP_BT` Kconfig option to no longer select the deprecated :kconfig:option:`CONFIG_BT_SIGNING` Kconfig option.
+  Application relies on Bluetooth LE security mode 1 and security level of at least 2 to ensure data confidentiality through encryption.
 
 nRF Machine Learning (Edge Impulse)
 -----------------------------------
-
-|no_changes_yet_note|
-
-Serial LTE modem
-----------------
 
 |no_changes_yet_note|
 
@@ -220,14 +223,13 @@ Samples
 
 This section provides detailed lists of changes by :ref:`sample <samples>`.
 
-Amazon Sidewalk samples
------------------------
-
-|no_changes_yet_note|
-
 Bluetooth samples
 -----------------
 
+|no_changes_yet_note|
+
+Bluetooth Mesh samples
+----------------------
 
 |no_changes_yet_note|
 
@@ -235,37 +237,6 @@ Bluetooth Fast Pair samples
 ---------------------------
 
 |no_changes_yet_note|
-
-Bluetooth Mesh samples
-----------------------
-
-* Added:
-
-  * Support for nRF54L15 in the following samples:
-
-    * :ref:`bluetooth_mesh_sensor_client`
-    * :ref:`bluetooth_mesh_sensor_server`
-    * :ref:`bluetooth_ble_peripheral_lbs_coex`
-    * :ref:`bt_mesh_chat`
-    * :ref:`bluetooth_mesh_light_switch`
-    * :ref:`bluetooth_mesh_silvair_enocean`
-    * :ref:`bluetooth_mesh_light_dim`
-    * :ref:`bluetooth_mesh_light`
-    * :ref:`ble_mesh_dfu_target`
-    * :ref:`bluetooth_mesh_light_lc`
-    * :ref:`ble_mesh_dfu_distributor`
-
-  * Support for nRF54L05 in the following samples:
-
-    * :ref:`bluetooth_mesh_sensor_client`
-    * :ref:`bluetooth_mesh_sensor_server`
-    * :ref:`bluetooth_ble_peripheral_lbs_coex`
-    * :ref:`bt_mesh_chat`
-    * :ref:`bluetooth_mesh_light_switch`
-    * :ref:`bluetooth_mesh_silvair_enocean`
-    * :ref:`bluetooth_mesh_light_dim`
-    * :ref:`bluetooth_mesh_light`
-    * :ref:`bluetooth_mesh_light_lc`
 
 Cellular samples
 ----------------
@@ -275,7 +246,9 @@ Cellular samples
 Cryptography samples
 --------------------
 
-|no_changes_yet_note|
+* :ref:`crypto_aes_ccm` sample:
+
+  * Added support for the ``nrf54lm20dk/nrf54lm20a/cpuapp`` board target.
 
 Debug samples
 -------------
@@ -302,6 +275,11 @@ Gazell samples
 
 |no_changes_yet_note|
 
+|ISE| samples
+--------------
+
+|no_changes_yet_note|
+
 Keys samples
 ------------
 
@@ -310,7 +288,9 @@ Keys samples
 Matter samples
 --------------
 
-|no_changes_yet_note|
+* :ref:`matter_manufacturer_specific_sample`:
+
+  * Added support for the ``NRF_MATTER_CLUSTER_INIT`` macro.
 
 Networking samples
 ------------------
@@ -362,13 +342,7 @@ Trusted Firmware-M (TF-M) samples
 
 |no_changes_yet_note|
 
-
 Thread samples
---------------
-
-|no_changes_yet_note|
-
-Zigbee samples
 --------------
 
 |no_changes_yet_note|
@@ -388,9 +362,12 @@ Drivers
 
 This section provides detailed lists of changes by :ref:`driver <drivers>`.
 
+Wi-Fi drivers
+-------------
+
 |no_changes_yet_note|
 
-Wi-Fi drivers
+Flash drivers
 -------------
 
 |no_changes_yet_note|
@@ -408,9 +385,7 @@ Binary libraries
 Bluetooth libraries and services
 --------------------------------
 
-* :ref:`bt_fast_pair_readme` library:
-
-  * Updated the :c:func:`bt_fast_pair_info_cb_register` API to allow registration of multiple callbacks.
+|no_changes_yet_note|
 
 Common Application Framework
 ----------------------------
@@ -440,7 +415,9 @@ Security libraries
 Modem libraries
 ---------------
 
-|no_changes_yet_note|
+* :ref:`lte_lc_readme` library:
+
+  * Added support for new PDN events :c:enumerator:`LTE_LC_EVT_PDN_SUSPENDED` and :c:enumerator:`LTE_LC_EVT_PDN_RESUMED`.
 
 Multiprotocol Service Layer libraries
 -------------------------------------
@@ -465,20 +442,12 @@ nRF RPC libraries
 Other libraries
 ---------------
 
-|no_changes_yet_note|
+* :ref:`lib_hw_id` library:
 
-Security libraries
-------------------
-
-|no_changes_yet_note|
+  * The ``CONFIG_HW_ID_LIBRARY_SOURCE_BLE_MAC`` Kconfig option has been renamed to :kconfig:option:`CONFIG_HW_ID_LIBRARY_SOURCE_BT_DEVICE_ADDRESS`.
 
 Shell libraries
 ---------------
-
-|no_changes_yet_note|
-
-Libraries for Zigbee
---------------------
 
 |no_changes_yet_note|
 
@@ -490,8 +459,6 @@ See the changelog for each library in the :doc:`nrfxlib documentation <nrfxlib:R
 Scripts
 =======
 
-This section provides detailed lists of changes by :ref:`script <scripts>`.
-
 |no_changes_yet_note|
 
 Integrations
@@ -502,7 +469,7 @@ This section provides detailed lists of changes by :ref:`integration <integratio
 Google Fast Pair integration
 ----------------------------
 
-* Added instructions on how to provision the Fast Pair data onto devices without the :ref:`partition_manager` support, specifically for the :ref:`zephyr:nrf54h20dk_nrf54h20`.
+|no_changes_yet_note|
 
 Edge Impulse integration
 ------------------------
@@ -512,7 +479,9 @@ Edge Impulse integration
 Memfault integration
 --------------------
 
-|no_changes_yet_note|
+* Updated:
+
+  * The ``CONFIG_MEMFAULT_DEVICE_INFO_BUILTIN`` Kconfig option has been renamed to :kconfig:option:`CONFIG_MEMFAULT_NCS_DEVICE_INFO_BUILTIN`.
 
 AVSystem integration
 --------------------
@@ -537,7 +506,7 @@ DULT integration
 MCUboot
 =======
 
-The MCUboot fork in |NCS| (``sdk-mcuboot``) contains all commits from the upstream MCUboot repository up to and including ``a4eda30f5b0cfd0cf15512be9dcd559239dbfc91``, with some |NCS| specific additions.
+The MCUboot fork in |NCS| (``sdk-mcuboot``) contains all commits from the upstream MCUboot repository up to and including ``8d14eebfe0b7402ebdf77ce1b99ba1a3793670e9``, with some |NCS| specific additions.
 
 The code for integrating MCUboot into |NCS| is located in the :file:`ncs/nrf/modules/mcuboot` folder.
 
@@ -550,21 +519,21 @@ Zephyr
 
 .. NOTE TO MAINTAINERS: All the Zephyr commits in the below git commands must be handled specially after each upmerge and each nRF Connect SDK release.
 
-The Zephyr fork in |NCS| (``sdk-zephyr``) contains all commits from the upstream Zephyr repository up to and including ``beb733919d8d64a778a11bd5e7d5cbe5ae27b8ee``, with some |NCS| specific additions.
+The Zephyr fork in |NCS| (``sdk-zephyr``) contains all commits from the upstream Zephyr repository up to and including ``911b3da1394dc6846c706868b1d407495701926f``, with some |NCS| specific additions.
 
-For the list of upstream Zephyr commits (not including cherry-picked commits) incorporated into nRF Connect SDK since the most recent release, run the following command from the :file:`ncs/zephyr` repository (after running ``west update``):
+For the list of upstream Zephyr commits (not including cherry-picked commits) incorporated into |NCS| since the most recent release, run the following command from the :file:`ncs/zephyr` repository (after running ``west update``):
 
 .. code-block:: none
 
-   git log --oneline beb733919d ^ea02b93eea
+   git log --oneline 911b3da139 ^0fe59bf1e4
 
 For the list of |NCS| specific commits, including commits cherry-picked from upstream, run:
 
 .. code-block:: none
 
-   git log --oneline manifest-rev ^beb733919d
+   git log --oneline manifest-rev ^911b3da139
 
-The current |NCS| main branch is based on revision ``beb733919d`` of Zephyr.
+The current |NCS| main branch is based on revision ``0fe59bf1e4`` of Zephyr.
 
 .. note::
    For possible breaking changes and changes between the latest Zephyr release and the current Zephyr version, refer to the :ref:`Zephyr release notes <zephyr_release_notes>`.
@@ -592,4 +561,4 @@ cJSON
 Documentation
 =============
 
-|no_changes_yet_note|
+* Updated the :ref:`install_ncs` page with minor updates and fixes to the :ref:`additional_deps` section.

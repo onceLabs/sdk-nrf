@@ -37,7 +37,15 @@ LOG_MODULE_REGISTER(MODULE, CONFIG_DESKTOP_HIDS_LOG_LEVEL);
  * Bluetooth LE connection event.
  */
 #define HIDS_SUBSCRIBER_PIPELINE_SIZE 0x02
-#define HIDS_SUBSCRIBER_REPORT_MAX    UINT8_MAX
+#define HIDS_SUBSCRIBER_REPORT_MAX    CONFIG_DESKTOP_HIDS_SUBSCRIBER_REPORT_MAX
+
+BUILD_ASSERT(HIDS_SUBSCRIBER_REPORT_MAX >= HIDS_SUBSCRIBER_PIPELINE_SIZE,
+	     "Ensure that HID input report pipeline can be created");
+/* Make sure that there is at least one extra ATT buffer for ATT response.
+ * More ATT buffers might be needed for other application modules (e.g. bas).
+ */
+BUILD_ASSERT(CONFIG_BT_ATT_TX_COUNT > HIDS_SUBSCRIBER_REPORT_MAX,
+	     "Too small number of ATT buffers");
 
 BT_HIDS_DEF(hids_obj,
 	IF_ENABLED(CONFIG_DESKTOP_HID_REPORT_MOUSE_SUPPORT,
@@ -68,14 +76,20 @@ static bool protocol_boot;
 static struct config_channel_transport cfg_chan_transport;
 static struct k_work_delayable notify_secured;
 
-static void broadcast_subscription_change(uint8_t report_id, bool enabled)
+
+static bool is_hid_boot_report(uint8_t report_id)
 {
-	bool boot = (report_id == REPORT_ID_BOOT_MOUSE) ||
-		    (report_id == REPORT_ID_BOOT_KEYBOARD);
+	return (report_id == REPORT_ID_BOOT_MOUSE) || (report_id == REPORT_ID_BOOT_KEYBOARD);
+}
 
-	enabled = enabled && (protocol_boot == boot);
+static bool is_subscribed(uint8_t report_id)
+{
+	return report_enabled[report_id] && (protocol_boot == is_hid_boot_report(report_id));
+}
 
-	if (enabled == subscribed[report_id]) {
+static void broadcast_subscription_change(uint8_t report_id, bool subscribe)
+{
+	if (subscribe == subscribed[report_id]) {
 		/* No change in subscription. */
 		return;
 	}
@@ -85,19 +99,37 @@ static void broadcast_subscription_change(uint8_t report_id, bool enabled)
 		return;
 	}
 
-	subscribed[report_id] = enabled;
+	subscribed[report_id] = subscribe;
 
 	struct hid_report_subscription_event *event =
 		new_hid_report_subscription_event();
 
 	event->report_id  = report_id;
-	event->enabled    = enabled;
+	event->enabled    = subscribe;
 	event->subscriber = cur_conn;
 
 	LOG_INF("Notifications for report 0x%x are %sabled", report_id,
 		(event->enabled)?("en"):("dis"));
 
 	APP_EVENT_SUBMIT(event);
+}
+
+static void broadcast_all_subscription_changes_internal(bool subscribed_filter)
+{
+	for (size_t r_id = 0; r_id < REPORT_ID_COUNT; r_id++) {
+		if (is_subscribed(r_id) == subscribed_filter) {
+			broadcast_subscription_change(r_id, subscribed_filter);
+		}
+	}
+}
+
+static void broadcast_all_subscription_changes(void)
+{
+	/* First disable old subscriptions, then enable new subscriptions. This is done to ensure
+	 * that HID boot and HID report mode subscriptions would never be enabled at the same time.
+	 */
+	broadcast_all_subscription_changes_internal(false);
+	broadcast_all_subscription_changes_internal(true);
 }
 
 static void pm_evt_handler(enum bt_hids_pm_evt evt, struct bt_conn *conn)
@@ -117,10 +149,7 @@ static void pm_evt_handler(enum bt_hids_pm_evt evt, struct bt_conn *conn)
 		break;
 	}
 
-	for (size_t r_id = 0; r_id < REPORT_ID_COUNT; r_id++) {
-		bool enabled = report_enabled[r_id];
-		broadcast_subscription_change(r_id, enabled);
-	}
+	broadcast_all_subscription_changes();
 }
 
 static void sync_notif_handler(const struct hid_notification_event *event)
@@ -137,10 +166,10 @@ static void sync_notif_handler(const struct hid_notification_event *event)
 
 	report_enabled[report_id] = enabled;
 
-	broadcast_subscription_change(report_id, enabled);
+	broadcast_subscription_change(report_id, is_subscribed(report_id));
 }
 
-static void async_notif_handler(uint8_t report_id, enum bt_hids_notify_evt evt)
+static void notification_change_handler_async(uint8_t report_id, enum bt_hids_notify_evt evt)
 {
 	struct hid_notification_event *event = new_hid_notification_event();
 
@@ -169,7 +198,7 @@ static void boot_mouse_report_sent_cb(struct bt_conn *conn, void *user_data)
 static void boot_mouse_notif_handler(enum bt_hids_notify_evt evt)
 {
 	__ASSERT_NO_MSG(IS_ENABLED(CONFIG_DESKTOP_HID_BOOT_INTERFACE_MOUSE));
-	async_notif_handler(REPORT_ID_BOOT_MOUSE, evt);
+	notification_change_handler_async(REPORT_ID_BOOT_MOUSE, evt);
 }
 
 static void boot_keyboard_report_sent_cb(struct bt_conn *conn, void *user_data)
@@ -180,90 +209,103 @@ static void boot_keyboard_report_sent_cb(struct bt_conn *conn, void *user_data)
 static void boot_keyboard_notif_handler(enum bt_hids_notify_evt evt)
 {
 	__ASSERT_NO_MSG(IS_ENABLED(CONFIG_DESKTOP_HID_BOOT_INTERFACE_KEYBOARD));
-	async_notif_handler(REPORT_ID_BOOT_KEYBOARD, evt);
+	notification_change_handler_async(REPORT_ID_BOOT_KEYBOARD, evt);
 }
 
-static void mouse_report_sent_cb(struct bt_conn *conn, void *user_data)
+static void report_sent_cb(struct bt_conn *conn, void *user_data)
 {
-	ARG_UNUSED(user_data);
-	hid_report_sent(conn, REPORT_ID_MOUSE, false);
-}
-static void mouse_notif_handler(enum bt_hids_notify_evt evt)
-{
-	async_notif_handler(REPORT_ID_MOUSE, evt);
+	uint8_t report_id = (uint8_t)(uintptr_t)user_data;
+
+	__ASSERT_NO_MSG(report_id < REPORT_ID_COUNT);
+
+	hid_report_sent(conn, report_id, false);
 }
 
-static void keyboard_keys_report_sent_cb(struct bt_conn *conn, void *user_data)
+static void output_report_handler_async(struct bt_hids_rep *rep, struct bt_conn *conn, bool write)
 {
-	ARG_UNUSED(user_data);
-	hid_report_sent(conn, REPORT_ID_KEYBOARD_KEYS, false);
-}
-static void keyboard_keys_notif_handler(enum bt_hids_notify_evt evt)
-{
-	async_notif_handler(REPORT_ID_KEYBOARD_KEYS, evt);
-}
-
-static void system_ctrl_report_sent_cb(struct bt_conn *conn, void *user_data)
-{
-	ARG_UNUSED(user_data);
-	hid_report_sent(conn, REPORT_ID_SYSTEM_CTRL, false);
-}
-static void system_ctrl_notif_handler(enum bt_hids_notify_evt evt)
-{
-	async_notif_handler(REPORT_ID_SYSTEM_CTRL, evt);
-}
-
-static void consumer_ctrl_report_sent_cb(struct bt_conn *conn, void *user_data)
-{
-	ARG_UNUSED(user_data);
-	hid_report_sent(conn, REPORT_ID_CONSUMER_CTRL, false);
-}
-static void consumer_ctrl_notif_handler(enum bt_hids_notify_evt evt)
-{
-	async_notif_handler(REPORT_ID_CONSUMER_CTRL, evt);
-}
-
-static void broadcast_kbd_leds_report(struct bt_hids_rep *rep, struct bt_conn *conn, bool write)
-{
-	/* Ignore HID keyboard LEDs report read. */
 	if (!write) {
+		/* Ignore reads on output reports. */
 		return;
 	}
 
-	struct hid_report_event *event = new_hid_report_event(rep->size + 1);
+	/* Check if report is supported. */
+	size_t i;
+
+	for (i = 0; i < ARRAY_SIZE(output_reports); i++) {
+		if (rep->id == output_reports[i]) {
+			break;
+		}
+	}
+
+	if (i == ARRAY_SIZE(output_reports)) {
+		LOG_ERR("Unsupported output report ID: 0x%" PRIx8, rep->id);
+		return;
+	}
+
+	if (rep->size > REPORT_BUFFER_SIZE_OUTPUT_REPORT) {
+		LOG_ERR("Unsupported output report size %" PRIu8, rep->size);
+		return;
+	}
+
+	size_t dyndata_len = sizeof(rep->id) + rep->size;
+	struct hid_report_event *event = new_hid_report_event(dyndata_len);
 
 	event->source = conn;
 	/* Subscriber is not specified for HID output report. */
 	event->subscriber = NULL;
-	event->dyndata.data[0] = REPORT_ID_KEYBOARD_LEDS;
-	memcpy(&event->dyndata.data[1], rep->data, rep->size);
 
+	uint8_t *evt_buf = event->dyndata.data;
+
+	/* Explicitly add report ID. */
+	evt_buf[0] = rep->id;
+	evt_buf++;
+
+	memcpy(evt_buf, rep->data, rep->size);
 	APP_EVENT_SUBMIT(event);
 }
 
-static void feature_report_handler(struct bt_hids_rep *rep,
-				   struct bt_conn *conn,
-				   bool write)
+static bool is_supported_config_channel_report_id(uint8_t rep_id)
 {
-	if (IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_ENABLE)) {
-		if (!write) {
-			int err = config_channel_transport_get(&cfg_chan_transport,
-							       rep->data,
-							       rep->size);
+	return ((IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_ENABLE) &&
+		 (rep_id == REPORT_ID_USER_CONFIG)) ||
+		(IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_OUT_REPORT) &&
+		 (rep_id == REPORT_ID_USER_CONFIG_OUT)));
+}
 
-			if (err) {
-				LOG_WRN("Failed to process report get");
-			}
-		} else {
-			int err = config_channel_transport_set(&cfg_chan_transport,
-							       rep->data,
-							       rep->size);
+static void config_channel_report_handler_async(struct bt_hids_rep *rep, struct bt_conn *conn,
+						bool write)
+{
+	if (!is_supported_config_channel_report_id(rep->id)) {
+		LOG_ERR("Not a supported config channel report ID: 0x%" PRIx8, rep->id);
+		return;
+	}
 
-			if (err) {
-				LOG_WRN("Failed to process report set");
-			}
+	if (!write) {
+		int err = config_channel_transport_get(&cfg_chan_transport,
+						       rep->data,
+						       rep->size);
+		if (err) {
+			LOG_WRN("config_channel_transport_get failed (err: %d)", err);
+		}
+	} else {
+		int err = config_channel_transport_set(&cfg_chan_transport,
+						       rep->data,
+						       rep->size);
+		if (err) {
+			LOG_WRN("config_channel_transport_set failed (err: %d)", err);
 		}
 	}
+}
+
+static void boot_keyboard_output_report_handler(struct bt_hids_rep *rep,
+						struct bt_conn *conn,
+						bool write)
+{
+	/* Update the passed report ID. */
+	struct bt_hids_rep updated_rep = *rep;
+
+	updated_rep.id = REPORT_ID_KEYBOARD_LEDS;
+	return output_report_handler_async(&updated_rep, conn, write);
 }
 
 static int module_init(void)
@@ -298,10 +340,10 @@ static int module_init(void)
 			     (sizeof(mask) == DIV_ROUND_UP(REPORT_SIZE_MOUSE, 8)));
 		BUILD_ASSERT(REPORT_ID_MOUSE < ARRAY_SIZE(report_index));
 
-		input_report[ir_pos].id       = REPORT_ID_MOUSE;
-		input_report[ir_pos].size     = REPORT_SIZE_MOUSE;
-		input_report[ir_pos].handler  = mouse_notif_handler;
-		input_report[ir_pos].rep_mask = (sizeof(mask) == 0)?(NULL):(mask);
+		input_report[ir_pos].id          = REPORT_ID_MOUSE;
+		input_report[ir_pos].size        = REPORT_SIZE_MOUSE;
+		input_report[ir_pos].handler_ext = notification_change_handler_async;
+		input_report[ir_pos].rep_mask    = (sizeof(mask) == 0)?(NULL):(mask);
 
 		report_index[input_report[ir_pos].id] = ir_pos;
 		ir_pos++;
@@ -313,10 +355,10 @@ static int module_init(void)
 			     (sizeof(mask) == DIV_ROUND_UP(REPORT_SIZE_KEYBOARD_KEYS, 8)));
 		BUILD_ASSERT(REPORT_ID_KEYBOARD_KEYS < ARRAY_SIZE(report_index));
 
-		input_report[ir_pos].id       = REPORT_ID_KEYBOARD_KEYS;
-		input_report[ir_pos].size     = REPORT_SIZE_KEYBOARD_KEYS;
-		input_report[ir_pos].handler  = keyboard_keys_notif_handler;
-		input_report[ir_pos].rep_mask = (sizeof(mask) == 0)?(NULL):(mask);
+		input_report[ir_pos].id          = REPORT_ID_KEYBOARD_KEYS;
+		input_report[ir_pos].size        = REPORT_SIZE_KEYBOARD_KEYS;
+		input_report[ir_pos].handler_ext = notification_change_handler_async;
+		input_report[ir_pos].rep_mask    = (sizeof(mask) == 0)?(NULL):(mask);
 
 		report_index[input_report[ir_pos].id] = ir_pos;
 		ir_pos++;
@@ -328,10 +370,10 @@ static int module_init(void)
 			     (sizeof(mask) == DIV_ROUND_UP(REPORT_SIZE_SYSTEM_CTRL, 8)));
 		BUILD_ASSERT(REPORT_ID_SYSTEM_CTRL < ARRAY_SIZE(report_index));
 
-		input_report[ir_pos].id       = REPORT_ID_SYSTEM_CTRL;
-		input_report[ir_pos].size     = REPORT_SIZE_SYSTEM_CTRL;
-		input_report[ir_pos].handler  = system_ctrl_notif_handler;
-		input_report[ir_pos].rep_mask = (sizeof(mask) == 0)?(NULL):(mask);
+		input_report[ir_pos].id          = REPORT_ID_SYSTEM_CTRL;
+		input_report[ir_pos].size        = REPORT_SIZE_SYSTEM_CTRL;
+		input_report[ir_pos].handler_ext = notification_change_handler_async;
+		input_report[ir_pos].rep_mask    = (sizeof(mask) == 0)?(NULL):(mask);
 
 		report_index[input_report[ir_pos].id] = ir_pos;
 		ir_pos++;
@@ -343,10 +385,10 @@ static int module_init(void)
 			     (sizeof(mask) == DIV_ROUND_UP(REPORT_SIZE_CONSUMER_CTRL, 8)));
 		BUILD_ASSERT(REPORT_ID_CONSUMER_CTRL < ARRAY_SIZE(report_index));
 
-		input_report[ir_pos].id       = REPORT_ID_CONSUMER_CTRL;
-		input_report[ir_pos].size     = REPORT_SIZE_CONSUMER_CTRL;
-		input_report[ir_pos].handler  = consumer_ctrl_notif_handler;
-		input_report[ir_pos].rep_mask = (sizeof(mask) == 0)?(NULL):(mask);
+		input_report[ir_pos].id          = REPORT_ID_CONSUMER_CTRL;
+		input_report[ir_pos].size        = REPORT_SIZE_CONSUMER_CTRL;
+		input_report[ir_pos].handler_ext = notification_change_handler_async;
+		input_report[ir_pos].rep_mask    = (sizeof(mask) == 0)?(NULL):(mask);
 
 		report_index[input_report[ir_pos].id] = ir_pos;
 		ir_pos++;
@@ -355,9 +397,9 @@ static int module_init(void)
 	hids_init_param.inp_rep_group_init.cnt = ir_pos;
 
 	if (IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_ENABLE)) {
-		feature_report[feat_pos].id      = REPORT_ID_USER_CONFIG;
-		feature_report[feat_pos].size    = REPORT_SIZE_USER_CONFIG;
-		feature_report[feat_pos].handler = feature_report_handler;
+		feature_report[feat_pos].id          = REPORT_ID_USER_CONFIG;
+		feature_report[feat_pos].size        = REPORT_SIZE_USER_CONFIG;
+		feature_report[feat_pos].handler     = config_channel_report_handler_async;
 
 		report_index[feature_report[feat_pos].id] = feat_pos;
 		feat_pos++;
@@ -366,19 +408,20 @@ static int module_init(void)
 	hids_init_param.feat_rep_group_init.cnt = feat_pos;
 
 	if (IS_ENABLED(CONFIG_DESKTOP_HID_REPORT_KEYBOARD_SUPPORT)) {
-		output_report[or_pos].id      = REPORT_ID_KEYBOARD_LEDS;
-		output_report[or_pos].size    = REPORT_SIZE_KEYBOARD_LEDS;
-		output_report[or_pos].handler = broadcast_kbd_leds_report;
+		output_report[or_pos].id          = REPORT_ID_KEYBOARD_LEDS;
+		output_report[or_pos].size        = REPORT_SIZE_KEYBOARD_LEDS;
+		output_report[or_pos].handler     = output_report_handler_async;
 
 		report_index[output_report[or_pos].id] = or_pos;
 		or_pos++;
 	}
 
 	if (IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_OUT_REPORT)) {
-		__ASSERT_NO_MSG(IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_ENABLE));
-		output_report[or_pos].id      = REPORT_ID_USER_CONFIG_OUT;
-		output_report[or_pos].size    = REPORT_SIZE_USER_CONFIG;
-		output_report[or_pos].handler = feature_report_handler;
+		BUILD_ASSERT(!IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_OUT_REPORT) ||
+			     IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_ENABLE));
+		output_report[or_pos].id          = REPORT_ID_USER_CONFIG_OUT;
+		output_report[or_pos].size        = REPORT_SIZE_USER_CONFIG;
+		output_report[or_pos].handler     = config_channel_report_handler_async;
 
 		report_index[output_report[or_pos].id] = or_pos;
 		or_pos++;
@@ -396,7 +439,7 @@ static int module_init(void)
 	if (IS_ENABLED(CONFIG_DESKTOP_HID_BOOT_INTERFACE_KEYBOARD)) {
 		hids_init_param.is_kb = true;
 		hids_init_param.boot_kb_notif_handler = boot_keyboard_notif_handler;
-		hids_init_param.boot_kb_outp_rep_handler = broadcast_kbd_leds_report;
+		hids_init_param.boot_kb_outp_rep_handler = boot_keyboard_output_report_handler;
 	}
 
 	if (IS_ENABLED(CONFIG_DESKTOP_CONFIG_CHANNEL_ENABLE)) {
@@ -410,15 +453,6 @@ static int module_init(void)
 
 static void send_hid_report(const struct hid_report_event *event)
 {
-	static void (*const report_sent_cb[REPORT_ID_COUNT])(struct bt_conn *conn, void *user_data) = {
-		[REPORT_ID_MOUSE]         = mouse_report_sent_cb,
-		[REPORT_ID_KEYBOARD_KEYS] = keyboard_keys_report_sent_cb,
-		[REPORT_ID_SYSTEM_CTRL]   = system_ctrl_report_sent_cb,
-		[REPORT_ID_CONSUMER_CTRL] = consumer_ctrl_report_sent_cb,
-		[REPORT_ID_BOOT_MOUSE] = boot_mouse_report_sent_cb,
-		[REPORT_ID_BOOT_KEYBOARD] = boot_keyboard_report_sent_cb,
-	};
-
 	if (!cur_conn || (cur_conn != event->subscriber)) {
 		/* It's not us */
 		return;
@@ -429,7 +463,6 @@ static void send_hid_report(const struct hid_report_event *event)
 	uint8_t report_id = event->dyndata.data[0];
 
 	__ASSERT_NO_MSG(report_id < ARRAY_SIZE(report_index));
-	__ASSERT_NO_MSG(report_sent_cb[report_id]);
 
 	if (!subscribed[report_id]) {
 		/* Notification disabled */
@@ -450,7 +483,7 @@ static void send_hid_report(const struct hid_report_event *event)
 			err = bt_hids_boot_mouse_inp_rep_send(&hids_obj, cur_conn,
 							      &buffer[0], buffer[1],
 							      buffer[2],
-							      report_sent_cb[report_id]);
+							      boot_mouse_report_sent_cb);
 		}
 		break;
 	case REPORT_ID_BOOT_KEYBOARD:
@@ -459,17 +492,18 @@ static void send_hid_report(const struct hid_report_event *event)
 		} else {
 			err = bt_hids_boot_kb_inp_rep_send(&hids_obj, cur_conn,
 							   buffer, size,
-							   report_sent_cb[report_id]);
+							   boot_keyboard_report_sent_cb);
 		}
 		break;
 	default:
 		if (protocol_boot) {
 			err = -EBADF;
 		} else {
-			err = bt_hids_inp_rep_send(&hids_obj, cur_conn,
-						   report_index[report_id],
-						   buffer, size,
-						   report_sent_cb[report_id]);
+			err = bt_hids_inp_rep_send_userdata(&hids_obj, cur_conn,
+							    report_index[report_id],
+							    buffer, size,
+							    report_sent_cb,
+							    (void *)(uintptr_t)report_id);
 		}
 		break;
 	}
@@ -491,11 +525,7 @@ static void send_hid_report(const struct hid_report_event *event)
 static void notify_secured_fn(struct k_work *work)
 {
 	secured = true;
-
-	for (size_t r_id = 0; r_id < REPORT_ID_COUNT; r_id++) {
-		bool enabled = report_enabled[r_id];
-		broadcast_subscription_change(r_id, enabled);
-	}
+	broadcast_all_subscription_changes();
 }
 
 static void broadcast_hids_subscriber_state(void *subscriber, bool enabled)
@@ -653,7 +683,7 @@ static bool app_event_handler(const struct app_event_header *aeh)
 	return false;
 }
 APP_EVENT_LISTENER(MODULE, app_event_handler);
-APP_EVENT_SUBSCRIBE(MODULE, hid_report_event);
+APP_EVENT_SUBSCRIBE_EARLY(MODULE, hid_report_event);
 APP_EVENT_SUBSCRIBE(MODULE, hid_notification_event);
 /* The module is initialized before CAF BLE state module to make sure that the GATT HIDS is
  * registered before Bluetooth is enabled. This is done to avoid submitting works related to Service

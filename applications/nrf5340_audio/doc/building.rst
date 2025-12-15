@@ -11,17 +11,18 @@ This nRF5340 Audio application source files can be found in their respective fol
 
 You can build and program the applications in one of the following ways:
 
-* :ref:`nrf53_audio_app_building_script`.
-  This is the suggested method.
+* :ref:`nrf53_audio_app_building_script` - This is the suggested method.
   Using this method allows you to build and program multiple development kits at the same time.
-* :ref:`nrf53_audio_app_building_standard`.
-  Using this method requires building and programming each development kit separately.
+* :ref:`nrf53_audio_app_building_standard` - Using this method requires building and programming each development kit separately.
 
 .. important::
-   Building and programming using the |nRFVSC| is currently not supported.
+   Building and programming using |nRFVSC| is currently not supported.
 
 .. note::
-   You might want to check the :ref:`nRF5340 Audio application known issues <known_issues_nrf5340audio>` before building and programming the applications.
+   Check the :ref:`nRF5340 Audio application known issues <known_issues_nrf5340audio>` before building and programming the applications.
+   Some of them might impact running the application on certain platforms.
+
+   For example, one of the known issues (OCT-2154) mentions intermittent audio stream on the headset when using USB audio interface on macOS.
 
 .. _nrf53_audio_app_dk_testing_out_of_the_box:
 
@@ -48,6 +49,9 @@ This eases the process of building and programming images for multiple developme
 
 The script is located in the :file:`applications/nrf5340_audio/tools/buildprog` directory.
 
+  .. note::
+     The :file:`buildprog.py` script is an app-specific script for building and programming multiple kits and cores with various audio application configurations. The script will be deprecated in a future release. The audio applications will gradually shift only to using standard tools for building and programming development kits.
+
 Preparing the JSON file
 =======================
 
@@ -60,13 +64,13 @@ This is how the file looks by default:
 
 When preparing the JSON file, update the following fields:
 
-* ``nrf5340_audio_dk_snr`` -- This field lists the SEGGER serial number.
+* ``nrf5340_audio_dk_snr`` - This field lists the SEGGER serial number.
   You can check this ten-digit number on the sticker on the nRF5340 Audio development kit.
-  Alternatively, connect the development kit to your PC and run ``nrfjprog -i`` in a command window to print the SEGGER serial number of all connected kits.
-* ``nrf5340_audio_dk_dev`` -- This field assigns the specific nRF5340 Audio development kit to be ``headset`` or ``gateway``.
-* ``channel`` -- This field is valid only for headsets.
-  It sets the channels on which the headset is meant to work.
-  When no channel is set, the headset is programmed as a left channel one.
+  Alternatively, connect the development kit to your PC and run ``nrfutil device list`` in a command window to print the SEGGER serial number of all connected kits.
+* ``nrf5340_audio_dk_dev`` - This field assigns the specific nRF5340 Audio development kit to be ``headset`` or ``gateway``.
+* ``location`` - This field is valid only for headsets.
+  It sets the location on which the headset is meant to work, especially when using the :ref:`default CIS transport mode configuration <nrf53_audio_transport_mode_configuration>`.
+  For more information, see :ref:`nrf53_audio_app_configuration_headset_location`.
 
 .. _nrf53_audio_app_building_script_running:
 
@@ -98,6 +102,10 @@ The building command for running the script requires providing the following par
      - ``release``, ``debug``
      - | :ref:`nrf53_audio_app_configuration_files`
        | **Note:** For FOTA DFU, you must use :ref:`nrf53_audio_app_building_standard`.
+   * - Transport type (``-t``)
+     - Specifies the transport type.
+     - ``broadcast``, ``unicast``
+     - :ref:`nrf53_audio_app_overview_architecture`
    * - Device type (``-d``)
      - Specifies the device type.
      - ``headset``, ``gateway``, ``both``
@@ -107,13 +115,13 @@ For example, the following command builds headset and gateway applications using
 
 .. code-block:: console
 
-   python buildprog.py -c app -b debug -d both
+   python buildprog.py -c app -b debug -d both -t unicast
 
 The command can be run from any location, as long as the correct path to :file:`buildprog.py` is given.
 
-The build files are saved in separate subdirectories in the :file:`applications/nrf5340_audio/build` directory.
-The script creates a directory for each application version and device type combination.
-For example, when running the command above, the script creates the :file:`dev_gateway/build_debug` and :file:`dev_headset/build_debug` directories.
+The build files are saved in separate subdirectories in the :file:`applications/nrf5340_audio/tools/build` directory.
+The script creates a directory for each transport, device type, core, and version combination.
+For example, when running the command above, the script creates the :file:`unicast/gateway/app/debug`, :file:`unicast/gateway/net/debug`, :file:`unicast/headset/app/debug`, :file:`unicast/headset/net/debug` files and directories.
 
 Script parameters for programming
 ---------------------------------
@@ -121,8 +129,8 @@ Script parameters for programming
 The script can program the build files as part of the same `python buildprog.py` command used for building.
 Use one of the following programming parameters:
 
-* Programming (``-p`` parameter) -- If you run the ``buildprog`` script with this parameter, you can program one or both of the cores after building the files.
-* Sequential programming (``-s`` parameter) -- If you encounter problems while programming, include this parameter alongside other parameters to program sequentially.
+* Programming (``-p`` parameter) - If you run the ``buildprog`` script with this parameter, you can program one or both of the cores after building the files.
+* Sequential programming (``-s`` parameter) - If you encounter problems while programming, include this parameter alongside other parameters to program sequentially.
 
 .. note::
     The development kits are programmed according to the serial numbers set in the JSON file.
@@ -132,9 +140,9 @@ The command for programming can look as follows:
 
 .. code-block:: console
 
-   python buildprog.py -c both -b debug -d both -p
+   python buildprog.py -c both -b debug -d both -t unicast -p
 
-This command builds the headset and the gateway applications with ``debug`` version of both the application core binary and the network core binary - and programs each to its respective core.
+This command builds the unicast headset and the gateway applications with ``debug`` version of both the application core binary and the network core binary - and programs each to its respective core.
 If you want to rebuild from scratch, you can add the ``--pristine`` parameter to the command (west's ``-p`` for cannot be used for a pristine build with the script).
 
 .. note::
@@ -143,7 +151,7 @@ If you want to rebuild from scratch, you can add the ``--pristine`` parameter to
 
    .. code-block:: console
 
-      python buildprog.py -c both -b debug -d both -p --recover_on_fail
+      python buildprog.py -c both -b debug -d both -t unicast -p --recover_on_fail
 
 Getting help
 ------------
@@ -218,14 +226,14 @@ Application configuration files
 ===============================
 
 The application uses a :file:`prj.conf` configuration file located in the sample root directory for the default configuration.
-It also provides additional files for different custom configurations.
+It also uses application-specific overlay files and can use additional files for different custom configurations.
 When you build the sample, you can select one of these configurations using the :makevar:`FILE_SUFFIX` variable.
 
-See :ref:`app_build_file_suffixes` and :ref:`cmake_options` for more information.
+See :ref:`nrf53_audio_app_configuration_files`, :ref:`app_build_file_suffixes`, and :ref:`cmake_options` for more information.
 
-The application supports the following custom configurations:
+The application supports the following configuration files:
 
-.. list-table:: Application custom configurations
+.. list-table:: Application configurations
    :widths: auto
    :header-rows: 1
 
@@ -244,8 +252,26 @@ The application supports the following custom configurations:
    * - FOTA DFU
      - :file:`prj_fota.conf`
      - ``fota``
-     - | Builds the debug version of the application with the features needed to perform DFU over Bluetooth LE, and includes bootloaders so that the applications on both the application core and network core can be updated.
+     - | Builds the debug version of the application (:file:`prj.conf`) with the features needed to perform DFU over Bluetooth LE, and includes bootloaders so that the applications on both the application core and network core can be updated.
        | See :ref:`nrf53_audio_app_fota` for more information.
+   * - Application-specific overlay file
+     - :file:`unicast_server/overlay-unicast_server.conf`
+     - ``unicast_server``
+     - Configuration file for the unicast server application.
+   * - Application-specific overlay file
+     - :file:`unicast_client/overlay-unicast_client.conf`
+     - ``unicast_client``
+     - Configuration file for the unicast client application.
+   * - Application-specific overlay file
+     - :file:`broadcast_sink/overlay-broadcast_sink.conf`
+     - ``broadcast_sink``
+     - Configuration file for the broadcast sink application.
+   * - Application-specific overlay file
+     - :file:`broadcast_source/overlay-broadcast_source.conf`
+     - ``broadcast_source``
+     - Configuration file for the broadcast source application.
+
+.. _nrf53_audio_app_configuration_select_build:
 
 Building the application
 ========================
@@ -254,10 +280,12 @@ Complete the following steps to build the application:
 
 1. Choose the combination of build flags:
 
-   a. Choose the device type by using one of the following options:
+   a. Choose the configuration file for the device selected by using one of the following options:
 
-      * For headset device: ``-DCONFIG_AUDIO_DEV=1``
-      * For gateway device: ``-DCONFIG_AUDIO_DEV=2``
+      * For unicast headset: ``-DEXTRA_CONF_FILE=".\unicast_server\overlay-unicast_server.conf"``
+      * For unicast gateway: ``-DEXTRA_CONF_FILE=".\unicast_client\overlay-unicast_client.conf"``
+      * For broadcast headset: ``-DEXTRA_CONF_FILE=".\broadcast_sink\overlay-broadcast_sink.conf"``
+      * For broadcast gateway: ``-DEXTRA_CONF_FILE=".\broadcast_source\overlay-broadcast_source.conf"``
 
    #. Choose the application version (:ref:`nrf53_audio_app_building_config_files`) by using one of the following options:
 
@@ -269,9 +297,9 @@ Complete the following steps to build the application:
 
    .. code-block:: console
 
-      west build -b nrf5340_audio_dk/nrf5340/cpuapp --pristine -- -DCONFIG_AUDIO_DEV=1 -DFILE_SUFFIX=release
+      west build -b nrf5340_audio_dk/nrf5340/cpuapp --pristine -- -DEXTRA_CONF_FILE=".\unicast_server\overlay-unicast_server.conf" -DFILE_SUFFIX=release
 
-   This command creates the build files for headset device directly in the :file:`build` directory.
+   This command creates the build files for a unicast headset device directly in the :file:`build` directory.
    What this means is that you cannot create build files for all devices you want to program, because the subsequent commands will overwrite the files in the :file:`build` directory.
 
    To work around this standard west behavior, you can add the ``-d`` parameter to the ``west`` command to specify a custom build folder for each device.
@@ -285,34 +313,44 @@ The following command example builds the application for :ref:`nrf53_audio_app_f
 
 .. code-block:: console
 
-   west build -b nrf5340_audio_dk/nrf5340/cpuapp --pristine -- -DCONFIG_AUDIO_DEV=1 -DFILE_SUFFIX=fota
+   west build -b nrf5340_audio_dk/nrf5340/cpuapp --pristine -- -DEXTRA_CONF_FILE=".\unicast_server\overlay-unicast_server.conf" -DFILE_SUFFIX=fota
 
 The command uses ``-DFILE_SUFFIX=fota`` to pick :file:`prj_fota.conf` instead of the default :file:`prj.conf`.
 It also uses the ``--pristine`` to clean the existing directory before starting the build process.
+
+.. _nrf53_audio_app_building_standard_programming:
 
 Programming the application
 ===========================
 
 After building the files for the development kit you want to program, follow the :ref:`standard procedure for programming applications <building>` in the |NCS|.
 
-When using the default CIS configuration, if you want to use two headset devices, you must also populate the UICR with the desired channel for each headset.
-Use the following commands, depending on which headset you want to populate:
+When using the :ref:`default CIS transport mode configuration <nrf53_audio_transport_mode_configuration>`, if you want to use two headset devices or the stereo configuration, you must :ref:`configure the headset location <nrf53_audio_app_configuration_headset_location>`.
+Use the combined bitfield values, depending on which headset you want to configure:
 
-* Left headset (``--val 0``):
+* Two headsets, left and right:
 
-   .. code-block:: console
+  * Left headset (``--value 1``):
 
-      nrfjprog --memwr 0x00FF80F4 --val 0
+    .. code-block:: console
 
-* Right headset (``--val 1``):
+       nrfutil device x-write --address 0x00FF80F4 --value 1
 
-   .. code-block:: console
+  * Right headset (``--value 2``):
 
-      nrfjprog --memwr 0x00FF80F4 --val 1
+    .. code-block:: console
+
+       nrfutil device x-write --address 0x00FF80F4 --value 2
+
+* One stereo headset (``--value 3``):
+
+  .. code-block:: console
+
+     nrfutil device x-write --address 0x00FF80F4 --value 3
 
 Select the correct board when prompted with the popup.
-Alternatively, you can add the ``--snr`` parameter followed by the SEGGER serial number of the correct board at the end of the ``nrfjprog`` command.
-You can check the serial numbers of the connected devices with the ``nrfjprog -i`` command.
+Alternatively, you can add the ``--serial-number`` parameter followed by the SEGGER serial number of the correct board at the end of the ``nrfutil device`` command.
+You can check the serial numbers of the connected devices with the ``nrfutil device list`` command.
 
 .. note::
    |usb_known_issues|

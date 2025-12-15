@@ -8,7 +8,6 @@ menuconfig LWM2M_CARRIER
 	bool "LwM2M carrier library"
 	depends on PICOLIBC || NEWLIB_LIBC || EXTERNAL_LIBC
 	depends on NRF_MODEM_LIB
-	depends on PDN
 	# Only have hard-float variant
 	depends on FP_HARDABI
 	# Need a source of entropy
@@ -26,9 +25,10 @@ menuconfig LWM2M_CARRIER
 	depends on NET_SOCKETS
 	depends on NET_SOCKETS_OFFLOAD
 	# Networking NCS
-	depends on DOWNLOAD_CLIENT
-	depends on (DOWNLOAD_CLIENT_MAX_HOSTNAME_SIZE >= 64)
-	depends on (DOWNLOAD_CLIENT_MAX_FILENAME_SIZE >= 192)
+	depends on DOWNLOADER
+	depends on NET_IPV4
+	depends on (DOWNLOADER_MAX_HOSTNAME_SIZE >= 64)
+	depends on (DOWNLOADER_MAX_FILENAME_SIZE >= 192)
 	# AT libraries
 	depends on AT_MONITOR
 	depends on (AT_MONITOR_HEAP_SIZE >= 320)
@@ -41,7 +41,7 @@ menuconfig LWM2M_CARRIER
 
 if LWM2M_CARRIER
 
-menu "Enabled Carriers"
+menu "Carriers"
 
 config LWM2M_CARRIER_GENERIC
 	bool "Generic"
@@ -234,7 +234,7 @@ config LWM2M_CARRIER_PDN_TYPE
 	  PDN type for custom APN.
 
 config LWM2M_CARRIER_QUEUE_MODE
-	bool "Enable queue mode"
+	bool "Queue mode"
 	default y
 	help
 	  Configure whether the LwM2M device is to inform the LwM2M server that
@@ -310,6 +310,15 @@ config LWM2M_CARRIER_FIRMWARE_DOWNLOAD_TIMEOUT
 	  PUSH delivery method of firmware images.
 	  Setting this to 0 will disable the use of this timer.
 
+config LWM2M_CARRIER_FIRMWARE_DOWNLOAD_BUF_SIZE
+	int "Firmware download buffer size"
+	range 128 65535
+	default 2048
+	help
+	  Size of the buffer used for the downloader library to download a new firmware image.
+	  Must be large enough to hold the message used to request data from the server, e.g. a
+	  HTTP header.
+
 config LWM2M_CARRIER_AUTO_REGISTER
 	bool "Auto registration on LTE Attach"
 	default y
@@ -364,6 +373,6 @@ config LWM2M_CARRIER_SHELL
 module=LWM2M_CARRIER
 module-dep=LOG
 module-str=LwM2M carrier library
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 endif # LWM2M_CARRIER

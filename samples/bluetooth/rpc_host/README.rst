@@ -27,7 +27,7 @@ Overview
 The host (network core) is running the full Bluetooth LE stack.
 It receives serialized function calls that it decodes and executes, then sends response data to the client (application core).
 
-When the sample starts, it displays the welcome prompt "Starting nRF RPC bluetooth host".
+When the sample starts, it displays the welcome prompt ``Starting nRF RPC bluetooth host``.
 
 Building and running
 ********************
@@ -61,7 +61,7 @@ Example build
 
 The recommended way of building this sample is to use :ref:`configuration_system_overview_sysbuild`, building the sample with the same Bluetooth configuration as the application core sample.
 
-To enable the firmware, use the sysbuild configuration ``SB_CONFIG_NETCORE_RPC_HOST``.
+To enable the firmware, use the :kconfig:option:`SB_CONFIG_NETCORE_RPC_HOST` sysbuild Kconfig.
 You also need to use the ``nordic-bt-rpc`` snippet, see :file:`snippets/nordic-bt-rpc/README.rst`.
 
 See :ref:`configure_application` for information about how to configure a sample.
@@ -82,13 +82,14 @@ You can take it as an example on how to create configuration for your own applic
 
 Testing
 =======
-After programming the example build to your development kit, complete the following steps to test it:
+After programming the sample build to your development kit, complete the following steps to test it:
 
 1. Connect the dual core development kit to the computer using a USB cable.
-   The development kit is assigned a COM port (Windows) or ttyACM device (Linux), which is visible in the Device Manager.
+   The development kit is assigned a serial port.
+   |serial_port_number_list|
 #. |connect_terminal|
 #. Reset the development kit.
-#. Observe that the terminal connected to the network core displays "Starting nRF RPC Bluetooth host".
+#. Observe that the terminal connected to the network core displays ``Starting nRF RPC Bluetooth host``.
 #. On the terminal connected to the application core, you can observe your Bluetooth application is running.
 
 Dependencies

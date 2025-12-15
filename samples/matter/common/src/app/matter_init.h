@@ -11,6 +11,7 @@
 #include <DeviceInfoProviderImpl.h>
 #include <app/clusters/network-commissioning/network-commissioning.h>
 #include <app/server/Server.h>
+#include <lib/core/CHIPPersistentStorageDelegate.h>
 #include <lib/core/Optional.h>
 #include <lib/support/Variant.h>
 #include <platform/PlatformManager.h>
@@ -21,6 +22,10 @@
 
 #ifdef CONFIG_CHIP_CRYPTO_PSA
 #include <crypto/PSAOperationalKeystore.h>
+#endif
+
+#ifdef CONFIG_CHIP_STORE_KEYS_IN_KMU
+#include <platform/nrfconnect/KMUSessionKeystore.h>
 #endif
 
 #ifdef CONFIG_CHIP_FACTORY_DATA
@@ -50,7 +55,7 @@ struct InitData {
 	/** @brief Pointer to the user provided custom server initialization parameters. */
 	chip::CommonCaseDeviceServerInitParams *mServerInitParams{ &sServerInitParamsDefault };
 	/** @brief Pointer to the user provided custom device info provider implementation. */
-	chip::DeviceLayer::DeviceInfoProviderImpl *mDeviceInfoProvider{ nullptr };
+	chip::DeviceLayer::DeviceInfoProviderImpl *mDeviceInfoProvider{ &sDeviceInfoProviderDefault };
 #ifdef CONFIG_CHIP_FACTORY_DATA
 	/** @brief Pointer to the user provided FactoryDataProvider implementation. */
 	chip::DeviceLayer::FactoryDataProviderBase *mFactoryDataProvider{ &sFactoryDataProviderDefault };
@@ -58,6 +63,10 @@ struct InitData {
 #ifdef CONFIG_CHIP_CRYPTO_PSA
 	/** @brief Pointer to the user provided OperationalKeystore implementation. */
 	chip::Crypto::OperationalKeystore *mOperationalKeyStore{ &sOperationalKeystoreDefault };
+#endif
+#ifdef CONFIG_CHIP_STORE_KEYS_IN_KMU
+	/** @brief Pointer to the user provided SessionKeystore implementation. */
+	chip::Crypto::SessionKeystore *mSessionKeystore{ &sKMUSessionKeystoreDefault };
 #endif
 	/** @brief Custom code to execute in the Matter main event loop before the server initialization. */
 	CustomInit mPreServerInitClbk{ nullptr };
@@ -77,6 +86,10 @@ struct InitData {
 #ifdef CONFIG_CHIP_CRYPTO_PSA
 	static chip::Crypto::PSAOperationalKeystore sOperationalKeystoreDefault;
 #endif
+#ifdef CONFIG_CHIP_STORE_KEYS_IN_KMU
+	static chip::DeviceLayer::KMUSessionKeystore sKMUSessionKeystoreDefault;
+#endif
+	static chip::DeviceLayer::DeviceInfoProviderImpl sDeviceInfoProviderDefault;
 };
 
 /**
@@ -116,5 +129,7 @@ CHIP_ERROR StartServer();
  */
 chip::DeviceLayer::FactoryDataProviderBase *GetFactoryDataProvider();
 #endif
+
+chip::PersistentStorageDelegate *GetPersistentStorageDelegate();
 
 } /* namespace Nrf::Matter */

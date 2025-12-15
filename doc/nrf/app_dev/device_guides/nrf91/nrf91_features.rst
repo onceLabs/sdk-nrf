@@ -11,9 +11,11 @@ The nRF91 Series SiPs integrate an application MCU, a full LTE modem, an RF fron
 These SiPs are designed to support a wide range of cellular IoT applications and DECT NR+ applications.
 
 Development Kits and Evaluation Kits
+  * nRF9151 DK - A development kit for designing and developing application firmware on the nRF9151 SiP, supporting LTE Cat-M1 and Cat-NB1 and GNSS with 3GPP 14 support and DECT NR+.
+  * nRF9151 SMA DK - A specialized version of nRF9151 DK with an SMA connector for high-performance external antenna connection or lab equipment for precise characterization and field testing.
+    It is recommended for any Non-Terrestrial Network (NTN) development.
   * nRF9160 DK - A development kit for designing and developing application firmware on the nRF9160 :term:`System in Package (SiP)`, supporting LTE Cat-M1 and Cat-NB1 and GNSS with 3GPP 13 support.
   * nRF9161 DK - A development kit for designing and developing application firmware on the nRF9161 SiP, supporting LTE Cat-M1 and Cat-NB1 and GNSS with 3GPP 14 support and DECT NR+.
-  * nRF9151 DK - A development kit for designing and developing application firmware on the nRF9151 SiP, supporting LTE Cat-M1 and Cat-NB1 and GNSS with 3GPP 14 support and DECT NR+.
   * nRF9131 EK - A single-board evaluation kit for the nRF9131 SiP, designed for DECT NR+ applications.
 
 Prototyping Platforms
@@ -41,17 +43,14 @@ Application MCU
 The application core is a full-featured Arm Cortex-M33 processor including DSP instructions and FPU.
 Use this core for tasks that require high performance and for application-level logic.
 
-The M33 TrustZone, one of Cortex-M Security Extensions (CMSE), divides the application MCU into Secure Processing Environment (SPE) and Non-Secure Processing Environment (NSPE).
-When the MCU boots, it always starts executing from the secure area.
-The secure bootloader chain starts the :ref:`Trusted Firmware-M (TF-M) <ug_tfm>`, which configures a part of memory and peripherals to be non-secure, and then jumps to the user application located in the non-secure area.
-
-For information about CMSE and the difference between the two environments, see :ref:`app_boards_spe_nspe`.
+You can use :ref:`security by separation <ug_tfm_security_by_separation>` with the M33 TrustZone for the application MCU.
+When security by separation is used, the MCU always starts executing from the secure area at boot.
+When enabled, the :ref:`ug_bootloader` starts the :ref:`Trusted Firmware-M (TF-M) <ug_tfm>`, which configures a part of memory and peripherals to be non-secure, and then jumps to the user application located in the non-secure area.
 
 Secure bootloader chain
 =======================
 
-A secure bootloader chain protects your application against running unauthorized code, and it enables you to do device firmware updates (DFU).
-See :ref:`ug_bootloader` for more information.
+A :ref:`ug_bootloader` protects your application against running unauthorized code, and it enables you to do device firmware updates (DFU).
 
 A bootloader chain is optional.
 Not all of the nRF91 Series samples include a secure bootloader chain, but the ones that do use the :ref:`bootloader` sample and :doc:`MCUboot <mcuboot:index-ncs>`.
@@ -80,8 +79,7 @@ Therefore, you must build it for any of the following board targets, depending o
 * ``thingy91x/nrf9151/ns``
 
 The application image might require other images to be present.
-Some samples include the :ref:`bootloader` sample (:kconfig:option:`CONFIG_SECURE_BOOT`) and :doc:`mcuboot:index-ncs` (:kconfig:option:`CONFIG_BOOTLOADER_MCUBOOT`).
-Depending on the configuration, all these images can be built at the same time in a :ref:`multi-image build <ug_multi_image>`.
+Some samples include the :ref:`bootloader` sample (:kconfig:option:`SB_CONFIG_SECURE_BOOT_APPCORE`) and :doc:`mcuboot:index-ncs` (:kconfig:option:`SB_CONFIG_BOOTLOADER_MCUBOOT`).
 
 .. _lte_modem:
 
@@ -121,14 +119,11 @@ There are two ways to update the modem firmware:
 Full update
   You can use either a wired or a wireless connection to do a full update of the modem firmware:
 
-  * When using a wired connection, you can use either the `Programmer app`_, which is part of `nRF Connect for Desktop`_, or the `nRF pynrfjprog`_ Python package.
-    Both methods use the Simple Management Protocol (SMP) to provide an interface over UART, which enables the device to perform the update.
+  * When using a wired connection, you can use either the `Programmer app`_, which is part of `nRF Connect for Desktop`_, or `nRF Util's device command <Upgrading modem firmware using J-Link_>`_.
+    Both methods use the :term:`Serial Wire Debug (SWD)` interface to update the firmware.
 
-    * You can use the Programmer app to perform the update, regardless of the images that are part of the existing firmware of the device.
-      For example, you can update the modem on an nRF9160 DK using the instructions described in the :ref:`nrf9160_updating_fw_modem` section.
-
-    * You can also use the nRF pynrfjprog Python package to perform the update, as long as a custom application image integrating the ``lib_fmfu_mgmt`` subsystem is included in the existing firmware of the device.
-      See the :ref:`fmfu_smp_svr_sample` sample for an example on how to integrate the :ref:`subsystem <lib_fmfu_mgmt>` in your custom application.
+    You can use the Programmer app to perform the update, regardless of the images that are part of the existing firmware of the device.
+    For example, you can update the modem on an nRF9160 DK using the instructions provided in the `Programming nRF91 Series DK firmware`_ page.
 
   * When using a wireless connection, the update is applied over-the-air (OTA).
     See :ref:`nrf91_fota` for more information.
@@ -206,7 +201,7 @@ For more information on how to do this, see the `Cellular Monitor app`_ document
 To enable the modem traces in the modem and to forward them to the :ref:`modem_trace_module` over UART, include the ``nrf91-modem-trace-uart`` snippet while building your application as described in :ref:`nrf91_modem_trace_uart_snippet`.
 
 .. note::
-   For the :ref:`serial_lte_modem` application and the :ref:`at_client_sample` sample, you must also run ``AT%XMODEMTRACE=1,2`` to manually activate the predefined trace set.
+   For the :ref:`at_client_sample` sample, you must also run ``AT%XMODEMTRACE=1,2`` to manually activate the predefined trace set.
 
 You can set the trace level using the AT command ``AT%XMODEMTRACE``.
 For more information, see the `modem trace activation %XMODEMTRACE`_ section in the nRF9160 AT Commands Reference Guide or the `same section <nRF91x1 modem trace activation %XMODEMTRACE_>`_ in the nRF91x1 AT Commands Reference Guide, depending on the SiP you are using.
@@ -355,14 +350,7 @@ Samples using GNSS in |NCS|
 There are many examples in |NCS| that use GNSS.
 Following is a list of the samples and applications with some information about the GNSS usage:
 
-* The :ref:`asset_tracker_v2` application uses nRF Cloud for A-GNSS, P-GPS, or a combination of both.
-  The application obtains GNSS fixes and transmits them to nRF Cloud along with sensor data.
-* The :ref:`serial_lte_modem` application uses AT commands to start and stop GNSS and supports nRF Cloud A-GNSS and P-GPS.
-  The application displays tracking and GNSS fix information in the serial console.
 * The :ref:`gnss_sample` sample does not use assistance by default but can be configured to use nRF Cloud A-GNSS, P-GPS, or a combination of both.
   The sample displays tracking and fix information as well as NMEA strings in the serial console.
-
-Operating modes
-***************
-
-nRF91 Series devices can display multiple LED patterns that indicate the operating state of the device as described in the :ref:`LED indication <led_indication>` section of the :ref:`asset_tracker_v2_ui_module` of the Asset Tracker v2 documentation.
+* The :ref:`location_sample` sample uses GNSS through the :ref:`lib_location` with nRF Cloud A-GNSS, P-GPS, or a combination of both.
+* The :ref:`modem_shell_application` sample has various usages of GNSS through different APIs with or without nRF Cloud A-GNSS and P-GPS.

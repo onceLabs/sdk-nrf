@@ -7,8 +7,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/init.h>
-#include <nrf.h>
 #include <nrfx.h>
+
+#define LFXO_NODE DT_NODELABEL(lfxo)
 
 /** @brief Power OFF entire RAM and suspend CPU forever.
  *
@@ -59,7 +60,11 @@ static int network_gpio_allow(void)
 	 * and P0.01 (XL2), as they need to stay configured with the value
 	 * Peripheral.
 	 */
-	uint32_t start_pin = (IS_ENABLED(CONFIG_SOC_ENABLE_LFXO) ? 2 : 0);
+#if DT_NODE_HAS_PROP(LFXO_NODE, load_capacitors)
+	uint32_t start_pin = 2;
+#else
+	uint32_t start_pin = 0;
+#endif
 
 	/* Allow the network core to use all GPIOs. */
 	for (uint32_t i = start_pin; i < P0_PIN_NUM; i++) {

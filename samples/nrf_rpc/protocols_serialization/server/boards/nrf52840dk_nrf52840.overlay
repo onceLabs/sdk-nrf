@@ -7,6 +7,11 @@
 	chosen {
 		nordic,rpc-uart = &uart1;
 	};
+
+	aliases {
+		rpc-alive-led = &led0;
+		fatal-error-trigger = &button0;
+	};
 };
 
 &uart1 {

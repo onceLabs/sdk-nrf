@@ -10,14 +10,18 @@
 #include <hal/nrf_radio.h>
 #include <hal/nrf_timer.h>
 #ifdef DPPI_PRESENT
-#include <nrfx_dppi.h>
+#include <helpers/nrfx_gppi.h>
 #endif
-#include <nrf_erratas.h>
+#include <nrfx.h>
 
 #include <zephyr/sys/printk.h>
 
 #include <mpsl_fem_config_common.h>
 #include <mpsl_fem_protocol_api.h>
+#if defined(CONFIG_MPSL_FEM_NRF2220_TEMPERATURE_COMPENSATION) && \
+	!defined(CONFIG_MPSL_FEM_NRF2220_TEMPERATURE_COMPENSATION_WITH_MPSL_SCHEDULER)
+#include <protocol/mpsl_fem_nrf2220_protocol_api.h>
+#endif
 
 #include "fem_al/fem_al.h"
 #include "fem_interface.h"
@@ -25,9 +29,9 @@
 
 #ifdef DPPI_PRESENT
 #if defined(NRF53_SERIES)
-#define RADIO_DOMAIN_NRFX_DPPI_INSTANCE NRFX_DPPI_INSTANCE(0)
+#define RADIO_DOMAIN_NRF_DPPI (uint32_t)NRF_DPPIC
 #elif defined(NRF54L_SERIES)
-#define RADIO_DOMAIN_NRFX_DPPI_INSTANCE NRFX_DPPI_INSTANCE(10)
+#define RADIO_DOMAIN_NRF_DPPI (uint32_t)NRF_DPPIC10
 #else
 #error Unsupported SoC type.
 #endif
@@ -186,6 +190,16 @@ int fem_tx_configure(uint32_t ramp_up_time)
 
 	fem_activate_event.event.timer.counter_period.end = ramp_up_time;
 
+#if defined(CONFIG_MPSL_FEM_NRF2220_TEMPERATURE_COMPENSATION) && \
+	!defined(CONFIG_MPSL_FEM_NRF2220_TEMPERATURE_COMPENSATION_WITH_MPSL_SCHEDULER)
+	err = mpsl_fem_nrf2220_temperature_changed_update_now();
+	if (err) {
+		printk("mpsl_fem_nrf2220_temperature_changed_update_now failed (err %d)\n", err);
+		return -EFAULT;
+	}
+#endif
+
+	mpsl_fem_enable();
 	err = mpsl_fem_pa_configuration_set(&fem_activate_event, &fem_deactivate_evt);
 	if (err) {
 		printk("PA configuration set failed (err %d)\n", err);
@@ -201,6 +215,7 @@ int fem_rx_configure(uint32_t ramp_up_time)
 
 	fem_activate_event.event.timer.counter_period.end = ramp_up_time;
 
+	mpsl_fem_enable();
 	err = mpsl_fem_lna_configuration_set(&fem_activate_event, &fem_deactivate_evt);
 	if (err) {
 		printk("LNA configuration set failed (err %d)\n", err);
@@ -250,6 +265,11 @@ int fem_txrx_configuration_clear(void)
 		printk("Failed to clear LNA configuration\n");
 		return -EPERM;
 	}
+	err = mpsl_fem_disable();
+	if (err) {
+		printk("Failed to disable front-end module\n");
+		return -EPERM;
+	}
 
 	return 0;
 }
@@ -259,13 +279,52 @@ void fem_txrx_stop(void)
 	mpsl_fem_deactivate_now(MPSL_FEM_ALL);
 }
 
-int8_t fem_tx_output_power_prepare(int8_t power, int8_t *radio_tx_power, uint16_t freq_mhz)
+static mpsl_phy_t convert_radio_mode_to_mpsl_phy(nrf_radio_mode_t radio_mode)
+{
+	switch (radio_mode) {
+	case NRF_RADIO_MODE_NRF_1MBIT: return MPSL_PHY_BLE_1M;
+	case NRF_RADIO_MODE_NRF_2MBIT: return MPSL_PHY_BLE_2M;
+#if defined(RADIO_MODE_MODE_Nrf_250Kbit)
+	case NRF_RADIO_MODE_NRF_250KBIT: return MPSL_PHY_NRF_250Kbit;
+#endif
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit0_5)
+	case NRF_RADIO_MODE_NRF_4MBIT_H_0_5: return MPSL_PHY_NRF_4Mbit0_5;
+#endif
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit0_25)
+	case NRF_RADIO_MODE_NRF_4MBIT_H_0_25: return MPSL_PHY_NRF_4Mbit0_25;
+#endif
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
+	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_6: return MPSL_PHY_NRF_4Mbit_0BT6;
+#endif
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4)
+	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_4: return MPSL_PHY_NRF_4Mbit_0BT4;
+#endif
+	case NRF_RADIO_MODE_BLE_1MBIT: return MPSL_PHY_BLE_1M;
+#if defined(RADIO_MODE_MODE_Ble_2Mbit)
+	case NRF_RADIO_MODE_BLE_2MBIT: return MPSL_PHY_BLE_2M;
+#endif
+#if defined(RADIO_MODE_MODE_Ble_LR125Kbit)
+	case NRF_RADIO_MODE_BLE_LR125KBIT: return MPSL_PHY_BLE_LR125Kbit;
+#endif
+#if defined(RADIO_MODE_MODE_Ble_LR500Kbit)
+	case NRF_RADIO_MODE_BLE_LR500KBIT: return MPSL_PHY_BLE_LR500Kbit;
+#endif
+#if defined(RADIO_MODE_MODE_Ieee802154_250Kbit)
+	case NRF_RADIO_MODE_IEEE802154_250KBIT: return MPSL_PHY_Ieee802154_250Kbit;
+#endif
+	default: return MPSL_PHY_BLE_1M;
+	}
+}
+
+int8_t fem_tx_output_power_prepare(int8_t power, int8_t *radio_tx_power,
+				   nrf_radio_mode_t radio_mode, uint16_t freq_mhz)
 {
 	int8_t output_power;
 	int32_t err;
 	mpsl_tx_power_split_t power_split = { 0 };
+	mpsl_phy_t mpsl_phy = convert_radio_mode_to_mpsl_phy(radio_mode);
 
-	output_power = mpsl_fem_tx_power_split(power, &power_split, freq_mhz, false);
+	output_power = mpsl_fem_tx_power_split(power, &power_split, mpsl_phy, freq_mhz, false);
 
 	*radio_tx_power = power_split.radio_tx_power;
 
@@ -279,11 +338,13 @@ int8_t fem_tx_output_power_prepare(int8_t power, int8_t *radio_tx_power, uint16_
 	return output_power;
 }
 
-int8_t fem_tx_output_power_check(int8_t power, uint16_t freq_mhz, bool tx_power_ceiling)
+int8_t fem_tx_output_power_check(int8_t power, nrf_radio_mode_t radio_mode, uint16_t freq_mhz,
+				 bool tx_power_ceiling)
 {
+	mpsl_phy_t mpsl_phy = convert_radio_mode_to_mpsl_phy(radio_mode);
 	mpsl_tx_power_split_t power_split = { 0 };
 
-	return mpsl_fem_tx_power_split(power, &power_split, freq_mhz, tx_power_ceiling);
+	return mpsl_fem_tx_power_split(power, &power_split, mpsl_phy, freq_mhz, tx_power_ceiling);
 }
 
 int8_t fem_default_tx_output_power_get(void)
@@ -296,25 +357,23 @@ int8_t fem_default_tx_output_power_get(void)
 }
 
 #if defined(DPPI_PRESENT)
-static nrfx_err_t radio_domain_nrfx_dppi_channel_alloc(uint8_t *channel)
+static int radio_domain_nrfx_dppi_channel_alloc(uint8_t *channel)
 {
-	nrfx_err_t err;
-	nrfx_dppi_t radio_domain_nrfx_dppi = RADIO_DOMAIN_NRFX_DPPI_INSTANCE;
+	int ch;
 
-	err = nrfx_dppi_channel_alloc(&radio_domain_nrfx_dppi, channel);
+	ch = nrfx_gppi_channel_alloc(nrfx_gppi_domain_id_get(RADIO_DOMAIN_NRF_DPPI));
+	if (ch < 0) {
+		return ch;
+	}
 
-	return err;
+	*channel = (uint8_t)ch;
+
+	return 0;
 }
 
 static void radio_domain_nrfx_dppi_channel_enable(uint8_t channel)
 {
-	nrfx_err_t err;
-	nrfx_dppi_t radio_domain_nrfx_dppi = RADIO_DOMAIN_NRFX_DPPI_INSTANCE;
-
-	err = nrfx_dppi_channel_enable(&radio_domain_nrfx_dppi, channel);
-
-	__ASSERT_NO_MSG(err == NRFX_SUCCESS);
-	(void)err;
+	nrfx_gppi_channels_enable(nrfx_gppi_domain_id_get(RADIO_DOMAIN_NRF_DPPI), BIT(channel));
 }
 #endif
 
@@ -328,11 +387,11 @@ int fem_init(NRF_TIMER_Type *timer_instance, uint8_t compare_channel_mask)
 	fem_activate_event.event.timer.compare_channel_mask = compare_channel_mask;
 
 #if defined(DPPI_PRESENT)
-	nrfx_err_t err;
+	int err;
 	uint8_t fem_dppi_ch;
 
 	err = radio_domain_nrfx_dppi_channel_alloc(&fem_dppi_ch);
-	if (err != NRFX_SUCCESS) {
+	if (err < 0) {
 		printk("radio_domain_nrfx_dppi_channel_alloc failed with: %d\n", err);
 		return -ENODEV;
 	}

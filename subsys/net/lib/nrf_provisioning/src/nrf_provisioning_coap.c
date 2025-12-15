@@ -4,6 +4,15 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#endif
+/* Define _POSIX_C_SOURCE before including <string.h> in order to use `strtok_r`. */
+#define _POSIX_C_SOURCE 200809L
+#include <string.h>
+#include <ncs_version.h>
+
 #include <modem/modem_info.h>
 #include <modem/nrf_modem_lib.h>
 
@@ -28,37 +37,36 @@ LOG_MODULE_REGISTER(nrf_provisioning_coap, CONFIG_NRF_PROVISIONING_LOG_LEVEL);
 #define COAP_HOST CONFIG_NRF_PROVISIONING_COAP_HOSTNAME
 #define PEER_PORT CONFIG_NRF_PROVISIONING_COAP_PORT
 
-#define MODEM_INFO_FWVER_SIZE 41
-#define CLIENT_VERSION "1"
+#define CLIENT_VERSION NCS_VERSION_STRING
 
 #define AUTH_MVER "mver=%s"
 #define AUTH_CVER "cver=%s"
 #define AUTH_PATH_JWT "p/auth-jwt"
-
 #define AUTH_API_TEMPLATE (AUTH_PATH_JWT "?" AUTH_MVER "&" AUTH_CVER)
 
 #define CMDS_PATH "p/cmd"
 #define CMDS_AFTER "after=%s"
 #define CMDS_MAX_RX_SZ "rxMaxSize=%s"
 #define CMDS_MAX_TX_SZ "txMaxSize=%s"
-#define CMDS_API_TEMPLATE (CMDS_PATH "?" CMDS_AFTER "&" CMDS_MAX_RX_SZ "&" CMDS_MAX_TX_SZ)
+#define CMDS_LIMIT "limit=%s"
+#define CMDS_API_TEMPLATE (CMDS_PATH "?" \
+	CMDS_AFTER "&" CMDS_MAX_RX_SZ "&" CMDS_MAX_TX_SZ "&" CMDS_LIMIT)
 
 #define RETRY_AMOUNT 10
 static const char *resp_path = "p/rsp";
 static const char *dtls_suspend = "/.dtls/suspend";
 
-static struct addrinfo *address;
 static struct coap_client client;
 static bool socket_keep_open;
 
 static K_SEM_DEFINE(coap_response, 0, 1);
 
-int nrf_provisioning_coap_init(struct nrf_provisioning_mm_change *mmode)
+int nrf_provisioning_coap_init(nrf_provisioning_event_cb_t callback)
 {
 	static bool initialized;
 	int ret;
 
-	nrf_provisioning_codec_init(mmode);
+	nrf_provisioning_codec_init(callback);
 
 	if (initialized) {
 		return 0;
@@ -104,7 +112,7 @@ static int dtls_setup(int fd)
 	err = zsock_setsockopt(fd, SOL_TLS, TLS_PEER_VERIFY, &verify, sizeof(verify));
 	if (err) {
 		LOG_ERR("Failed to setup peer verification, err %d", errno);
-		return err;
+		return -errno;
 	}
 
 	/* Associate the socket with the security tag
@@ -113,7 +121,7 @@ static int dtls_setup(int fd)
 	err = zsock_setsockopt(fd, SOL_TLS, TLS_SEC_TAG_LIST, tls_sec_tag, sizeof(tls_sec_tag));
 	if (err) {
 		LOG_ERR("Failed to setup TLS sec tag, err %d", errno);
-		return err;
+		return -errno;
 	}
 
 	if (IS_ENABLED(CONFIG_NRF_PROVISIONING_COAP_DTLS_SESSION_CACHE)) {
@@ -126,13 +134,13 @@ static int dtls_setup(int fd)
 					&session_cache, sizeof(session_cache));
 	if (err) {
 		LOG_ERR("Failed to set TLS_SESSION_CACHE option: %d", errno);
-		return err;
+		return -errno;
 	}
 
 	err = zsock_setsockopt(fd, SOL_TLS, TLS_HOSTNAME, COAP_HOST, strlen(COAP_HOST));
 	if (err) {
 		LOG_ERR("Failed to setup TLS hostname, err %d", errno);
-		return err;
+		return -errno;
 	}
 
 	/* Enable connection ID */
@@ -141,7 +149,7 @@ static int dtls_setup(int fd)
 	err = zsock_setsockopt(fd, SOL_TLS, TLS_DTLS_CID, &dtls_cid, sizeof(dtls_cid));
 	if (err) {
 		LOG_ERR("Failed to enable connection ID, err %d", errno);
-		return err;
+		return -errno;
 	}
 
 	if (IS_ENABLED(CONFIG_SOC_NRF9120)) {
@@ -151,7 +159,7 @@ static int dtls_setup(int fd)
 		if (err) {
 			LOG_ERR("Failed to set socket option SO_KEEPOPEN, err %d", errno);
 			socket_keep_open = false;
-			return err;
+			return -errno;
 		}
 		socket_keep_open = true;
 	}
@@ -161,7 +169,8 @@ static int dtls_setup(int fd)
 
 static int socket_connect(int *const fd)
 {
-	static struct zsock_addrinfo hints;
+	struct zsock_addrinfo hints = {};
+	struct zsock_addrinfo *address = NULL;
 	int st;
 	int ret = 0;
 	struct sockaddr *sa;
@@ -199,30 +208,28 @@ static int socket_connect(int *const fd)
 	*fd = zsock_socket(address->ai_family, address->ai_socktype, IPPROTO_DTLS_1_2);
 	if (*fd < 0) {
 		LOG_ERR("Failed to create UDP socket %d", errno);
-		ret = -ENOTCONN;
+		ret = -errno;
 		goto clean_up;
 	}
 
 	/* Setup DTLS socket options */
 	ret = dtls_setup(*fd);
 	if (ret) {
-		LOG_ERR("Failed to setup TLS socket option");
-		ret = -EACCES;
 		goto clean_up;
 	}
 
 	if (zsock_connect(*fd, address->ai_addr, address->ai_addrlen) < 0) {
 		LOG_ERR("Failed to connect UDP socket %d", errno);
-		if (errno == ETIMEDOUT) {
-			ret = -ETIMEDOUT;
-		} else {
-			ret = -ECONNREFUSED;
-		}
+		ret = -errno;
 		goto clean_up;
 	}
 	LOG_INF("Connected");
 
 clean_up:
+
+	if (address) {
+		zsock_freeaddrinfo(address);
+	}
 
 	if (ret) {
 		if (*fd > -1) {
@@ -302,7 +309,10 @@ static int send_coap_request(struct coap_client *client, uint8_t method, const c
 			     const uint8_t *payload, size_t len,
 			     struct nrf_provisioning_coap_context *const coap_ctx, bool confirmable)
 {
+	int ret;
 	int retries = 0;
+	struct coap_transmission_parameters params = coap_get_transmission_parameters();
+	static struct coap_client_option block2_option;
 
 	struct coap_client_request client_request = {
 		.method = method,
@@ -320,18 +330,29 @@ static int send_coap_request(struct coap_client *client, uint8_t method, const c
 		client_request.len = len;
 	}
 
-	while (coap_client_req(client, coap_ctx->connect_socket, NULL, &client_request, NULL) ==
-	       -EAGAIN) {
+	/* Suggest the maximum block size CONFIG_COAP_CLIENT_BLOCK_SIZE to the server */
+	if (method == COAP_METHOD_GET) {
+		block2_option = coap_client_option_initial_block2();
+		client_request.options = &block2_option;
+		client_request.num_options = 1;
+	}
+
+	while ((ret = coap_client_req(client, coap_ctx->connect_socket, NULL, &client_request,
+				      NULL)) == -EAGAIN) {
 		if (retries > RETRY_AMOUNT) {
 			break;
 		}
 		LOG_DBG("CoAP client busy");
-		k_sleep(K_MSEC(500));
+		k_sleep(K_MSEC(params.ack_timeout));
 		retries++;
 	}
-	k_sem_take(&coap_response, K_FOREVER);
 
-	return 0;
+	if (ret == 0) {
+		return k_sem_take(&coap_response,
+				  K_SECONDS(CONFIG_NRF_PROVISIONING_COAP_TIMEOUT_SECONDS));
+	}
+
+	return ret;
 }
 
 static int max_token_len(void)
@@ -383,9 +404,7 @@ fail:
 static int generate_auth_path(char *buffer, size_t len)
 {
 	int ret;
-	char mver[CONFIG_MODEM_INFO_BUFFER_SIZE];
-	char *mvernmb;
-	int cnt;
+	char mver[MODEM_INFO_FWVER_SIZE];
 
 	if (!buffer) {
 		LOG_ERR("Cannot generate auth path, no output pointer given");
@@ -393,34 +412,54 @@ static int generate_auth_path(char *buffer, size_t len)
 		return -EINVAL;
 	}
 
-	ret = modem_info_string_get(MODEM_INFO_FW_VERSION, mver, sizeof(mver));
-
-	if (ret <= 0) {
+	ret = modem_info_get_fw_version(mver, sizeof(mver));
+	if (ret < 0) {
 		LOG_ERR("Failed to get modem FW version");
-		return ret ? ret : -ENODATA;
+		return ret;
 	}
 
-	mvernmb = strtok(mver, "_-");
-	cnt = 1;
-
-	/* mfw_nrf9160_1.3.2-FOTA-TEST - for example */
-	while (cnt++ < 3) {
-		mvernmb = strtok(NULL, "_-");
-	}
-
-	if (len < (sizeof(AUTH_API_TEMPLATE) + strlen(mvernmb) + strlen(CLIENT_VERSION))) {
+	if (len < (sizeof(AUTH_API_TEMPLATE) + strlen(mver) + strlen(CLIENT_VERSION))) {
 		LOG_ERR("Cannot generate auth path, buffer too small");
 		return -ENOMEM;
 	}
 
-	ret = snprintk(buffer, len, AUTH_API_TEMPLATE, mvernmb, CLIENT_VERSION);
-
+	ret = snprintk(buffer, len, AUTH_API_TEMPLATE, mver, CLIENT_VERSION);
 	if ((ret < 0) || (ret >= len)) {
 		LOG_ERR("Could not format URL");
 		return -ETXTBSY;
 	}
 
 	return 0;
+}
+
+static int response_code_to_error(int code)
+{
+	switch (code) {
+	case COAP_RESPONSE_CODE_UNAUTHORIZED:
+		LOG_ERR("Device not authorized");
+		return -EACCES;
+	case COAP_RESPONSE_CODE_FORBIDDEN:
+		LOG_ERR("Device provided wrong auth credentials");
+		return -EPERM;
+	case COAP_RESPONSE_CODE_BAD_REQUEST:
+		LOG_ERR("Bad request");
+		return -EINVAL;
+	case COAP_RESPONSE_CODE_NOT_ACCEPTABLE:
+		LOG_ERR("Invalid Accept Headers");
+		return -EINVAL;
+	case COAP_RESPONSE_CODE_NOT_FOUND:
+		LOG_ERR("Resource not found");
+		return -ENOENT;
+	case COAP_RESPONSE_CODE_INTERNAL_ERROR:
+		LOG_ERR("Internal server error");
+		return -EBUSY;
+	case COAP_RESPONSE_CODE_SERVICE_UNAVAILABLE:
+		LOG_ERR("Service unavailable");
+		return -EBUSY;
+	default:
+		LOG_ERR("Unknown response code %d", code);
+		return -ENOTSUP;
+	}
 }
 
 static int authenticate(struct coap_client *client, const char *auth_token,
@@ -447,16 +486,10 @@ static int authenticate(struct coap_client *client, const char *auth_token,
 
 	LOG_DBG("Response code %d", coap_ctx->code);
 	if (coap_ctx->code != COAP_RESPONSE_CODE_CREATED) {
-		if (coap_ctx->code == COAP_RESPONSE_CODE_INTERNAL_ERROR ||
-		    coap_ctx->code == COAP_RESPONSE_CODE_SERVICE_UNAVAILABLE) {
-			return -EBUSY;
-		} else if (coap_ctx->code == COAP_RESPONSE_CODE_UNAUTHORIZED ||
-			   coap_ctx->code == COAP_RESPONSE_CODE_FORBIDDEN) {
-			LOG_ERR("Unauthorized, code %d", coap_ctx->code);
-			return -EACCES;
+		if (coap_ctx->code < 0) {
+			return coap_ctx->code;
 		}
-		LOG_ERR("Unknown result code %d", coap_ctx->code);
-		return -ENOTSUP;
+		return response_code_to_error(coap_ctx->code);
 	}
 
 	return 0;
@@ -467,17 +500,18 @@ static int request_commands(struct coap_client *client,
 {
 	int ret;
 	char after[NRF_PROVISIONING_CORRELATION_ID_SIZE];
-	char *rx_buf_sz = STRINGIFY(CONFIG_NRF_PROVISIONING_RX_BUF_SZ);
-	char *tx_buf_sz = STRINGIFY(CONFIG_NRF_PROVISIONING_TX_BUF_SZ);
+	const char *rx_buf_sz = STRINGIFY(CONFIG_NRF_PROVISIONING_RX_BUF_SZ);
+	const char *tx_buf_sz = STRINGIFY(CONFIG_NRF_PROVISIONING_TX_BUF_SZ);
+	const char *limit = STRINGIFY(CONFIG_NRF_PROVISIONING_CBOR_RECORDS);
 	char cmd[sizeof(CMDS_API_TEMPLATE) + NRF_PROVISIONING_CORRELATION_ID_SIZE +
-		 strlen(rx_buf_sz) + strlen(tx_buf_sz)];
+		 strlen(rx_buf_sz) + strlen(tx_buf_sz) + strlen(limit)];
 
 	LOG_DBG("Get commands");
 
 	memcpy(after, nrf_provisioning_codec_get_latest_cmd_id(),
 	       NRF_PROVISIONING_CORRELATION_ID_SIZE);
 
-	ret = snprintk(cmd, sizeof(cmd), CMDS_API_TEMPLATE, after, rx_buf_sz, tx_buf_sz);
+	ret = snprintk(cmd, sizeof(cmd), CMDS_API_TEMPLATE, after, rx_buf_sz, tx_buf_sz, limit);
 
 	if ((ret < 0) || (ret >= sizeof(cmd))) {
 		LOG_ERR("Could not format URL");
@@ -511,15 +545,10 @@ static int send_response(struct coap_client *client,
 
 	LOG_DBG("Response code %d", coap_ctx->code);
 	if (coap_ctx->code != COAP_RESPONSE_CODE_CHANGED) {
-		if (coap_ctx->code == COAP_RESPONSE_CODE_INTERNAL_ERROR ||
-		    coap_ctx->code == COAP_RESPONSE_CODE_SERVICE_UNAVAILABLE) {
-			return -EBUSY;
-		} else if (coap_ctx->code == COAP_RESPONSE_CODE_BAD_REQUEST) {
-			LOG_ERR("Bad request");
-			return -EINVAL;
+		if (coap_ctx->code < 0) {
+			return coap_ctx->code;
 		}
-		LOG_ERR("Unknown result code %d", coap_ctx->code);
-		return -ENOTSUP;
+		return response_code_to_error(coap_ctx->code);
 	}
 
 	return 0;
@@ -559,13 +588,13 @@ int nrf_provisioning_coap_req(struct nrf_provisioning_coap_context *const coap_c
 	char *auth_token = NULL;
 	struct cdc_context cdc_ctx;
 	bool finished = false;
+	int retries = 0;
 
 	coap_ctx->rx_buf = rx_buf;
 	coap_ctx->rx_buf_len = sizeof(rx_buf);
 
 	ret = socket_connect(&coap_ctx->connect_socket);
-	if (ret) {
-		LOG_ERR("Failed to connect socket");
+	if (ret < 0) {
 		return ret;
 	}
 
@@ -594,8 +623,8 @@ int nrf_provisioning_coap_req(struct nrf_provisioning_coap_context *const coap_c
 
 		if (coap_ctx->code == COAP_RESPONSE_CODE_CONTENT) {
 			if (!coap_ctx->response_len) {
-				LOG_INF("No more commands to process on server side");
-				ret = 0;
+				LOG_INF("No commands to process on server side");
+				ret = -ENODATA;
 				break;
 			}
 			nrf_provisioning_codec_setup(&cdc_ctx, tx_buf.at, sizeof(tx_buf));
@@ -621,11 +650,10 @@ int nrf_provisioning_coap_req(struct nrf_provisioning_coap_context *const coap_c
 				LOG_INF("Finished");
 				finished = true;
 			}
-
+retry_response:
 			if (!socket_keep_open) {
 				ret = socket_connect(&coap_ctx->connect_socket);
 				if (ret < 0) {
-					LOG_ERR("Failed to connect socket, error: %d", ret);
 					break;
 				}
 
@@ -638,6 +666,13 @@ int nrf_provisioning_coap_req(struct nrf_provisioning_coap_context *const coap_c
 			LOG_INF("Sending response to server");
 			ret = send_response(&client, coap_ctx, &cdc_ctx);
 			if (ret < 0) {
+				if (socket_keep_open && retries++ == 0) {
+					/* Try reconnecting */
+					socket_close(&coap_ctx->connect_socket);
+					socket_keep_open = false;
+					goto retry_response;
+				}
+				LOG_ERR("Failed to send response, ret %d", ret);
 				break;
 			}
 			/* Provisioning finished */
@@ -647,24 +682,8 @@ int nrf_provisioning_coap_req(struct nrf_provisioning_coap_context *const coap_c
 			}
 			nrf_provisioning_codec_teardown();
 			continue;
-		} else if (coap_ctx->code == COAP_RESPONSE_CODE_UNAUTHORIZED) {
-			LOG_ERR("Unauthorized");
-			ret = -EACCES;
-		} else if (coap_ctx->code == COAP_RESPONSE_CODE_INTERNAL_ERROR) {
-			LOG_ERR("Internal error");
-			ret = -EBUSY;
-		} else if (coap_ctx->code == COAP_RESPONSE_CODE_NOT_ACCEPTABLE) {
-			LOG_ERR("Not acceptable");
-			ret = -EINVAL;
-		} else if (coap_ctx->code == COAP_RESPONSE_CODE_FORBIDDEN) {
-			LOG_ERR("Forbidden");
-			ret = -EACCES;
-		} else if (coap_ctx->code == COAP_RESPONSE_CODE_BAD_REQUEST) {
-			LOG_ERR("Bad request");
-			ret = -EINVAL;
 		} else {
-			LOG_ERR("Unknown response code %d", coap_ctx->code);
-			ret = -ENOTSUP;
+			ret = response_code_to_error(coap_ctx->code);
 		}
 		break;
 	}

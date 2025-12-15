@@ -45,7 +45,6 @@ In the following example, the :ref:`Bluetooth Peripheral UART <peripheral_uart>`
    <home>/
    ├─── .west/
    ├─── bootloader/
-   ├─── mbedtls/
    ├─── modules/
    ├─── nrf/
    │    ├─── applications/
@@ -99,7 +98,9 @@ This application type is suitable for the following development cases:
 * You want to take advantage of west to manage your own set of repositories.
 * You want to make changes to one or more of the repositories of the |NCS| when working on the application.
 * You want to develop a project that involves more than one board target, for example using a mesh networking protocol like :ref:`ug_matter` or :ref:`ug_bt_mesh`.
-* You want to run a big project that lets you develop most features without having to patch the |NCS| tree, for example with out-of-tree boards, drivers, SoCs, and so on.
+* You want to run a big project that lets you develop most features without having to patch the |NCS| tree, for example with out-of-tree boards, drivers, or SoCs.
+* You want to use out-of-tree applications from the `nRF Connect SDK Add-ons`_ index.
+* You want to set up Continuous Integration (CI) for your application and explicitly define all dependencies (such as the |NCS| version) in the application's west manifest file.
 
 For more information about applications placed in workspace in the |NCS|, see the :ref:`workflow 4 on the development model page <dm_workflow_4>`.
 
@@ -110,8 +111,7 @@ Freestanding application
 
 This kind of application is handled separately from the |NCS|.
 It is located out-of-tree, that is outside of a west workspace, and is not using the `west manifest file`_ to specify the SDK version.
-Instead, the |NCS| version is taken from the :makevar:`ZEPHYR_BASE` environment variable.
-This means that all freestanding applications will use the same |NCS| version and the same copy of the SDK.
+The build system will find the location of the SDK through the :makevar:`ZEPHYR_BASE` environment variable, which is set either through a script or manually in an IDE.
 
 With this kind of application, the workspace has the following structure:
 
@@ -138,7 +138,7 @@ Creating an |NCS| application
 *****************************
 
 The process for creating an |NCS| application depends on the development environment.
-Using the |nRFVSC| is the recommended method.
+Using |nRFVSC| is the recommended method.
 
 .. note::
      No steps are provided for the creation of :ref:`repository applications <create_application_types_repository>`.
@@ -146,8 +146,11 @@ Using the |nRFVSC| is the recommended method.
 
 .. _creating_vsc:
 
-Creating application in the |nRFVSC|
-====================================
+Creating application in |nRFVSC|
+================================
+
+.. note::
+   If you prefer, you can `start VS Code walkthrough`_ and create applications and build configurations from there.
 
 Use the following steps depending on the application placement:
 
@@ -155,23 +158,24 @@ Use the following steps depending on the application placement:
 
    .. group-tab:: Workspace application (recommended)
 
-      To create a workspace application in the |nRFVSC|:
+      To create a workspace application in |nRFVSC|:
 
       1. Open |VSC|.
-      #. Open the |nRFVSC|.
-      #. In the :guilabel:`Welcome View`, click the :guilabel:`Create a new application` action.
+      #. Open |nRFVSC|.
+      #. In the `Welcome View`_, click the :guilabel:`Create a new application` action.
          A quick pick menu appears.
       #. Choose one of the following options:
 
          * :guilabel:`Create a blank application` - This will create an application with a code structure that you need to populate from scratch.
          * :guilabel:`Copy a sample` - This will create an application from an |NCS| sample or an |NCS| application.
+           If you have more than one version of the |NCS| installed, you have to choose the version from which you copy the sample or the application from.
 
       #. Enter the location and the name for the application.
          The location will be the *<west-workspace>/* directory mentioned in the :ref:`workspace application structure <create_application_types_workspace>`.
          The application creation process starts after you enter the name.
          When the application is created, a VS Code prompt appears asking you what to do with the application.
       #. Click :guilabel:`Open`.
-         This will open the new application and add it to the :guilabel:`Applications View` in the extension.
+         This will open the new application and add it to the `Applications View`_ in the extension.
          At this point, you have created a freestanding application.
       #. Add the :file:`west.yml` to create a west workspace around the application:
 
@@ -179,7 +183,7 @@ Use the following steps depending on the application placement:
             A quick pick menu appears.
          #. Click :guilabel:`Manage West Workspace...`.
          #. In the :guilabel:`Manage West Workspace...` action menu, click :guilabel:`Create West Workspace`.
-         #. Enter a location for the :file:`west.yml` file that matches the location provided in step 4.
+         #. Enter a location for the :file:`west.yml` file that matches the location provided when you were creating the application.
          #. Select the SDK version for the west workspace.
             The west workspace is initialized.
          #. Click :guilabel:`Manage SDKs` > :guilabel:`Manage West Workspace` > :guilabel:`West Update` to update the workspace modules.
@@ -190,11 +194,11 @@ Use the following steps depending on the application placement:
 
    .. group-tab:: Freestanding application
 
-      To create a freestanding application in the |nRFVSC|:
+      To create a freestanding application in |nRFVSC|:
 
       1. Open |VSC|.
-      #. Open the |nRFVSC|.
-      #. In the :guilabel:`Welcome View`, click the :guilabel:`Create a new application` action.
+      #. Open |nRFVSC|.
+      #. In the `Welcome View`_, click the :guilabel:`Create a new application` action.
          A quick pick menu appears.
       #. Choose one of the following options:
 
@@ -205,7 +209,7 @@ Use the following steps depending on the application placement:
          The application creation process starts after you enter the name.
          When the application is created, a VS Code prompt appears.
       #. Click :guilabel:`Open`.
-         This opens the new application and adds it to the :guilabel:`Applications View` in the extension.
+         This opens the new application and adds it to the `Applications View`_ in the extension.
 
       You can now start :ref:`configuring and building <configuration_and_build>` the application.
 
@@ -291,3 +295,34 @@ Use the following steps depending on the application type:
          This allows CMake to automatically load the boilerplate code required for building |NCS| applications.
 
 You can now start :ref:`configuring and building <configuration_and_build>` the application using the command line.
+
+.. _creating_add_on_index:
+
+Creating application from add-ons
+=================================
+
+You can create a :ref:`workspace application <create_application_types_workspace>` also by browsing and copying reference applications from the `nRF Connect SDK Add-ons`_ index.
+The index is a collection of publicly available |NCS| supplementary components that extend the SDK's functionality.
+In addition to applications, it includes drivers, libraries, and protocol implementations.
+
+To create an application from the add-on index, complete the following steps:
+
+.. tabs::
+
+   .. tab:: nRF Connect for VS Code (recommended)
+
+      Complete the following steps in |nRFVSC|:
+
+      1. In the `Welcome View`_, click :guilabel:`Create a new application`.
+      #. Select :guilabel:`Browse nRF Connect SDK Add-on Index`.
+      #. Browse through the available add-ons and select one that matches your needs.
+      #. Follow the creation wizard to set up your workspace application.
+
+   .. tab:: Command line
+
+      When creating add-on applications from the command line, follow the instructions provided in the `nRF Connect SDK Add-ons`_ repository.
+      These instructions guide you through the process of copying and configuring the add-on application in your workspace.
+
+The add-on is copied to your workspace and automatically configured with a west workspace, allowing you to start development right away.
+
+For more information, including how to contribute your own add-on to the index, read :file:`README.md` and :file:`CONTRIBUTING.md` in the `ncs-app-index repository <ncs-app-index_>`_.

@@ -18,18 +18,26 @@ LOG_MODULE_REGISTER(raw_tx_packet, CONFIG_LOG_DEFAULT_LEVEL);
 #include <zephyr/posix/sys/socket.h>
 #endif
 
+#include <zephyr/net/ethernet.h>
 #include <zephyr/net/socket.h>
 
 #include "net_private.h"
 #include "wifi_connection.h"
 
 #define BEACON_PAYLOAD_LENGTH 256
+#define DEFAULT_RAW_TX_WIFI_CHANNEL 6
+#define PADDING_ZERO_THRESHOLD 10
+#define DS_PARAMETER_SET_ELEMENT_ID 3
+#define DS_PARAMETER_SET_LENGTH 1
 #define CONTINUOUS_MODE_TRANSMISSION 0
 #define FIXED_MODE_TRANSMISSION 1
 
 #define IEEE80211_SEQ_CTRL_SEQ_NUM_MASK 0xFFF0
 #define IEEE80211_SEQ_NUMBER_INC BIT(4) /* 0-3 is fragment number */
 #define NRF_WIFI_MAGIC_NUM_RAWTX 0x12345678
+
+static struct net_mgmt_event_callback net_iface_mgmt_cb;
+K_SEM_DEFINE(wait_for_oper_up, 0, 1);
 
 struct beacon {
 	uint16_t frame_control;
@@ -62,16 +70,17 @@ static struct beacon test_beacon_frame = {
 		0X0F, 0XAC, 0X02, 0X0C, 0X00, 0X3B, 0X02, 0X51, 0X00, 0X2D,
 		0X1A, 0X0C, 0X00, 0X17, 0XFF, 0XFF, 0X00, 0X00, 0X00, 0X00,
 		0X00, 0X00, 0X00, 0X2C, 0X01, 0X01, 0X00, 0X00, 0X00, 0X00,
-		0X00, 0X00, 0X00, 0X00, 0X00, 0X3D, 0X16, 0X06, 0X00, 0X00,
+		0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X3D, 0X16, 0X06,
 		0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
-		0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X7F, 0X08, 0X04, 0X00,
-		0X00, 0X02, 0X00, 0X00, 0X00, 0X40, 0XFF, 0X1A, 0X23, 0X01,
-		0X78, 0X10, 0X1A, 0X00, 0X00, 0X00, 0X20, 0X0E, 0X09, 0X00,
-		0X09, 0X80, 0X04, 0X01, 0XC4, 0X00, 0XFA, 0XFF, 0XFA, 0XFF,
-		0X61, 0X1C, 0XC7, 0X71, 0XFF, 0X07, 0X24, 0XF0, 0X3F, 0X00,
-		0X81, 0XFC, 0XFF, 0XDD, 0X18, 0X00, 0X50, 0XF2, 0X02, 0X01,
-		0X01, 0X01, 0X00, 0X03, 0XA4, 0X00, 0X00, 0X27, 0XA4, 0X00,
-		0X00, 0X42, 0X43, 0X5E, 0X00, 0X62, 0X32, 0X2F, 0X00
+		0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00,
+		0X00, 0X7F, 0X08, 0X04, 0X00, 0X00, 0X02, 0X00, 0X00, 0X00,
+		0X40, 0XFF, 0X1A, 0X23, 0X01, 0X78, 0X10, 0X1A, 0X00, 0X00,
+		0X00, 0X20, 0X0E, 0X09, 0X00, 0X09, 0X80, 0X04, 0X01, 0XC4,
+		0X00, 0XFA, 0XFF, 0XFA, 0XFF, 0X61, 0X1C, 0XC7, 0X71, 0XFF,
+		0X07, 0X24, 0XF0, 0X3F, 0X00, 0X81, 0XFC, 0XFF, 0XDD, 0X18,
+		0X00, 0X50, 0XF2, 0X02, 0X01, 0X01, 0X01, 0X00, 0X03, 0XA4,
+		0X00, 0X00, 0X27, 0XA4, 0X00, 0X00, 0X42, 0X43, 0X5E, 0X00,
+		0X62, 0X32, 0X2F, 0X00
 	}
 };
 
@@ -168,7 +177,8 @@ static int setup_raw_pkt_socket(int *sockfd, struct sockaddr_ll *sa)
 	struct net_if *iface = NULL;
 	int ret;
 
-	*sockfd = socket(AF_PACKET, SOCK_RAW, htons(IPPROTO_RAW));
+	/* proto=0 implies a TX only socket */
+	*sockfd = socket(AF_PACKET, SOCK_RAW, 0);
 	if (*sockfd < 0) {
 		LOG_ERR("Unable to create a socket %d", errno);
 		return -1;
@@ -195,12 +205,111 @@ static int setup_raw_pkt_socket(int *sockfd, struct sockaddr_ll *sa)
 	return 0;
 }
 
+static unsigned short calculate_beacon_payload_length(const uint8_t *payload,
+						      unsigned short max_length)
+{
+	/* Skip fixed parameters: timestamp(8) + beacon_interval(2) + capability(2) */
+	unsigned short pos = 12;
+	unsigned short actual_length = pos;
+
+	while (pos < max_length) {
+		if ((pos + 1 < max_length) && (payload[pos] == 0) && (payload[pos + 1] == 0)) {
+			unsigned short zero_count = 0;
+			unsigned short check_pos = pos;
+
+			while (check_pos < max_length && payload[check_pos] == 0) {
+				zero_count++;
+				check_pos++;
+			}
+
+			if (zero_count >= PADDING_ZERO_THRESHOLD) {
+				break;
+			}
+		}
+
+		if (pos + 1 >= max_length) {
+			break;
+		}
+
+		uint8_t length = payload[pos + 1];
+
+		actual_length = pos + 2 + length;
+
+		pos += 2 + length;
+
+		if (pos >= max_length) {
+			break;
+		}
+	}
+	return actual_length;
+}
+
+static unsigned short calculate_beacon_frame_length(const struct beacon *beacon_frame)
+{
+	unsigned short header_length = sizeof(beacon_frame->frame_control) +
+				       sizeof(beacon_frame->duration) +
+				       sizeof(beacon_frame->da) +
+				       sizeof(beacon_frame->sa) +
+				       sizeof(beacon_frame->bssid) +
+				       sizeof(beacon_frame->seq_ctrl);
+
+	unsigned short payload_length = calculate_beacon_payload_length(beacon_frame->payload,
+									BEACON_PAYLOAD_LENGTH);
+
+	return header_length + payload_length;
+}
+
+static void update_beacon_channel(void)
+{
+	uint8_t channel;
+	struct net_if *iface = net_if_get_first_wifi();
+
+	if (!iface) {
+		channel = DEFAULT_RAW_TX_WIFI_CHANNEL;
+	} else {
+#ifdef CONFIG_RAW_TX_PKT_SAMPLE_CONNECTION_MODE
+		struct wifi_iface_status status = {0};
+
+		if (net_mgmt(NET_REQUEST_WIFI_IFACE_STATUS, iface, &status, sizeof(status)) == 0) {
+			if (status.state >= WIFI_STATE_ASSOCIATED && status.channel > 0) {
+				channel = (uint8_t)status.channel;
+			} else {
+				channel = DEFAULT_RAW_TX_WIFI_CHANNEL;
+			}
+		} else {
+			channel = DEFAULT_RAW_TX_WIFI_CHANNEL;
+		}
+#else
+		channel = CONFIG_RAW_TX_PKT_SAMPLE_CHANNEL;
+#endif
+	}
+
+	/* Update channel in DS Parameter */
+	uint8_t *payload = test_beacon_frame.payload;
+	unsigned short pos = 12;
+
+	while ((pos + 2) < BEACON_PAYLOAD_LENGTH) {
+		uint8_t tag = payload[pos];
+		uint8_t length = payload[pos + 1];
+
+		if (tag == DS_PARAMETER_SET_ELEMENT_ID && length == DS_PARAMETER_SET_LENGTH) {
+			payload[pos + 2] = channel;
+			return;
+		}
+
+		pos += 2 + length;
+		if (pos >= BEACON_PAYLOAD_LENGTH) {
+			break;
+		}
+	}
+}
+
 static void fill_raw_tx_pkt_hdr(struct raw_tx_pkt_header *raw_tx_pkt)
 {
 	/* Raw Tx Packet header */
 	raw_tx_pkt->magic_num = NRF_WIFI_MAGIC_NUM_RAWTX;
 	raw_tx_pkt->data_rate = CONFIG_RAW_TX_PKT_SAMPLE_RATE_VALUE;
-	raw_tx_pkt->packet_length = sizeof(test_beacon_frame);
+	raw_tx_pkt->packet_length = calculate_beacon_frame_length(&test_beacon_frame);
 	raw_tx_pkt->tx_mode = CONFIG_RAW_TX_PKT_SAMPLE_RATE_FLAGS;
 	raw_tx_pkt->queue = CONFIG_RAW_TX_PKT_SAMPLE_QUEUE_NUM;
 	/* The byte is reserved and used by the driver */
@@ -250,6 +359,9 @@ static void wifi_send_raw_tx_packets(void)
 	struct raw_tx_pkt_header packet;
 	char *test_frame = NULL;
 	unsigned int buf_length, num_pkts, transmission_mode, num_failures = 0;
+	unsigned short beacon_frame_length = calculate_beacon_frame_length(&test_beacon_frame);
+
+	update_beacon_channel();
 
 	ret = setup_raw_pkt_socket(&sockfd, &sa);
 	if (ret < 0) {
@@ -265,18 +377,18 @@ static void wifi_send_raw_tx_packets(void)
 		return;
 	}
 
-	test_frame = malloc(sizeof(struct raw_tx_pkt_header) + sizeof(test_beacon_frame));
+	test_frame = malloc(sizeof(struct raw_tx_pkt_header) + beacon_frame_length);
 	if (!test_frame) {
 		LOG_ERR("Malloc failed for send buffer %d", errno);
 		return;
 	}
 
-	buf_length = sizeof(struct raw_tx_pkt_header) + sizeof(test_beacon_frame);
+	buf_length = sizeof(struct raw_tx_pkt_header) + beacon_frame_length;
 	memcpy(test_frame, &packet, sizeof(struct raw_tx_pkt_header));
 
 	if (num_pkts == 1) {
 		memcpy(test_frame + sizeof(struct raw_tx_pkt_header),
-		       &test_beacon_frame, sizeof(test_beacon_frame));
+		       &test_beacon_frame, beacon_frame_length);
 
 		ret = wifi_send_raw_tx_pkt(sockfd, test_frame, buf_length, &sa);
 		if (ret < 0) {
@@ -288,7 +400,7 @@ static void wifi_send_raw_tx_packets(void)
 	} else {
 		for (int i = 0; i < num_pkts; i++) {
 			memcpy(test_frame + sizeof(struct raw_tx_pkt_header),
-			       &test_beacon_frame, sizeof(test_beacon_frame));
+			       &test_beacon_frame, beacon_frame_length);
 
 			ret = sendto(sockfd, test_frame, buf_length, 0,
 					(struct sockaddr *)&sa, sizeof(sa));
@@ -310,9 +422,27 @@ static void wifi_send_raw_tx_packets(void)
 	free(test_frame);
 }
 
+/* Net iface events handler */
+static void net_events_handler(struct net_mgmt_event_callback *cb,
+			       uint64_t mgmt_event, struct net_if *iface)
+{
+	switch (mgmt_event) {
+	case NET_EVENT_IF_UP:
+		LOG_DBG("Interface is up");
+		k_sem_give(&wait_for_oper_up);
+		break;
+	default:
+		break;
+	}
+}
+
 int main(void)
 {
 	int mode;
+
+	net_mgmt_init_event_callback(&net_iface_mgmt_cb, net_events_handler,
+				     NET_EVENT_IF_UP);
+	net_mgmt_add_event_callback(&net_iface_mgmt_cb);
 
 	mode = BIT(0);
 	/* This is to set mode to STATION */
@@ -334,6 +464,13 @@ int main(void)
 #else
 	wifi_set_channel();
 #endif
+	if (k_sem_take(&wait_for_oper_up,
+			K_SECONDS(CONFIG_RAW_TX_PKT_SAMPLE_WIFI_IFACE_OPER_UP_TIMEOUT_S)) != 0) {
+		LOG_ERR("Timeout waiting for iface to become operational after %d seconds",
+			CONFIG_RAW_TX_PKT_SAMPLE_WIFI_IFACE_OPER_UP_TIMEOUT_S);
+		return -1;
+	}
+
 	wifi_send_raw_tx_packets();
 
 	return 0;

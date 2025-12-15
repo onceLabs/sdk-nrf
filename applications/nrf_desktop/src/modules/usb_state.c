@@ -142,6 +142,45 @@ static struct config_channel_transport cfg_chan_transport;
 
 static void report_sent(struct usb_hid_device *usb_hid, struct usb_hid_buf *buf, bool error);
 
+/* Start - wrappers used to suppress deprecation warnings (`sdw_`) for USB legacy stack APIs. */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+static int sdw_usb_enable(usb_dc_status_callback status_cb)
+{
+	return usb_enable(status_cb);
+}
+
+static int sdw_usb_wakeup_request(void)
+{
+	return usb_wakeup_request();
+}
+
+static int sdw_usb_hid_init(const struct device *dev)
+{
+	return usb_hid_init(dev);
+}
+
+static void sdw_usb_hid_register_device(const struct device *dev, const uint8_t *desc,
+					size_t size, const struct hid_ops *op)
+{
+	usb_hid_register_device(dev, desc, size, op);
+}
+
+static int sdw_usb_hid_set_proto_code(const struct device *dev, uint8_t proto_code)
+{
+	return usb_hid_set_proto_code(dev, proto_code);
+}
+
+static int sdw_hid_int_ep_write(const struct device *dev, const uint8_t *data,
+				uint32_t data_len, uint32_t *bytes_ret)
+{
+	return hid_int_ep_write(dev, data, data_len, bytes_ret);
+}
+
+#pragma GCC diagnostic pop
+/* End - wrappers used to suppress deprecation warnings (`sdw_`) for USB legacy stack APIs. */
+
 static uint8_t usb_hid_buf_get_report_id(struct usb_hid_buf *buf)
 {
 	__ASSERT_NO_MSG(buf->status_bm & USB_HID_BUF_ALLOCATED);
@@ -273,7 +312,7 @@ static void usb_hid_buf_send(struct usb_hid_device *usb_hid, struct usb_hid_buf 
 		err = hid_device_submit_report(usb_hid->dev, size, data);
 	} else {
 		__ASSERT_NO_MSG(IS_ENABLED(CONFIG_DESKTOP_USB_STACK_LEGACY));
-		err = hid_int_ep_write(usb_hid->dev, data, size, NULL);
+		err = sdw_hid_int_ep_write(usb_hid->dev, data, size, NULL);
 	}
 
 	if (err) {
@@ -534,91 +573,43 @@ static void broadcast_subscriber_change(struct usb_hid_device *usb_hid)
 	APP_EVENT_SUBMIT(event);
 }
 
-static void broadcast_subscription_change(struct usb_hid_device *usb_hid)
+static void broadcast_subscription_change_internal(struct usb_hid_device *usb_hid,
+						   bool enabled_filter)
 {
 	bool new_rep_enabled = (usb_hid->enabled) && (usb_hid->hid_protocol == HID_PROTOCOL_REPORT);
 	bool new_boot_enabled = (usb_hid->enabled) && (usb_hid->hid_protocol == HID_PROTOCOL_BOOT);
 
-	if (IS_ENABLED(CONFIG_DESKTOP_HID_REPORT_MOUSE_SUPPORT) &&
-	    (new_rep_enabled != usb_hid->report_enabled[REPORT_ID_MOUSE]) &&
-	    (usb_hid->report_bm & BIT(REPORT_ID_MOUSE))) {
-		struct hid_report_subscription_event *event =
-			new_hid_report_subscription_event();
+	for (size_t i = 0; i < ARRAY_SIZE(input_reports); i++) {
+		uint8_t rep_id = input_reports[i];
+		bool new_enabled = is_hid_boot_report(rep_id) ? new_boot_enabled : new_rep_enabled;
 
-		event->report_id  = REPORT_ID_MOUSE;
-		event->enabled    = new_rep_enabled;
-		event->subscriber = usb_hid;
+		if (new_enabled != enabled_filter) {
+			continue;
+		}
 
-		APP_EVENT_SUBMIT(event);
+		if ((new_enabled != usb_hid->report_enabled[rep_id]) &&
+		    (usb_hid->report_bm & BIT(rep_id))) {
+			struct hid_report_subscription_event *event =
+				new_hid_report_subscription_event();
 
-		usb_hid->report_enabled[REPORT_ID_MOUSE] = new_rep_enabled;
+			event->report_id  = rep_id;
+			event->enabled    = new_enabled;
+			event->subscriber = usb_hid;
+
+			APP_EVENT_SUBMIT(event);
+
+			usb_hid->report_enabled[rep_id] = new_enabled;
+		}
 	}
-	if (IS_ENABLED(CONFIG_DESKTOP_HID_REPORT_KEYBOARD_SUPPORT) &&
-	    (new_rep_enabled != usb_hid->report_enabled[REPORT_ID_KEYBOARD_KEYS]) &&
-	    (usb_hid->report_bm & BIT(REPORT_ID_KEYBOARD_KEYS))) {
-		struct hid_report_subscription_event *event =
-			new_hid_report_subscription_event();
+}
 
-		event->report_id  = REPORT_ID_KEYBOARD_KEYS;
-		event->enabled    = new_rep_enabled;
-		event->subscriber = usb_hid;
-
-		APP_EVENT_SUBMIT(event);
-
-		usb_hid->report_enabled[REPORT_ID_KEYBOARD_KEYS] = new_rep_enabled;
-	}
-	if (IS_ENABLED(CONFIG_DESKTOP_HID_REPORT_SYSTEM_CTRL_SUPPORT) &&
-	    (new_rep_enabled != usb_hid->report_enabled[REPORT_ID_SYSTEM_CTRL]) &&
-	    (usb_hid->report_bm & BIT(REPORT_ID_SYSTEM_CTRL))) {
-		struct hid_report_subscription_event *event =
-			new_hid_report_subscription_event();
-
-		event->report_id  = REPORT_ID_SYSTEM_CTRL;
-		event->enabled    = new_rep_enabled;
-		event->subscriber = usb_hid;
-
-		APP_EVENT_SUBMIT(event);
-		usb_hid->report_enabled[REPORT_ID_SYSTEM_CTRL] = new_rep_enabled;
-	}
-	if (IS_ENABLED(CONFIG_DESKTOP_HID_REPORT_CONSUMER_CTRL_SUPPORT) &&
-	    (new_rep_enabled != usb_hid->report_enabled[REPORT_ID_CONSUMER_CTRL]) &&
-	    (usb_hid->report_bm & BIT(REPORT_ID_CONSUMER_CTRL))) {
-		struct hid_report_subscription_event *event =
-			new_hid_report_subscription_event();
-
-		event->report_id  = REPORT_ID_CONSUMER_CTRL;
-		event->enabled    = new_rep_enabled;
-		event->subscriber = usb_hid;
-
-		APP_EVENT_SUBMIT(event);
-		usb_hid->report_enabled[REPORT_ID_CONSUMER_CTRL] = new_rep_enabled;
-	}
-	if (IS_ENABLED(CONFIG_DESKTOP_HID_BOOT_INTERFACE_MOUSE) &&
-	    (new_boot_enabled != usb_hid->report_enabled[REPORT_ID_BOOT_MOUSE]) &&
-	    (usb_hid->report_bm & BIT(REPORT_ID_BOOT_MOUSE))) {
-		struct hid_report_subscription_event *event =
-			new_hid_report_subscription_event();
-
-		event->report_id  = REPORT_ID_BOOT_MOUSE;
-		event->enabled    = new_boot_enabled;
-		event->subscriber = usb_hid;
-
-		APP_EVENT_SUBMIT(event);
-		usb_hid->report_enabled[REPORT_ID_BOOT_MOUSE] = new_boot_enabled;
-	}
-	if (IS_ENABLED(CONFIG_DESKTOP_HID_BOOT_INTERFACE_KEYBOARD) &&
-	    (new_boot_enabled != usb_hid->report_enabled[REPORT_ID_BOOT_KEYBOARD]) &&
-	    (usb_hid->report_bm & BIT(REPORT_ID_BOOT_KEYBOARD))) {
-		struct hid_report_subscription_event *event =
-			new_hid_report_subscription_event();
-
-		event->report_id  = REPORT_ID_BOOT_KEYBOARD;
-		event->enabled    = new_boot_enabled;
-		event->subscriber = usb_hid;
-
-		APP_EVENT_SUBMIT(event);
-		usb_hid->report_enabled[REPORT_ID_BOOT_KEYBOARD] = new_boot_enabled;
-	}
+static void broadcast_subscription_change(struct usb_hid_device *usb_hid)
+{
+	/* First disable old subscriptions, then enable new subscriptions. This is done to ensure
+	 * that HID boot and HID report mode subscriptions would never be enabled at the same time.
+	 */
+	broadcast_subscription_change_internal(usb_hid, false);
+	broadcast_subscription_change_internal(usb_hid, true);
 
 	LOG_INF("USB HID %p %sabled", (void *)usb_hid, (usb_hid->enabled) ? ("en"):("dis"));
 	if (usb_hid->enabled) {
@@ -745,7 +736,7 @@ static void usb_wakeup(void)
 		}
 	} else {
 		__ASSERT_NO_MSG(IS_ENABLED(CONFIG_DESKTOP_USB_STACK_LEGACY));
-		err = usb_wakeup_request();
+		err = sdw_usb_wakeup_request();
 	}
 
 	if (!err) {
@@ -902,13 +893,13 @@ static int usb_init_legacy_hid_device_init(struct usb_hid_device *usb_hid_dev,
 	usb_hid_dev->hid_protocol = HID_PROTOCOL_REPORT;
 	usb_hid_dev->report_bm = report_bm;
 
-	usb_hid_register_device(dev, hid_report_desc, hid_report_desc_size, &hid_ops);
+	sdw_usb_hid_register_device(dev, hid_report_desc, hid_report_desc_size, &hid_ops);
 
 	int err = 0;
 
 	/* Legacy way of setting HID boot protocol requires an additional API call. */
 	if (IS_ENABLED(CONFIG_USB_HID_BOOT_PROTOCOL)) {
-		err = usb_hid_set_proto_code(dev, CONFIG_DESKTOP_USB_HID_PROTOCOL_CODE);
+		err = sdw_usb_hid_set_proto_code(dev, CONFIG_DESKTOP_USB_HID_PROTOCOL_CODE);
 		if (err) {
 			LOG_ERR("usb_hid_set_proto_code failed for dev: %p (err: %d)",
 				(void *)dev, err);
@@ -916,7 +907,7 @@ static int usb_init_legacy_hid_device_init(struct usb_hid_device *usb_hid_dev,
 		}
 	}
 
-	err = usb_hid_init(dev);
+	err = sdw_usb_hid_init(dev);
 	if (err) {
 		LOG_ERR("usb_hid_init failed for dev: %p (err: %d)", (void *)dev, err);
 		return err;
@@ -1061,7 +1052,7 @@ static int usb_init_legacy(void)
 		return err;
 	}
 
-	err = usb_enable(usb_init_legacy_status_cb);
+	err = sdw_usb_enable(usb_init_legacy_status_cb);
 	if (err) {
 		LOG_ERR("usb_enable failed (err: %d)", err);
 		return err;
@@ -1137,12 +1128,14 @@ static uint32_t get_idle_next(const struct device *dev, const uint8_t id)
 	return usb_hid->idle_duration[id];
 }
 
-static void report_sent_cb_next(const struct device *dev)
+static void report_sent_cb_next(const struct device *dev, const uint8_t *report)
 {
 	struct usb_hid_device *usb_hid = dev_to_usb_hid(dev);
 	struct usb_hid_buf *buf = usb_hid_buf_find(usb_hid, USB_HID_BUF_SENDING);
 	/* USB next stack does not explicitly indicate failed transfers. */
 	bool error = !usb_hid->enabled;
+
+	ARG_UNUSED(report);
 
 	report_sent(usb_hid, buf, error);
 }
@@ -1574,7 +1567,7 @@ static bool app_event_handler(const struct app_event_header *aeh)
 }
 APP_EVENT_LISTENER(MODULE, app_event_handler);
 APP_EVENT_SUBSCRIBE(MODULE, module_state_event);
-APP_EVENT_SUBSCRIBE(MODULE, hid_report_event);
+APP_EVENT_SUBSCRIBE_EARLY(MODULE, hid_report_event);
 #if CONFIG_DESKTOP_CONFIG_CHANNEL_ENABLE
 APP_EVENT_SUBSCRIBE(MODULE, config_event);
 #endif

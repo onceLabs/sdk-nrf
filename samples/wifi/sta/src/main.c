@@ -23,10 +23,11 @@ LOG_MODULE_REGISTER(sta, CONFIG_LOG_DEFAULT_LEVEL);
 #include <zephyr/net/net_event.h>
 #include <zephyr/drivers/gpio.h>
 
-#include <net/wifi_mgmt_ext.h>
+#ifdef CONFIG_WIFI_READY_LIB
 #include <net/wifi_ready.h>
+#endif /* CONFIG_WIFI_READY_LIB */
 
-#if defined(CONFIG_BOARD_NRF7002DK_NRF7001_NRF5340_CPUAPP) || \
+#if defined(CONFIG_BOARD_NRF7002DK_NRF5340_CPUAPP_NRF7001) || \
 	defined(CONFIG_BOARD_NRF7002DK_NRF5340_CPUAPP)
 #include <zephyr/drivers/wifi/nrf_wifi/bus/qspi_if.h>
 #endif
@@ -180,7 +181,7 @@ static void handle_wifi_disconnect_result(struct net_mgmt_event_callback *cb)
 }
 
 static void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				     uint32_t mgmt_event, struct net_if *iface)
+				     uint64_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_CONNECT_RESULT:
@@ -206,7 +207,7 @@ static void print_dhcp_ip(struct net_mgmt_event_callback *cb)
 	LOG_INF("DHCP IP address: %s", dhcp_info);
 }
 static void net_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				    uint32_t mgmt_event, struct net_if *iface)
+				    uint64_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_IPV4_DHCP_BOUND:
@@ -257,7 +258,7 @@ int bytes_from_str(const char *str, uint8_t *bytes, size_t bytes_len)
 
 int start_app(void)
 {
-#if defined(CONFIG_BOARD_NRF7002DK_NRF7001_NRF5340_CPUAPP) || \
+#if defined(CONFIG_BOARD_NRF7002DK_NRF5340_CPUAPP_NRF7001) || \
 	defined(CONFIG_BOARD_NRF7002DK_NRF5340_CPUAPP)
 	if (strlen(CONFIG_NRF70_QSPI_ENCRYPTION_KEY)) {
 		int ret;
@@ -284,7 +285,7 @@ int start_app(void)
 	} else {
 		LOG_INF("QSPI Encryption disabled");
 	}
-#endif /* CONFIG_BOARD_NRF700XDK_NRF5340 */
+#endif /* CONFIG_BOARD_NRF7002DK_NRF5340_CPUAPP_NRF7001 || CONFIG_BOARD_NRF7002DK_NRF5340_CPUAPP */
 
 	LOG_INF("Static IP address (overridable): %s/%s -> %s",
 		CONFIG_NET_CONFIG_MY_IPV4_ADDR,

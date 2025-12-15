@@ -32,7 +32,8 @@ public:
 	/* Define the maximum available event triggers that can be registered. */
 	constexpr static TriggerSlot kMaxEventTriggers = CONFIG_NCS_SAMPLE_MATTER_TEST_EVENT_TRIGGERS_MAX;
 	constexpr static TriggerSlot kInvalidTriggerSlot = CONFIG_NCS_SAMPLE_MATTER_TEST_EVENT_TRIGGERS_MAX + 1;
-	constexpr static TriggerSlot kMaxEventTriggersHandlers = CONFIG_NCS_SAMPLE_MATTER_TEST_EVENT_TRIGGERS_MAX_TRIGGERS_DELEGATES;
+	constexpr static TriggerSlot kMaxEventTriggersHandlers =
+		CONFIG_NCS_SAMPLE_MATTER_TEST_EVENT_TRIGGERS_MAX_TRIGGERS_DELEGATES;
 	constexpr static uint8_t kDisableEventTriggersKey[chip::TestEventTriggerDelegate::kEnableKeyLength] = {
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
@@ -101,6 +102,18 @@ public:
 	 */
 	CHIP_ERROR RegisterTestEventTriggerHandler(chip::TestEventTriggerHandler *triggerDelegate);
 
+#ifdef CONFIG_CHIP_ENABLE_ICD_SUPPORT
+	/**
+	 * @brief Register all ICD test event triggers
+	 *
+	 * This function registers all the ICD test event triggers defined in ICDManager.cpp
+	 * including active mode requests, counter invalidation, and DSLS mode changes.
+	 *
+	 * @return CHIP_NO_ERROR on success, or appropriate error code on failure.
+	 */
+	CHIP_ERROR RegisterICDTestEventTriggers();
+#endif
+
 	/**
 	 * @brief Set the new Enable Key read out from an external source.
 	 *
@@ -128,6 +141,6 @@ private:
 	uint8_t mEnableKeyData[chip::TestEventTriggerDelegate::kEnableKeyLength] = {};
 	chip::MutableByteSpan mEnableKey{ mEnableKeyData };
 	Nrf::FiniteMap<EventTriggerId, EventTrigger, kMaxEventTriggers> mTriggersMap;
-	chip::TestEventTriggerHandler* mHandlers[kMaxEventTriggersHandlers];
+	chip::TestEventTriggerHandler *mHandlers[kMaxEventTriggersHandlers] = {};
 };
 }; // namespace Nrf::Matter

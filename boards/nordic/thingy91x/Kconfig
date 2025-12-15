@@ -4,7 +4,7 @@
 module=BOARD
 module-dep=LOG
 module-str=Log level for board
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 if BOARD_THINGY91X_NRF5340_CPUAPP || BOARD_THINGY91X_NRF5340_CPUAPP_NS
 
@@ -31,11 +31,6 @@ config DOMAIN_CPUNET_BOARD
 endif
 
 if BOARD_THINGY91X_NRF5340_CPUNET
-
-# BT_CTLR depends on BT. When BT is enabled we should default to also
-# enabling the controller.
-config BT_CTLR
-	default y if BT
 
 config BT_ECC
 	default y if BT

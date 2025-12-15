@@ -40,6 +40,7 @@ Features
  * Individual TX and RX FIFOs for every pipe
  * Backward compatible with legacy nRF24Lxx Enhanced ShockBurst
  * Support for external front-end modules.
+ * Monitor mode for protocol debugging purposes.
 
 .. _esb_config:
 
@@ -124,10 +125,18 @@ However, repeated packets will always be ACKed by the PRX, even though they are 
 
 A PTX can select that individual packets that are transmitted to the PRX do not require an ACK to be sent in return from the PRX.
 This decision is taken by the application when uploading a packet to the TX FIFO using the :c:member:`esb_payload.noack` field of the :c:struct:`esb_payload` parameter that is passed to the :c:func:`esb_write_payload` function.
-When the :c:member:`selective_auto_ack` field in the :c:struct:`esb_config` configuration structure is disabled, all packets will be acknowledged, ignoring the :c:member:`esb_payload.noack` field.
+When the :c:member:`esb_config.selective_auto_ack` field in the :c:struct:`esb_config` configuration structure is disabled, all packets will be acknowledged, ignoring the :c:member:`esb_payload.noack` field.
+The :c:member:`esb_config.selective_auto_ack` field must be configured with the same value on both the PTX and PRX sides to ensure consistent behavior.
 
 When the PRX receives a packet that does not require an ACK, it does not send an ACK packet to the PTX.
 In this case, when :c:member:`esb_payload.noack` = ``true``, packet retransmission does not occur.
+
+.. _esb_monitor_mode:
+
+ESB Monitor mode
+================
+
+ESB Monitor mode feature allows you to capture both packets and ACKs sent by other ESB devices, which can be useful when analyzing or debugging the protocol.
 
 .. _esb_getting_started:
 
@@ -170,6 +179,28 @@ Perform the following steps to set up an application to send and receive packets
 	The payload must be queued before a packet is received.
 	After a queued payload is sent with an acknowledgment, it is assumed that it reaches the other device.
 	Therefore, an :c:macro:`ESB_EVENT_TX_SUCCESS` event is queued.
+
+To set up an application as MONITOR, complete the following steps:
+
+1. Initialize the ESB module using the :c:func:`esb_init` function with default parameters from :c:macro:`ESB_DEFAULT_CONFIG`.
+   Set the :c:member:`esb_config.mode` parameter to :c:macro:`ESB_MODE_MONITOR` value and set :c:member:`esb.config.event_handler` callback.
+
+   You can adjust the following parameters:
+
+      * :c:member:`esb_config.protocol`
+      * :c:member:`esb_config.bitrate`
+      * :c:member:`esb_config.crc`
+      * :c:member:`esb_config.payload_length`
+
+   These parameters as well as addresses and prefixes must be the same as those configured in the PTX and PRX nodes that you want to monitor.
+
+#. Set up the high-frequency clock in the same manner as in the PRX or PTX mode.
+
+#. Start monitoring using the :c:func:`esb_start_rx` function.
+
+#. Handle the :c:macro:`ESB_EVENT_RX_RECEIVED` events using the :c:func:`esb_read_rx_payload` function.
+
+#. Stop monitoring using the :c:func:`esb_stop_rx` function.
 
 To stop the ESB module, call :c:func:`esb_disable`.
 Note, however, that if a transaction is ongoing when you disable the module, it is not completed.
@@ -258,11 +289,18 @@ If an ACK received by a PTX contains a payload, this payload is added to the PTX
 PRX FIFO handling
 *****************
 
-When ESB is enabled in PRX mode, all enabled pipes (addresses) are simultaneously monitored for incoming packets.
+When ESB is enabled in PRX or Monitor mode, all enabled pipes (addresses) are simultaneously monitored for incoming packets.
 
-If a new packet that was not previously added to the PRX's RX FIFO is received, and RX FIFO has available space for the packet, the packet is added to the RX FIFO and an ACK is sent in return to the PTX.
-If the TX FIFO contains any packets, the next serviceable packet in the TX FIFO is attached as a payload in the ACK packet.
-Note that this TX packet must have been uploaded to the TX FIFO before the packet is received.
+PRX:
+
+   If a new packet that was not previously added to the PRX's RX FIFO is received, and RX FIFO has available space for it, the packet is added to the RX FIFO and an ACK is sent in return to the PTX.
+   If the TX FIFO contains any packets, the next serviceable packet in the TX FIFO is attached as a payload in the ACK packet.
+   This TX packet must have been uploaded to the TX FIFO before the packet is received.
+
+Monitor:
+
+   All received packets are added to the RX FIFO if it has available space, without sending ACKs.
+   Packets in the TX FIFO are ignored.
 
 .. _callback_queuing:
 
@@ -301,10 +339,11 @@ If you are sure that you do not require support for revision 2 chips, you may re
 Examples
 ========
 
-The |NCS| provides the following two samples that show how to use the ESB protocol:
+The |NCS| provides the following three samples that show how to use the ESB protocol:
 
 * :ref:`esb_ptx`
 * :ref:`esb_prx`
+* :ref:`esb_monitor`
 
 .. _esb_fast_ramp_up:
 
@@ -338,3 +377,5 @@ It changes the ESB driver's behavior.
 If a packet is not acknowledged, the radio peripheral remains in TXIDLE state instead of TXDISABLE when transmission is pending.
 Using this experimental feature can reduce transmission delay below 100 µs for a 32 bits (four bytes) payload.
 However, this process consumes more energy, because the radio transmitter stage remains enabled when transmission is taking place.
+In this mode, the :c:member:`esb_config.retransmit_delay` field specifies the delay between consecutive packet transmissions from the TX FIFO.
+Depending on the reception processing time, a minimum value might be required.

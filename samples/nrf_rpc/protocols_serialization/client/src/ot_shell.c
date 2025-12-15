@@ -5,19 +5,25 @@
  */
 
 #include "ot_shell.h"
+#include <net/ot_rpc.h>
 
-#include <zephyr/shell/shell.h>
 #include <zephyr/net/net_ip.h>
+#include <zephyr/shell/shell.h>
 
 #include <openthread/cli.h>
 #include <openthread/coap.h>
+#include <openthread/dns_client.h>
+#include <openthread/instance.h>
 #include <openthread/ip6.h>
+#include <openthread/link_raw.h>
 #include <openthread/link.h>
+#include <openthread/mesh_diag.h>
+#include <openthread/message.h>
+#include <openthread/netdata.h>
+#include <openthread/netdiag.h>
+#include <openthread/srp_client.h>
 #include <openthread/thread.h>
 #include <openthread/udp.h>
-#include <openthread/netdata.h>
-#include <openthread/message.h>
-#include <openthread/srp_client.h>
 
 #include <string.h>
 
@@ -99,15 +105,15 @@ static void ot_cli_lazy_init(const struct shell *sh)
 typedef otError(*ot_cli_command_handler_t)(const struct shell *, size_t argc, char *argv[]);
 
 /*
- * Invokes the OT shell command handler with the provided arguments. Then prints either
- * "Done", if the handler returns no error, or an OpenThread error code that the handler
- * returns.
+ * Executes the local shell command handler with the provided arguments.
+ * Then it prints either "Done", if the handler returns no error, or "Error X", where X is
+ * an OpenThread error code returned by the handler.
  *
  * This is meant to duplicate the behavior of the OpenThread's CLI subsystem, which prints
  * the command result in a similar manner.
  */
-static int ot_cli_command_invoke(ot_cli_command_handler_t handler, const struct shell *sh,
-				 size_t argc, char *argv[])
+static int ot_cli_command_exec(ot_cli_command_handler_t handler, const struct shell *sh,
+			       size_t argc, char *argv[])
 {
 	otError error;
 
@@ -137,7 +143,7 @@ static int ot_cli_command_send(const struct shell *sh, size_t argc, char *argv[]
 
 	ot_cli_lazy_init(sh);
 
-	for (size_t i = 1; i < argc; i++) {
+	for (size_t i = 0; i < argc; i++) {
 		int arg_len = snprintk(ptr, end - ptr, "%s", argv[i]);
 
 		if (arg_len < 0) {
@@ -147,7 +153,7 @@ static int ot_cli_command_send(const struct shell *sh, size_t argc, char *argv[]
 		ptr += arg_len;
 
 		if (ptr >= end) {
-			shell_fprintf(sh, SHELL_WARNING, "OT shell buffer full\n");
+			shell_warn(sh, "OT shell buffer full");
 			return -ENOEXEC;
 		}
 
@@ -230,7 +236,27 @@ static otError ot_cli_command_discover(const struct shell *sh, size_t argc, char
 
 static int cmd_discover(const struct shell *sh, size_t argc, char *argv[])
 {
-	return ot_cli_command_invoke(ot_cli_command_discover, sh, argc, argv);
+	return ot_cli_command_exec(ot_cli_command_discover, sh, argc, argv);
+}
+
+static otError cmd_radio_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc != 2 || strcmp(argv[1], "time") != 0) {
+		return OT_ERROR_INVALID_COMMAND;
+	}
+
+	shell_print(sh, "%" PRIu64, otLinkRawGetRadioTime(NULL));
+
+	return OT_ERROR_NONE;
+}
+
+static int cmd_radio(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 2 && strcmp(argv[1], "time") == 0) {
+		return ot_cli_command_exec(cmd_radio_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc, argv);
 }
 
 static otError ot_cli_command_ifconfig(const struct shell *sh, size_t argc, char *argv[])
@@ -260,12 +286,7 @@ static otError ot_cli_command_ipmaddr(const struct shell *sh, size_t argc, char 
 		char addr_string[NET_IPV6_ADDR_LEN];
 
 		for (addr = otIp6GetMulticastAddresses(NULL); addr != NULL; addr = addr->mNext) {
-			memcpy(in6_addr.s6_addr, addr->mAddress.mFields.m8, OT_IP6_ADDRESS_SIZE);
-
-			if (!net_addr_ntop(AF_INET6, &in6_addr, addr_string, sizeof(addr_string))) {
-				return OT_ERROR_FAILED;
-			}
-
+			otIp6AddressToString(&addr->mAddress, addr_string, sizeof(addr_string));
 			shell_print(sh, "%s", addr_string);
 		}
 
@@ -396,22 +417,22 @@ static otError ot_cli_command_thread(const struct shell *sh, size_t argc, char *
 
 static int cmd_ifconfig(const struct shell *sh, size_t argc, char *argv[])
 {
-	return ot_cli_command_invoke(ot_cli_command_ifconfig, sh, argc, argv);
+	return ot_cli_command_exec(ot_cli_command_ifconfig, sh, argc, argv);
 }
 
 static int cmd_ipmaddr(const struct shell *sh, size_t argc, char *argv[])
 {
-	return ot_cli_command_invoke(ot_cli_command_ipmaddr, sh, argc, argv);
+	return ot_cli_command_exec(ot_cli_command_ipmaddr, sh, argc, argv);
 }
 
 static int cmd_mode(const struct shell *sh, size_t argc, char *argv[])
 {
-	return ot_cli_command_invoke(ot_cli_command_mode, sh, argc, argv);
+	return ot_cli_command_exec(ot_cli_command_mode, sh, argc, argv);
 }
 
 static int cmd_pollperiod(const struct shell *sh, size_t argc, char *argv[])
 {
-	return ot_cli_command_invoke(ot_cli_command_pollperiod, sh, argc, argv);
+	return ot_cli_command_exec(ot_cli_command_pollperiod, sh, argc, argv);
 }
 
 static int cmd_state(const struct shell *sh, size_t argc, char *argv[])
@@ -421,15 +442,15 @@ static int cmd_state(const struct shell *sh, size_t argc, char *argv[])
 		 * Serialization of OT APIs for enforcing the role is to be done,
 		 * so send the command to be processed by the RPC server.
 		 */
-		return ot_cli_command_send(sh, argc + 1, argv - 1);
+		return ot_cli_command_send(sh, argc, argv);
 	}
 
-	return ot_cli_command_invoke(ot_cli_command_state, sh, argc, argv);
+	return ot_cli_command_exec(ot_cli_command_state, sh, argc, argv);
 }
 
 static int cmd_thread(const struct shell *sh, size_t argc, char *argv[])
 {
-	return ot_cli_command_invoke(ot_cli_command_thread, sh, argc, argv);
+	return ot_cli_command_exec(ot_cli_command_thread, sh, argc, argv);
 }
 
 static int cmd_test_message(const struct shell *sh, size_t argc, char *argv[])
@@ -473,83 +494,6 @@ exit:
 		otMessageFree(message);
 	}
 
-	return 0;
-}
-
-static void handle_udp_receive(void *context, otMessage *message, const otMessageInfo *message_info)
-{
-	uint16_t length;
-	uint16_t offset;
-	uint16_t read;
-	char buf[128] = {0};
-
-	offset = otMessageGetOffset(message);
-	length = otMessageGetLength(message);
-
-	read = otMessageRead(message, offset, buf, length);
-
-	if (read > 0) {
-		printk("RECEIVED: '%s'\n", buf);
-	} else {
-		printk("message empty\n");
-	}
-}
-
-static int cmd_test_udp_init(const struct shell *sh, size_t argc, char *argv[])
-{
-	otSockAddr listen_sock_addr;
-
-	memset(&udp_socket, 0, sizeof(udp_socket));
-	memset(&listen_sock_addr, 0, sizeof(listen_sock_addr));
-
-	listen_sock_addr.mPort = PORT;
-
-	otUdpOpen(NULL, &udp_socket, handle_udp_receive, NULL);
-	otUdpBind(NULL, &udp_socket, &listen_sock_addr, OT_NETIF_THREAD);
-
-	return 0;
-}
-
-static int cmd_test_udp_send(const struct shell *sh, size_t argc, char *argv[])
-{
-	otError error = OT_ERROR_NONE;
-	otMessage *message = NULL;
-	otMessageInfo message_info;
-	otIp6Address destination_addr;
-
-	memset(&message_info, 0, sizeof(message_info));
-	memset(&destination_addr, 0, sizeof(destination_addr));
-
-	destination_addr.mFields.m8[0] = 0xff;
-	destination_addr.mFields.m8[1] = 0x03;
-	destination_addr.mFields.m8[15] = 0x01;
-	message_info.mPeerAddr = destination_addr;
-	message_info.mPeerPort = PORT;
-
-	message = otUdpNewMessage(NULL, NULL);
-	if (message == NULL) {
-		error = OT_ERROR_NO_BUFS;
-		goto exit;
-	};
-
-	error = otMessageAppend(message, udp_payload, sizeof(udp_payload));
-	if (error != OT_ERROR_NONE) {
-		goto exit;
-	}
-	error = otUdpSend(NULL, &udp_socket, message, &message_info);
-	shell_print(sh, "Udp message send.");
-
-exit:
-	if (error != OT_ERROR_NONE && message != NULL) {
-		otMessageFree(message);
-	}
-	return 0;
-}
-
-static int cmd_test_udp_close(const struct shell *sh, size_t argc, char *argv[])
-{
-	otUdpClose(NULL, &udp_socket);
-	shell_print(sh, "Udp socket closed.");
 	return 0;
 }
 
@@ -788,7 +732,7 @@ exit:
 
 static int cmd_ot(const struct shell *sh, size_t argc, char *argv[])
 {
-	return ot_cli_command_send(sh, argc, argv);
+	return ot_cli_command_send(sh, argc - 1, argv + 1);
 }
 
 static int cmd_test_srp_client_autostart(const struct shell *sh, size_t argc, char *argv[])
@@ -842,10 +786,16 @@ static int cmd_test_srp_client_host_info(const struct shell *sh, size_t argc, ch
 
 static int cmd_test_srp_client_host_name(const struct shell *sh, size_t argc, char *argv[])
 {
+	otError error;
+
 	memset(srp_client_host_name, 0, sizeof(srp_client_host_name));
 	strncpy(srp_client_host_name, argv[1], sizeof(srp_client_host_name) - 1);
 
-	otSrpClientSetHostName(NULL, srp_client_host_name);
+	error = otSrpClientSetHostName(NULL, srp_client_host_name);
+	if (error) {
+		shell_error(sh, "otSrpClientSetHostName() error: %u", error);
+		return -ENOEXEC;
+	}
 
 	shell_print(sh, "Name set to: %s", argv[1]);
 
@@ -854,7 +804,12 @@ static int cmd_test_srp_client_host_name(const struct shell *sh, size_t argc, ch
 
 static int cmd_test_srp_client_host_address_auto(const struct shell *sh, size_t argc, char *argv[])
 {
-	otSrpClientEnableAutoHostAddress(NULL);
+	otError error = otSrpClientEnableAutoHostAddress(NULL);
+
+	if (error) {
+		shell_error(sh, "otSrpClientEnableAutoHostAddress() error: %u", error);
+		return -ENOEXEC;
+	}
 
 	return 0;
 }
@@ -864,6 +819,7 @@ static int cmd_test_srp_client_host_remove(const struct shell *sh, size_t argc, 
 	bool remove_key_lease = false;
 	bool send_unreg = false;
 	int err = 0;
+	otError error;
 
 	if (argc > 1) {
 		remove_key_lease = shell_strtobool(argv[1], 0, &err);
@@ -885,7 +841,11 @@ static int cmd_test_srp_client_host_remove(const struct shell *sh, size_t argc, 
 		}
 	}
 
-	otSrpClientRemoveHostAndServices(NULL, remove_key_lease, send_unreg);
+	error = otSrpClientRemoveHostAndServices(NULL, remove_key_lease, send_unreg);
+	if (error) {
+		shell_error(sh, "otSrpClientRemoveHostAndServices() error: %u", error);
+		return -ENOEXEC;
+	}
 
 	return 0;
 }
@@ -967,6 +927,7 @@ static int cmd_test_srp_client_start(const struct shell *sh, size_t argc, char *
 {
 	otSockAddr sockaddr;
 	int err = 0;
+	otError error;
 
 	if (net_addr_pton(AF_INET6, argv[1], (struct in6_addr *)&sockaddr.mAddress)) {
 		shell_error(sh, "Invalid IPv6 address: %s", argv[1]);
@@ -982,7 +943,11 @@ static int cmd_test_srp_client_start(const struct shell *sh, size_t argc, char *
 		return -EINVAL;
 	}
 
-	otSrpClientStart(NULL, &sockaddr);
+	error = otSrpClientStart(NULL, &sockaddr);
+	if (error) {
+		shell_error(sh, "otSrpClientStart() error: %u", error);
+		return -ENOEXEC;
+	}
 
 	return 0;
 }
@@ -1027,6 +992,408 @@ static int cmd_test_srp_client_ttl(const struct shell *sh, size_t argc, char *ar
 	return 0;
 }
 
+static int cmd_test_vendor_data(const struct shell *sh, size_t argc, char *argv[])
+{
+	otError error;
+
+	error = otThreadSetVendorName(NULL, argv[1]);
+	if (error) {
+		shell_error(sh, "otThreadSetVendorName() error: %u", error);
+		return -EINVAL;
+	}
+
+	error = otThreadSetVendorModel(NULL, argv[2]);
+	if (error) {
+		shell_error(sh, "otThreadSetVendorModel() error: %u", error);
+		return -EINVAL;
+	}
+
+	error = otThreadSetVendorSwVersion(NULL, argv[3]);
+	if (error) {
+		shell_error(sh, "otThreadSetVendorSwVersion() error: %u", error);
+		return -EINVAL;
+	}
+
+	shell_print(sh, "Vendor name set to: %s", otThreadGetVendorName(NULL));
+	shell_print(sh, "Vendor model set to: %s", otThreadGetVendorModel(NULL));
+	shell_print(sh, "Vendor SW version set to: %s", otThreadGetVendorSwVersion(NULL));
+
+	return 0;
+}
+
+static void handle_receive_diagnostic_get(otError error, otMessage *message,
+					  const otMessageInfo *message_info, void *context)
+{
+	otNetworkDiagTlv diagTlv;
+	otNetworkDiagIterator iterator = OT_NETWORK_DIAGNOSTIC_ITERATOR_INIT;
+
+	const struct shell *sh = (const struct shell *)context;
+	char addr_string[NET_IPV6_ADDR_LEN];
+
+	if (error != OT_ERROR_NONE) {
+		shell_error(sh, "Failed to get the diagnostic response, error: %d", error);
+		return;
+	}
+
+	if (!net_addr_ntop(AF_INET6, message_info->mPeerAddr.mFields.m8,
+			   addr_string, sizeof(addr_string))) {
+		shell_error(sh, "Failed to convert the IPv6 address");
+		return;
+	}
+
+	shell_print(sh, "------------------------------------------------------------------");
+	shell_print(sh, "Received DIAG_GET.rsp/ans from %s", addr_string);
+
+	while (otThreadGetNextDiagnosticTlv(message, &iterator, &diagTlv) == OT_ERROR_NONE) {
+		shell_fprintf(sh, SHELL_NORMAL, "\nTLV type: 0x%x ", diagTlv.mType);
+		switch (diagTlv.mType) {
+		case OT_NETWORK_DIAGNOSTIC_TLV_EXT_ADDRESS:
+			shell_print(sh, "(MAC Extended Address TLV)");
+			shell_hexdump(sh, diagTlv.mData.mExtAddress.m8, OT_EXT_ADDRESS_SIZE);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_EUI64:
+			shell_print(sh, "(EUI64 TLV)");
+			shell_hexdump(sh, diagTlv.mData.mEui64.m8, OT_EXT_ADDRESS_SIZE);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_MODE:
+			shell_print(sh, "(Mode TLV)");
+			shell_print(sh, "RX on when idle: %s", diagTlv.mData.mMode.mRxOnWhenIdle ?
+				    "true" : "false");
+			shell_print(sh, "Device type: %s", diagTlv.mData.mMode.mDeviceType ?
+				    "true" : "false");
+			shell_print(sh, "Network data: %s", diagTlv.mData.mMode.mNetworkData ?
+				    "true" : "false");
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_CONNECTIVITY:
+			shell_print(sh, "(Connectivity TLV)");
+			shell_print(sh, "Parent priority: %d",
+				    diagTlv.mData.mConnectivity.mParentPriority);
+			shell_print(sh, "Link quality 3: %u",
+				    diagTlv.mData.mConnectivity.mLinkQuality3);
+			shell_print(sh, "Link quality 2: %u",
+				    diagTlv.mData.mConnectivity.mLinkQuality2);
+			shell_print(sh, "Link quality 1: %u",
+				    diagTlv.mData.mConnectivity.mLinkQuality1);
+			shell_print(sh, "Leader cost: %u",
+				    diagTlv.mData.mConnectivity.mLeaderCost);
+			shell_print(sh, "ID sequence: %u", diagTlv.mData.mConnectivity.mIdSequence);
+			shell_print(sh, "Active routers: %u",
+				    diagTlv.mData.mConnectivity.mActiveRouters);
+			shell_print(sh, "SED buffer size: %u",
+				    diagTlv.mData.mConnectivity.mSedBufferSize);
+			shell_print(sh, "SED datagram count: %u",
+				    diagTlv.mData.mConnectivity.mSedDatagramCount);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_ROUTE:
+			shell_print(sh, "(Route64 TLV)");
+			shell_print(sh, "ID sequence: %u", diagTlv.mData.mRoute.mIdSequence);
+			shell_print(sh, "Route count: %u", diagTlv.mData.mRoute.mRouteCount);
+
+			for (int i = 0; i < diagTlv.mData.mRoute.mRouteCount; i++) {
+				shell_print(sh, "\tRouter ID: %u",
+					    diagTlv.mData.mRoute.mRouteData[i].mRouterId);
+				shell_print(sh, "\tLink quality in: %u",
+					    diagTlv.mData.mRoute.mRouteData[i].mLinkQualityIn);
+				shell_print(sh, "\tLink quality out: %u",
+					    diagTlv.mData.mRoute.mRouteData[i].mLinkQualityOut);
+				shell_print(sh, "\tRoute cost: %u\n",
+					    diagTlv.mData.mRoute.mRouteData[i].mRouteCost);
+			}
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_LEADER_DATA:
+			shell_print(sh, "(Leader Data TLV)");
+			shell_print(sh, "Partition ID: 0x%x",
+				    diagTlv.mData.mLeaderData.mPartitionId);
+			shell_print(sh, "Weighting: %u", diagTlv.mData.mLeaderData.mWeighting);
+			shell_print(sh, "Data version: %u", diagTlv.mData.mLeaderData.mDataVersion);
+			shell_print(sh, "Stable data version: %u",
+				    diagTlv.mData.mLeaderData.mStableDataVersion);
+			shell_print(sh, "Leader router ID: 0x%x",
+				    diagTlv.mData.mLeaderData.mLeaderRouterId);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_MAC_COUNTERS:
+			shell_print(sh, "(MAC Counters TLV)");
+			shell_print(sh, "IfInUnknownProtos: %u",
+				    diagTlv.mData.mMacCounters.mIfInUnknownProtos);
+			shell_print(sh, "IfInErrors: %u", diagTlv.mData.mMacCounters.mIfInErrors);
+			shell_print(sh, "IfOutErrors: %u", diagTlv.mData.mMacCounters.mIfOutErrors);
+			shell_print(sh, "IfInUcastPkts: %u",
+				    diagTlv.mData.mMacCounters.mIfInUcastPkts);
+			shell_print(sh, "IfInBroadcastPkts: %u",
+				    diagTlv.mData.mMacCounters.mIfInBroadcastPkts);
+			shell_print(sh, "IfInDiscards: %u",
+				    diagTlv.mData.mMacCounters.mIfInDiscards);
+			shell_print(sh, "IfOutUcastPkts: %u",
+				    diagTlv.mData.mMacCounters.mIfOutUcastPkts);
+			shell_print(sh, "IfOutBroadcastPkts: %u",
+				    diagTlv.mData.mMacCounters.mIfOutBroadcastPkts);
+			shell_print(sh, "IfOutDiscards: %u",
+				    diagTlv.mData.mMacCounters.mIfOutDiscards);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_MLE_COUNTERS:
+			shell_print(sh, "(MLE Counters TLV)");
+			shell_print(sh, "DisabledRole: %u",
+				    diagTlv.mData.mMleCounters.mDisabledRole);
+			shell_print(sh, "DetachedRole: %u",
+				    diagTlv.mData.mMleCounters.mDetachedRole);
+			shell_print(sh, "ChildRole: %u", diagTlv.mData.mMleCounters.mChildRole);
+			shell_print(sh, "RouterRole: %u", diagTlv.mData.mMleCounters.mRouterRole);
+			shell_print(sh, "LeaderRole: %u", diagTlv.mData.mMleCounters.mLeaderRole);
+			shell_print(sh, "AttachAttempts: %u",
+				    diagTlv.mData.mMleCounters.mAttachAttempts);
+			shell_print(sh, "PartitionIdChanges: %u",
+				    diagTlv.mData.mMleCounters.mPartitionIdChanges);
+			shell_print(sh, "BetterPartitionAttachAttempts: %u",
+				    diagTlv.mData.mMleCounters.mBetterPartitionAttachAttempts);
+			shell_print(sh, "ParentChanges: %u",
+				    diagTlv.mData.mMleCounters.mParentChanges);
+			shell_print(sh, "TrackedTime: %llu",
+				    diagTlv.mData.mMleCounters.mTrackedTime);
+			shell_print(sh, "DisabledTime: %llu",
+				    diagTlv.mData.mMleCounters.mDisabledTime);
+			shell_print(sh, "DetachedTime: %llu",
+				    diagTlv.mData.mMleCounters.mDetachedTime);
+			shell_print(sh, "ChildTime: %llu", diagTlv.mData.mMleCounters.mChildTime);
+			shell_print(sh, "RouterTime: %llu", diagTlv.mData.mMleCounters.mRouterTime);
+			shell_print(sh, "LeaderTime: %llu", diagTlv.mData.mMleCounters.mLeaderTime);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_BATTERY_LEVEL:
+			shell_print(sh, "(Battery Level TLV)");
+			shell_print(sh, "Battery level: %u", diagTlv.mData.mBatteryLevel);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_TIMEOUT:
+			shell_print(sh, "(Timeout TLV)");
+			shell_print(sh, "Timeout: %u", diagTlv.mData.mTimeout);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_MAX_CHILD_TIMEOUT:
+			shell_print(sh, "(Max Child Timeout TLV)");
+			shell_print(sh, "Max child timeout: %u", diagTlv.mData.mMaxChildTimeout);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_SHORT_ADDRESS:
+			shell_print(sh, "(Address16 TLV)");
+			shell_print(sh, "Rloc16: 0x%x", diagTlv.mData.mAddr16);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_SUPPLY_VOLTAGE:
+			shell_print(sh, "(Supply Voltage TLV)");
+			shell_print(sh, "Supply voltage: %u", diagTlv.mData.mSupplyVoltage);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_VERSION:
+			shell_print(sh, "(Thread Version TLV)");
+			shell_print(sh, "Version: %u", diagTlv.mData.mVersion);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_NAME:
+			shell_print(sh, "(Vendor Name TLV)");
+			shell_print(sh, "Vendor name: %s", diagTlv.mData.mVendorName);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_MODEL:
+			shell_print(sh, "(Vendor Model TLV)");
+			shell_print(sh, "Vendor model: %s", diagTlv.mData.mVendorModel);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_SW_VERSION:
+			shell_print(sh, "(Vendor SW Version TLV)");
+			shell_print(sh, "Vendor SW version: %s", diagTlv.mData.mVendorSwVersion);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_THREAD_STACK_VERSION:
+			shell_print(sh, "(Thread Stack Version TLV)");
+			shell_print(sh, "Thread stack version: %s",
+				    diagTlv.mData.mThreadStackVersion);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_VENDOR_APP_URL:
+			shell_print(sh, "(Vendor App URL TLV)");
+			shell_print(sh, "Vendor app URL: %s", diagTlv.mData.mVendorAppUrl);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_NETWORK_DATA:
+			shell_print(sh, "(Network Data TLV)");
+			shell_hexdump(sh, diagTlv.mData.mNetworkData.m8,
+				      diagTlv.mData.mNetworkData.mCount);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_CHANNEL_PAGES:
+			shell_print(sh, "(Channel Pages TLV)");
+			shell_hexdump(sh, diagTlv.mData.mChannelPages.m8,
+				      diagTlv.mData.mChannelPages.mCount);
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_IP6_ADDR_LIST:
+			shell_print(sh, "(IPv6 Address List TLV)");
+			for (int i = 0; i < diagTlv.mData.mIp6AddrList.mCount; i++) {
+				shell_hexdump(sh, diagTlv.mData.mIp6AddrList.mList[i].mFields.m8,
+					      OT_IP6_ADDRESS_SIZE);
+			}
+			break;
+		case OT_NETWORK_DIAGNOSTIC_TLV_CHILD_TABLE:
+			shell_print(sh, "(Child Table TLV)");
+			for (int i = 0; i < diagTlv.mData.mChildTable.mCount; i++) {
+				shell_print(sh, "\tChild ID: %u",
+					    diagTlv.mData.mChildTable.mTable[i].mChildId);
+				shell_print(sh, "\tTimeout: %u",
+					    diagTlv.mData.mChildTable.mTable[i].mTimeout);
+				shell_print(sh, "\tLink quality: %u",
+					    diagTlv.mData.mChildTable.mTable[i].mLinkQuality);
+				shell_print(sh, "\tRX on when idle: %s",
+					    diagTlv.mData.mChildTable.mTable[i].mMode.mRxOnWhenIdle
+					    ? "true" : "false");
+				shell_print(sh, "\tDevice type: %s",
+					    diagTlv.mData.mChildTable.mTable[i].mMode.mDeviceType ?
+					    "true" : "false");
+				shell_print(sh, "\tNetwork data: %s",
+					    diagTlv.mData.mChildTable.mTable[i].mMode.mNetworkData ?
+					    "true" : "false");
+			}
+			break;
+
+		default:
+			shell_print(sh, "(Unknown TLV)");
+		}
+	}
+}
+
+static int cmd_test_net_diag(const struct shell *sh, size_t argc, char *argv[])
+{
+	uint8_t tlv_types[35];
+	uint8_t count = 0;
+	otIp6Address addr;
+	otError error;
+
+	if (net_addr_pton(AF_INET6, argv[2], addr.mFields.m8)) {
+		shell_error(sh, "Failed to parse IPv6 address: %s", argv[1]);
+		return -EINVAL;
+	}
+
+	for (int arg = 3; arg < argc; ++arg) {
+		tlv_types[count] = shell_strtoul(argv[arg], 0, NULL);
+		count++;
+	}
+
+	if (strcmp(argv[1], "get") == 0) {
+		error = otThreadSendDiagnosticGet(NULL, &addr, tlv_types, count,
+						  handle_receive_diagnostic_get, (void *)sh);
+		if (error) {
+			shell_error(sh, "otThreadSendDiagnosticGet() error: %u", error);
+			return -ENOEXEC;
+		}
+
+	} else if (strcmp(argv[1], "reset") == 0) {
+		error = otThreadSendDiagnosticReset(NULL, &addr, tlv_types, count);
+		if (error) {
+			shell_error(sh, "otThreadSendDiagnosticGet() error: %u", error);
+			return -ENOEXEC;
+		}
+	} else {
+		shell_error(sh, "Invalid argument %s", argv[1]);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static void handle_mesh_diag_discover(otError error, otMeshDiagRouterInfo *router_info,
+				      void *context)
+{
+	const struct shell *sh = (const struct shell *)context;
+
+	if (error != OT_ERROR_NONE && error != OT_ERROR_PENDING) {
+		shell_error(sh, "Error in mesh diag discovery :%d", error);
+		return;
+	}
+
+	shell_print(sh, "------------------------------------------------------------------");
+	shell_print(sh, "Received mesh diagnostic response from Router ID: %u",
+		    router_info->mRouterId);
+	shell_print(sh, "Rloc16: 0x%x", router_info->mRloc16);
+	shell_print(sh, "Extended Address:");
+	shell_hexdump(sh, router_info->mExtAddress.m8, OT_EXT_ADDRESS_SIZE);
+	if (router_info->mVersion != OT_MESH_DIAG_VERSION_UNKNOWN) {
+		shell_print(sh, "Version: %u", router_info->mVersion);
+	}
+	shell_print(sh, "IsThisDeviceParent: %s",
+		    router_info->mIsThisDeviceParent ? "true" : "false");
+	shell_print(sh, "IsLeader: %s", router_info->mIsLeader ? "true" : "false");
+	shell_print(sh, "IsThisDevice: %s", router_info->mIsThisDevice ? "true" : "false");
+	shell_print(sh, "IsBorderRouter:  %s", router_info->mIsBorderRouter ? "true" : "false");
+
+	for (int i = 0; i <= OT_NETWORK_MAX_ROUTER_ID; i++) {
+		if (router_info->mLinkQualities[i]) {
+			shell_print(sh, "Link quality to Router %u: %u", i,
+				    router_info->mLinkQualities[i]);
+		}
+	}
+
+	if (router_info->mIp6AddrIterator) {
+		otIp6Address address;
+
+		error = otMeshDiagGetNextIp6Address(router_info->mIp6AddrIterator, &address);
+		if (error == OT_ERROR_NONE) {
+			shell_print(sh, "\nIPv6 addresses:");
+			do {
+				shell_hexdump(sh, address.mFields.m8, OT_IP6_ADDRESS_SIZE);
+				error = otMeshDiagGetNextIp6Address(router_info->mIp6AddrIterator,
+								    &address);
+
+			} while (error == OT_ERROR_NONE);
+		}
+	}
+
+	if (router_info->mChildIterator) {
+		otMeshDiagChildInfo child_info;
+
+		error = otMeshDiagGetNextChildInfo(router_info->mChildIterator, &child_info);
+		if (error == OT_ERROR_NONE) {
+			shell_print(sh, "\nChildren:");
+			do {
+				shell_print(sh, "\tRloc16 0x%x", child_info.mRloc16);
+				shell_print(sh, "\tLink quality: %u", child_info.mLinkQuality);
+				shell_print(sh, "\tRxOnWhenIdle: %s",
+					    child_info.mMode.mRxOnWhenIdle ? "true" : "false");
+				shell_print(sh, "\tDeviceType: %s",
+					    child_info.mMode.mDeviceType ? "true" : "false");
+				shell_print(sh, "\tNetworkData: %s",
+					    child_info.mMode.mNetworkData ? "true" : "false");
+				shell_print(sh, "\tIsThisDevice: %s",
+					    child_info.mIsThisDevice ? "true" : "false");
+				shell_print(sh, "\tIsBorderRouter: %s\n",
+					    child_info.mIsBorderRouter ? "true" : "false");
+				error = otMeshDiagGetNextChildInfo(router_info->mChildIterator,
+								   &child_info);
+			} while (error == OT_ERROR_NONE);
+		}
+	}
+}
+
+static int cmd_test_mesh_diag(const struct shell *sh, size_t argc, char *argv[])
+{
+	otMeshDiagDiscoverConfig config = {
+		.mDiscoverIp6Addresses = false,
+		.mDiscoverChildTable = false,
+	};
+	otError error;
+
+	if (strcmp(argv[1], "cancel") == 0) {
+		otMeshDiagCancel(NULL);
+		return 0;
+	} else if (strcmp(argv[1], "start") != 0) {
+		shell_error(sh, "Invalid argument %s", argv[1]);
+		return -EINVAL;
+	}
+
+	for (int i = 2; i < argc; i++) {
+		if (strcmp(argv[i], "ip6") == 0) {
+			config.mDiscoverIp6Addresses = true;
+		} else if (strcmp(argv[i], "children") == 0) {
+			config.mDiscoverChildTable = true;
+		} else {
+			shell_error(sh, "Invalid argument %s", argv[i]);
+			return -EINVAL;
+		}
+	}
+
+	error = otMeshDiagDiscoverTopology(NULL, &config, handle_mesh_diag_discover, (void *)sh);
+	if (error) {
+		shell_error(sh, "otMeshDiagDiscoverTopology() error: %u", error);
+		return -ENOEXEC;
+	}
+
+	return 0;
+}
+
 static void print_txt_entry(const struct shell *sh, const otDnsTxtEntry *entry)
 {
 	char buffer[128];
@@ -1051,7 +1418,7 @@ static void print_txt_entry(const struct shell *sh, const otDnsTxtEntry *entry)
 	shell_print(sh, "\t\t%s", buffer);
 }
 
-static void print_service_info(const struct shell *sh, const otSrpClientService *service)
+static void print_srp_service_info(const struct shell *sh, const otSrpClientService *service)
 {
 	const char *const *subtype = service->mSubTypeLabels;
 	size_t index = 0;
@@ -1098,7 +1465,7 @@ static int cmd_test_srp_client_services(const struct shell *sh, size_t argc, cha
 
 	while (service) {
 		shell_print(sh, "Service 0x%p", service);
-		print_service_info(sh, service);
+		print_srp_service_info(sh, service);
 
 		service = service->mNext;
 	}
@@ -1238,18 +1605,698 @@ static int cmd_test_srp_client_host_addresses(const struct shell *sh, size_t arg
 	return 0;
 }
 
+static int cmd_dns_client_config_get(const struct shell *sh, size_t argc, char *argv[])
+{
+	const otDnsQueryConfig *config;
+	struct in6_addr in6_addr;
+	char addr_string[NET_IPV6_ADDR_LEN];
+
+	config = otDnsClientGetDefaultConfig(NULL);
+
+	memcpy(in6_addr.s6_addr, config->mServerSockAddr.mAddress.mFields.m8, OT_IP6_ADDRESS_SIZE);
+
+	if (!net_addr_ntop(AF_INET6, &in6_addr, addr_string, sizeof(addr_string))) {
+		shell_error(sh, "Failed to convert the IPv6 address");
+		return -EINVAL;
+	}
+
+	shell_print(sh, "Address: [%s]:%u", addr_string, config->mServerSockAddr.mPort);
+	shell_print(sh, "Response timeout: %u", config->mResponseTimeout);
+	shell_print(sh, "Max attempts: %u", config->mMaxTxAttempts);
+	shell_print(sh, "Recursion flag: %u", config->mRecursionFlag);
+	shell_print(sh, "NAT64 mode: %u", config->mNat64Mode);
+	shell_print(sh, "Service mode: %u", config->mServiceMode);
+	shell_print(sh, "Transport protocol: %u", config->mTransportProto);
+
+	return 0;
+}
+
+static int cmd_dns_client_config_set(const struct shell *sh, size_t argc, char *argv[])
+{
+	struct in6_addr in6_addr;
+	otDnsQueryConfig config;
+	unsigned long port;
+	unsigned long timeout;
+	unsigned long attempts;
+	unsigned long recursion;
+	unsigned long nat_mode;
+	unsigned long service_mode;
+	unsigned long transport;
+	int err = 0;
+
+	if (net_addr_pton(AF_INET6, argv[1], &in6_addr)) {
+		shell_error(sh, "Invalid address");
+		return -EINVAL;
+	}
+
+	port = shell_strtoul(argv[2], 0, &err);
+	timeout = shell_strtoul(argv[3], 0, &err);
+	attempts = shell_strtoul(argv[4], 0, &err);
+	recursion = shell_strtoul(argv[5], 0, &err);
+	nat_mode = shell_strtoul(argv[6], 0, &err);
+	service_mode = shell_strtoul(argv[7], 0, &err);
+	transport = shell_strtoul(argv[8], 0, &err);
+
+	if (err) {
+		shell_warn(sh, "Unable to parse config string");
+		return -EINVAL;
+	}
+
+	memcpy(config.mServerSockAddr.mAddress.mFields.m8, in6_addr.s6_addr, OT_IP6_ADDRESS_SIZE);
+
+	config.mServerSockAddr.mPort = (uint16_t)port;
+	config.mResponseTimeout = (uint32_t)timeout;
+	config.mMaxTxAttempts = (uint32_t)attempts;
+	config.mRecursionFlag = (otDnsRecursionFlag)recursion;
+	config.mNat64Mode = (otDnsNat64Mode)nat_mode;
+	config.mServiceMode = (otDnsServiceMode)service_mode;
+	config.mTransportProto = (otDnsTransportProto)transport;
+
+	otDnsClientSetDefaultConfig(NULL, &config);
+
+	return 0;
+}
+
+static void dns_resolve_cb(otError error, const otDnsAddressResponse *response, void *context)
+{
+	const struct shell *sh = (const struct shell *)context;
+	char hostname[128];
+	otError getter_err;
+	uint16_t index = 0;
+	otIp6Address address;
+	uint32_t ttl;
+	char addr_string[NET_IPV6_ADDR_LEN];
+
+	if (error == OT_ERROR_NONE) {
+		getter_err = otDnsAddressResponseGetHostName(response, hostname, sizeof(hostname));
+
+		if (getter_err == OT_ERROR_NONE) {
+			shell_print(sh, "Hostname %s", hostname);
+		} else {
+			shell_error(sh, "Hostname error: %u", getter_err);
+			return;
+		}
+
+		while (otDnsAddressResponseGetAddress(response, index++, &address, &ttl) ==
+		       OT_ERROR_NONE) {
+			if (!net_addr_ntop(AF_INET6, (struct in6_addr *)&address, addr_string,
+					   sizeof(addr_string))) {
+				shell_error(sh, "Failed to convert the IPv6 address");
+				return;
+			}
+
+			shell_print(sh, "Address #%u: %s ttl: %u", index, addr_string, ttl);
+		}
+	} else {
+		shell_error(sh, "DNS resolve callback error: %u", error);
+	}
+}
+
+static int cmd_dns_client_resolve(const struct shell *sh, size_t argc, char *argv[])
+{
+	otError error;
+	const otDnsQueryConfig *config;
+
+	config = otDnsClientGetDefaultConfig(NULL);
+
+	if (net_addr_pton(AF_INET6, argv[2],
+			  (struct in6_addr *)&config->mServerSockAddr.mAddress)) {
+		shell_error(sh, "Invalid server address");
+		return -EINVAL;
+	}
+
+	if (strcmp(argv[0], "test_dns_client_resolve4") == 0) {
+		error = otDnsClientResolveIp4Address(NULL, argv[1], dns_resolve_cb, (void *)sh,
+						     config);
+	} else {
+		error = otDnsClientResolveAddress(NULL, argv[1], dns_resolve_cb, (void *)sh,
+						  config);
+	}
+
+	shell_print(sh, "Resolve requested, err: %u", error);
+
+	return 0;
+}
+
+static void print_dns_service_info(const struct shell *sh, const otDnsServiceInfo *service_info)
+{
+	char addr[INET6_ADDRSTRLEN];
+
+	net_addr_ntop(AF_INET6, (struct in6_addr *)&service_info->mHostAddress, addr, sizeof(addr));
+
+	shell_print(sh, "Port:%d, Priority:%d, Weight:%d, TTL:%u", service_info->mPort,
+		    service_info->mPriority, service_info->mWeight, service_info->mTtl);
+	shell_print(sh, "Host: %s", service_info->mHostNameBuffer);
+	shell_print(sh, "Address: %s", addr);
+	shell_print(sh, "Address TTL: %u", service_info->mHostAddressTtl);
+	shell_print(sh, "TXT:");
+
+	shell_hexdump(sh, service_info->mTxtData, service_info->mTxtDataSize);
+
+	shell_print(sh, "TXT TTL: %u", service_info->mTxtDataTtl);
+}
+
+
+static void dns_service_cb(otError error, const otDnsServiceResponse *response, void *context)
+{
+	const struct shell *sh = (const struct shell *)context;
+	char name[OT_DNS_MAX_NAME_SIZE];
+	char label[OT_DNS_MAX_LABEL_SIZE];
+	uint8_t txtBuffer[CONFIG_OPENTHREAD_RPC_DNS_MAX_TXT_DATA_SIZE];
+	otDnsServiceInfo service_info;
+
+	if (otDnsServiceResponseGetServiceName(response, label, sizeof(label), name,
+					       sizeof(name))) {
+		shell_error(sh, "otDnsServiceResponseGetServiceName() error");
+		return;
+	}
+
+	if (error == OT_ERROR_NONE) {
+		shell_print(sh, "DNS service resolution response for %s for service %s", label,
+			    name);
+
+		service_info.mHostNameBuffer = name;
+		service_info.mHostNameBufferSize = sizeof(name);
+		service_info.mTxtData = txtBuffer;
+		service_info.mTxtDataSize = sizeof(txtBuffer);
+
+		if (otDnsServiceResponseGetServiceInfo(response, &service_info) == OT_ERROR_NONE) {
+			print_dns_service_info(sh, &service_info);
+		}
+	} else {
+		shell_error(sh, "DNS service resolution error: %u", error);
+	}
+}
+
+static int cmd_dns_client_service(const struct shell *sh, size_t argc, char *argv[])
+{
+	const otDnsQueryConfig *config;
+	otError error;
+
+	config = otDnsClientGetDefaultConfig(NULL);
+
+	if (net_addr_pton(AF_INET6, argv[3],
+			  (struct in6_addr *)&config->mServerSockAddr.mAddress)) {
+		shell_error(sh, "Invalid server address");
+		return -EINVAL;
+	}
+
+	if (strcmp(argv[0], "test_dns_client_servicehost") == 0) {
+		error = otDnsClientResolveService(NULL, argv[1], argv[2], dns_service_cb,
+						 (void *)sh, config);
+	} else {
+		error = otDnsClientResolveServiceAndHostAddress(NULL, argv[1], argv[2],
+								dns_service_cb, (void *)sh,
+								config);
+	}
+
+	shell_print(sh, "Service resolve requested, err: %u", error);
+
+	return 0;
+}
+
+static void dns_browse_cb(otError error, const otDnsBrowseResponse *response, void *context)
+{
+	const struct shell *sh = (const struct shell *)context;
+	char name[OT_DNS_MAX_NAME_SIZE];
+	char label[OT_DNS_MAX_LABEL_SIZE];
+	uint8_t txtBuffer[CONFIG_OPENTHREAD_RPC_DNS_MAX_TXT_DATA_SIZE];
+	otDnsServiceInfo info;
+
+	if (otDnsBrowseResponseGetServiceName(response, name, sizeof(name))) {
+		shell_error(sh, "otDnsBrowseResponseGetServiceName() error");
+		return;
+	}
+
+	shell_print(sh, "DNS browse response for: %s", name);
+
+	if (error == OT_ERROR_NONE) {
+		uint16_t index = 0;
+
+		while (otDnsBrowseResponseGetServiceInstance(response, index++, label,
+							     sizeof(label)) == OT_ERROR_NONE) {
+			shell_print(sh, "%s", label);
+
+			info.mHostNameBuffer     = name;
+			info.mHostNameBufferSize = sizeof(name);
+			info.mTxtData            = txtBuffer;
+			info.mTxtDataSize        = sizeof(txtBuffer);
+
+			if (otDnsBrowseResponseGetServiceInfo(response, label, &info) ==
+			    OT_ERROR_NONE) {
+				print_dns_service_info(sh, &info);
+			}
+		}
+	}
+}
+
+static int cmd_dns_client_browse(const struct shell *sh, size_t argc, char *argv[])
+{
+	const otDnsQueryConfig *config;
+	otError error;
+
+	config = otDnsClientGetDefaultConfig(NULL);
+
+	if (net_addr_pton(AF_INET6, argv[2],
+			  (struct in6_addr *)&config->mServerSockAddr.mAddress)) {
+		shell_error(sh, "Invalid server address");
+		return -EINVAL;
+	}
+
+	error = otDnsClientBrowse(NULL, argv[1], dns_browse_cb, (void *)sh, config);
+
+	shell_print(sh, "Browse requested, err: %u", error);
+
+	return 0;
+}
+
+static otError ot_cli_command_eui64(const struct shell *sh, size_t argc, char *argv[])
+{
+	otExtAddress ext_addr;
+
+	if (argc == 1) {
+		/* Read current EUI64 */
+		otLinkGetFactoryAssignedIeeeEui64(NULL, &ext_addr);
+		shell_print(sh, "%02x%02x%02x%02x%02x%02x%02x%02x", ext_addr.m8[0], ext_addr.m8[1],
+			    ext_addr.m8[2], ext_addr.m8[3], ext_addr.m8[4], ext_addr.m8[5],
+			    ext_addr.m8[6], ext_addr.m8[7]);
+		return OT_ERROR_NONE;
+	}
+
+	/* Set new EUI64 */
+	if (hex2bin(argv[1], strlen(argv[1]), ext_addr.m8, sizeof(ext_addr.m8)) !=
+	    sizeof(ext_addr.m8)) {
+		return OT_ERROR_INVALID_ARGS;
+	}
+
+	return ot_rpc_set_factory_assigned_ieee_eui64(&ext_addr);
+}
+
+static int cmd_eui64(const struct shell *sh, size_t argc, char *argv[])
+{
+	return ot_cli_command_exec(ot_cli_command_eui64, sh, argc, argv);
+}
+
+static otError cmd_rloc16_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	shell_print(sh, "%04x", otThreadGetRloc16(NULL));
+
+	return OT_ERROR_NONE;
+}
+
+static int cmd_rloc16(const struct shell *sh, size_t argc, char *argv[])
+{
+	return ot_cli_command_exec(cmd_rloc16_impl, sh, argc, argv);
+}
+
+static otError cmd_factoryreset_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	otInstanceFactoryReset(NULL);
+
+	return OT_ERROR_NONE;
+}
+
+static int cmd_factoryreset(const struct shell *sh, size_t argc, char *argv[])
+{
+	return ot_cli_command_exec(cmd_factoryreset_impl, sh, argc, argv);
+}
+
+static void handle_udp_receive(void *context, otMessage *msg, const otMessageInfo *msg_info)
+{
+	uint16_t offset;
+	uint16_t length;
+	char addr_string[OT_IP6_ADDRESS_STRING_SIZE];
+	otThreadLinkInfo link_info;
+	const struct shell *sh = context;
+
+	offset = otMessageGetOffset(msg);
+	length = otMessageGetLength(msg);
+	otIp6AddressToString(&msg_info->mPeerAddr, addr_string, sizeof(addr_string));
+
+	shell_print(sh, "%d bytes from %s %d", length - offset, addr_string, msg_info->mPeerPort);
+
+	while (offset < length) {
+		uint8_t buf[64];
+		uint16_t read = otMessageRead(msg, offset, buf, sizeof(buf));
+
+		shell_hexdump(sh, buf, read);
+		offset += read;
+	}
+
+	if (otMessageGetThreadLinkInfo(msg, &link_info) == OT_ERROR_NONE) {
+		shell_print(sh, "PanId: %x", link_info.mPanId);
+		shell_print(sh, "Channel: %u", link_info.mChannel);
+		shell_print(sh, "Rss: %d", link_info.mRss);
+		shell_print(sh, "Lqi: %u", link_info.mLqi);
+		shell_print(sh, "LinkSecurity: %c", link_info.mLinkSecurity ? 'y' : 'n');
+	}
+}
+
+static otError cmd_udp_open_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (otUdpIsOpen(NULL, &udp_socket)) {
+		return OT_ERROR_ALREADY;
+	}
+
+	return otUdpOpen(NULL, &udp_socket, handle_udp_receive, (void *)sh);
+}
+
+static int cmd_udp_open(const struct shell *sh, size_t argc, char *argv[])
+{
+	return ot_cli_command_exec(cmd_udp_open_impl, sh, argc, argv);
+}
+
+static otError cmd_udp_bind_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	otNetifIdentifier netif;
+	otSockAddr sock_addr;
+	int rc = 0;
+
+	if (strcmp(argv[1], "-u") == 0) {
+		netif = OT_NETIF_UNSPECIFIED;
+	} else if (strcmp(argv[1], "-b") == 0) {
+		netif = OT_NETIF_BACKBONE;
+	} else {
+		netif = OT_NETIF_THREAD;
+	}
+
+	if (net_addr_pton(AF_INET6, argv[argc - 2], (struct in6_addr *)&sock_addr.mAddress)) {
+		return OT_ERROR_INVALID_ARGS;
+	}
+
+	sock_addr.mPort = shell_strtoul(argv[argc - 1], 0, &rc);
+
+	if (rc) {
+		return OT_ERROR_INVALID_ARGS;
+	}
+
+	return otUdpBind(NULL, &udp_socket, &sock_addr, netif);
+}
+
+static int cmd_udp_bind(const struct shell *sh, size_t argc, char *argv[])
+{
+	return ot_cli_command_exec(cmd_udp_bind_impl, sh, argc, argv);
+}
+
+static otError cmd_udp_connect_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	otSockAddr sock_addr;
+	int rc = 0;
+
+	if (net_addr_pton(AF_INET6, argv[1], (struct in6_addr *)&sock_addr.mAddress)) {
+		return OT_ERROR_INVALID_ARGS;
+	}
+
+	sock_addr.mPort = shell_strtoul(argv[2], 0, &rc);
+
+	if (rc) {
+		return OT_ERROR_INVALID_ARGS;
+	}
+
+	return otUdpConnect(NULL, &udp_socket, &sock_addr);
+}
+
+static int cmd_udp_connect(const struct shell *sh, size_t argc, char *argv[])
+{
+	return ot_cli_command_exec(cmd_udp_connect_impl, sh, argc, argv);
+}
+
+static otError cmd_udp_send_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	otError error;
+	otMessageInfo msg_info;
+	otMessageSettings msg_settings = {
+		.mLinkSecurityEnabled = true,
+		.mPriority = OT_MESSAGE_PRIORITY_NORMAL,
+	};
+	otMessage *msg;
+	int rc = 0;
+
+	if (!otUdpIsOpen(NULL, &udp_socket)) {
+		return OT_ERROR_INVALID_STATE;
+	}
+
+	memset(&msg_info, 0, sizeof(msg_info));
+
+	if (argc >= 4) {
+		if (net_addr_pton(AF_INET6, argv[1], (struct in6_addr *)&msg_info.mPeerAddr)) {
+			return OT_ERROR_INVALID_ARGS;
+		}
+
+		msg_info.mPeerPort = shell_strtoul(argv[2], 0, &rc);
+		if (rc) {
+			return OT_ERROR_INVALID_ARGS;
+		}
+	}
+
+	msg = otUdpNewMessage(NULL, &msg_settings);
+	if (msg == NULL) {
+		return OT_ERROR_NO_BUFS;
+	}
+
+	error = otMessageAppend(msg, argv[argc - 1], strlen(argv[argc - 1]));
+	if (error != OT_ERROR_NONE) {
+		otMessageFree(msg);
+		return error;
+	}
+
+	error = otUdpSend(NULL, &udp_socket, msg, &msg_info);
+	if (error != OT_ERROR_NONE) {
+		otMessageFree(msg);
+	}
+
+	return error;
+}
+
+static int cmd_udp_send(const struct shell *sh, size_t argc, char *argv[])
+{
+	return ot_cli_command_exec(cmd_udp_send_impl, sh, argc, argv);
+}
+
+static otError cmd_udp_close_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	return otUdpClose(NULL, &udp_socket);
+}
+
+static int cmd_udp_close(const struct shell *sh, size_t argc, char *argv[])
+{
+	return ot_cli_command_exec(cmd_udp_close_impl, sh, argc, argv);
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
-	ot_cmds, SHELL_CMD_ARG(ifconfig, NULL, "Interface management", cmd_ifconfig, 1, 1),
+	udp_cmds, SHELL_CMD_ARG(open, NULL, "Open socket", cmd_udp_open, 1, 0),
+	SHELL_CMD_ARG(bind, NULL, "Bind socket [-u|-b] <addr> <port>", cmd_udp_bind, 3, 1),
+	SHELL_CMD_ARG(connect, NULL, "Connect socket <addr> <port>", cmd_udp_connect, 3, 0),
+	SHELL_CMD_ARG(send, NULL, "Send message [addr port] <message>", cmd_udp_send, 2, 2),
+	SHELL_CMD_ARG(close, NULL, "Close socket", cmd_udp_close, 1, 0), SHELL_SUBCMD_SET_END);
+
+static otError cmd_channel_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	shell_print(sh, "%u", otLinkGetChannel(NULL));
+	return OT_ERROR_NONE;
+}
+
+static int cmd_channel(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 1) {
+		return ot_cli_command_exec(cmd_channel_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc, argv);
+}
+
+static otError cmd_counters_mac_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	const otMacCounters *counters = otLinkGetCounters(NULL);
+
+	shell_print(sh, "TxTotal: %u", counters->mTxTotal);
+
+	shell_print(sh, "    TxUnicast: %u", counters->mTxUnicast);
+	shell_print(sh, "    TxBroadcast: %u", counters->mTxBroadcast);
+	shell_print(sh, "    TxAckRequested: %u", counters->mTxAckRequested);
+	shell_print(sh, "    TxAcked: %u", counters->mTxAcked);
+	shell_print(sh, "    TxNoAckRequested: %u", counters->mTxNoAckRequested);
+	shell_print(sh, "    TxData: %u", counters->mTxData);
+	shell_print(sh, "    TxDataPoll: %u", counters->mTxDataPoll);
+	shell_print(sh, "    TxBeacon: %u", counters->mTxBeacon);
+	shell_print(sh, "    TxBeaconRequest: %u", counters->mTxBeaconRequest);
+	shell_print(sh, "    TxOther: %u", counters->mTxOther);
+	shell_print(sh, "    TxRetry: %u", counters->mTxRetry);
+	shell_print(sh, "    TxErrCca: %u", counters->mTxErrCca);
+	shell_print(sh, "    TxErrBusyChannel: %u", counters->mTxErrBusyChannel);
+	shell_print(sh, "    TxErrAbort: %u", counters->mTxErrAbort);
+	shell_print(sh, "    TxDirectMaxRetryExpiry: %u", counters->mTxDirectMaxRetryExpiry);
+	shell_print(sh, "    TxIndirectMaxRetryExpiry: %u", counters->mTxIndirectMaxRetryExpiry);
+
+	shell_print(sh, "RxTotal: %u", counters->mRxTotal);
+
+	shell_print(sh, "    RxUnicast: %u", counters->mRxUnicast);
+	shell_print(sh, "    RxBroadcast: %u", counters->mRxBroadcast);
+	shell_print(sh, "    RxData: %u", counters->mRxData);
+	shell_print(sh, "    RxDataPoll: %u", counters->mRxDataPoll);
+	shell_print(sh, "    RxBeacon: %u", counters->mRxBeacon);
+	shell_print(sh, "    RxBeaconRequest: %u", counters->mRxBeaconRequest);
+	shell_print(sh, "    RxOther: %u", counters->mRxOther);
+	shell_print(sh, "    RxAddressFiltered: %u", counters->mRxAddressFiltered);
+	shell_print(sh, "    RxDestAddrFiltered: %u", counters->mRxDestAddrFiltered);
+	shell_print(sh, "    RxDuplicated: %u", counters->mRxDuplicated);
+	shell_print(sh, "    RxErrNoFrame: %u", counters->mRxErrNoFrame);
+	shell_print(sh, "    RxErrNoUnknownNeighbor: %u", counters->mRxErrUnknownNeighbor);
+	shell_print(sh, "    RxErrInvalidSrcAddr: %u", counters->mRxErrInvalidSrcAddr);
+	shell_print(sh, "    RxErrSec: %u", counters->mRxErrSec);
+	shell_print(sh, "    RxErrFcs: %u", counters->mRxErrFcs);
+	shell_print(sh, "    RxErrOther: %u", counters->mRxErrOther);
+
+	return OT_ERROR_NONE;
+}
+
+static int cmd_counters_mac(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 1) {
+		return ot_cli_command_exec(cmd_counters_mac_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc + 1, argv - 1);
+}
+
+static otError cmd_counters_mle_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	const otMleCounters *counters = otThreadGetMleCounters(NULL);
+
+	shell_print(sh, "Role Disabled: %u", counters->mDisabledRole);
+	shell_print(sh, "Role Detached: %u", counters->mDetachedRole);
+	shell_print(sh, "Role Child: %u", counters->mChildRole);
+	shell_print(sh, "Role Router: %u", counters->mRouterRole);
+	shell_print(sh, "Role Leader: %u", counters->mLeaderRole);
+	shell_print(sh, "Attach Attempts: %u", counters->mAttachAttempts);
+	shell_print(sh, "Partition Id Changes: %u", counters->mPartitionIdChanges);
+	shell_print(sh, "Better Partition Attach Attempts: %u",
+		    counters->mBetterPartitionAttachAttempts);
+	shell_print(sh, "Parent Changes: %u", counters->mParentChanges);
+	shell_print(sh, "Time Disabled Milli: %llu", counters->mDisabledTime);
+	shell_print(sh, "Time Detached Milli: %llu", counters->mDetachedTime);
+	shell_print(sh, "Time Child Milli: %llu", counters->mChildTime);
+	shell_print(sh, "Time Router Milli: %llu", counters->mRouterTime);
+	shell_print(sh, "Time Leader Milli: %llu", counters->mLeaderTime);
+	shell_print(sh, "Time Tracked Milli: %llu", counters->mTrackedTime);
+
+	return OT_ERROR_NONE;
+}
+
+static int cmd_counters_mle(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 1) {
+		return ot_cli_command_exec(cmd_counters_mle_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc + 1, argv - 1);
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(counters_cmds,
+			       SHELL_CMD_ARG(mac, NULL, "MAC counters", cmd_counters_mac, 1, 1),
+			       SHELL_CMD_ARG(mle, NULL, "MLE counters", cmd_counters_mle, 1, 1),
+			       SHELL_SUBCMD_SET_END);
+
+static otError cmd_extaddr_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	const otExtAddress *ext_addr = otLinkGetExtendedAddress(NULL);
+
+	shell_print(sh, "%016llx", sys_get_be64(ext_addr->m8));
+
+	return OT_ERROR_NONE;
+}
+
+static int cmd_extaddr(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 1) {
+		return ot_cli_command_exec(cmd_extaddr_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc, argv);
+}
+
+static otError cmd_networkname_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	shell_print(sh, "%s", otThreadGetNetworkName(NULL));
+	return OT_ERROR_NONE;
+}
+
+static int cmd_networkname(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 1) {
+		return ot_cli_command_exec(cmd_networkname_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc, argv);
+}
+
+static otError cmd_panid_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	shell_print(sh, "0x%04x", otLinkGetPanId(NULL));
+	return OT_ERROR_NONE;
+}
+
+static int cmd_panid(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 1) {
+		return ot_cli_command_exec(cmd_panid_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc, argv);
+}
+
+static otError cmd_partitionid_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	shell_print(sh, "%u", otThreadGetPartitionId(NULL));
+	return OT_ERROR_NONE;
+}
+
+static int cmd_partitionid(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 1) {
+		return ot_cli_command_exec(cmd_partitionid_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc, argv);
+}
+
+static otError cmd_version_impl(const struct shell *sh, size_t argc, char *argv[])
+{
+	shell_print(sh, "%s", otGetVersionString());
+	return OT_ERROR_NONE;
+}
+
+static int cmd_version(const struct shell *sh, size_t argc, char *argv[])
+{
+	if (argc == 1) {
+		return ot_cli_command_exec(cmd_version_impl, sh, argc, argv);
+	}
+
+	return ot_cli_command_send(sh, argc, argv);
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(
+	ot_cmds, SHELL_CMD_ARG(channel, NULL, "Channel configuration", cmd_channel, 1, 255),
+	SHELL_CMD_ARG(cli, NULL, "Send command as text", cmd_ot, 1, 255),
+	SHELL_CMD_ARG(counters, &counters_cmds, "Counters subcommands", NULL, 1, 0),
+	SHELL_CMD_ARG(discover, NULL, "Thread discovery scan", cmd_discover, 1, 4),
+	SHELL_CMD_ARG(eui64, NULL, "EUI64 configuration", cmd_eui64, 1, 1),
+	SHELL_CMD_ARG(extaddr, NULL, "Ext address configuration", cmd_extaddr, 1, 1),
+	SHELL_CMD_ARG(factoryreset, NULL, "Factory reset", cmd_factoryreset, 1, 0),
+	SHELL_CMD_ARG(ifconfig, NULL, "Interface management", cmd_ifconfig, 1, 1),
 	SHELL_CMD_ARG(ipmaddr, NULL, "IPv6 multicast configuration", cmd_ipmaddr, 1, 2),
 	SHELL_CMD_ARG(mode, NULL, "Mode configuration", cmd_mode, 1, 1),
+	SHELL_CMD_ARG(networkname, NULL, "Network name configuration", cmd_networkname, 1, 1),
+	SHELL_CMD_ARG(panid, NULL, "PAN ID configuration", cmd_panid, 1, 1),
+	SHELL_CMD_ARG(partitionid, NULL, "Partition configuration", cmd_partitionid, 1, 2),
 	SHELL_CMD_ARG(pollperiod, NULL, "Polling configuration", cmd_pollperiod, 1, 1),
+	SHELL_CMD_ARG(radio, NULL, "Radio configuration", cmd_radio, 1, 1),
+	SHELL_CMD_ARG(rloc16, NULL, "Get RLOC16", cmd_rloc16, 1, 0),
 	SHELL_CMD_ARG(state, NULL, "Current role", cmd_state, 1, 1),
 	SHELL_CMD_ARG(thread, NULL, "Role management", cmd_thread, 2, 0),
-	SHELL_CMD_ARG(discover, NULL, "Thread discovery scan", cmd_discover, 1, 4),
+	SHELL_CMD_ARG(udp, &udp_cmds, "UDP subcommands", NULL, 1, 0),
+	SHELL_CMD_ARG(version, NULL, "Get version", cmd_version, 1, 1),
 	SHELL_CMD_ARG(test_message, NULL, "Test message API", cmd_test_message, 1, 0),
-	SHELL_CMD_ARG(test_udp_init, NULL, "Test udp init API", cmd_test_udp_init, 1, 0),
-	SHELL_CMD_ARG(test_udp_send, NULL, "Test udp send API", cmd_test_udp_send, 1, 0),
-	SHELL_CMD_ARG(test_udp_close, NULL, "Test udp close API", cmd_test_udp_close, 1, 0),
 	SHELL_CMD_ARG(test_net_data, NULL, "Test netdata API", cmd_test_net_data, 1, 0),
 	SHELL_CMD_ARG(test_net_data_mesh_prefix, NULL, "Test netdata msh prefix API",
 		      cmd_test_net_data_mesh_prefix, 1, 0),
@@ -1290,13 +2337,46 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(cmd_test_srp_client_service_clear, NULL, "Test SRP client service clear API",
 		      cmd_test_srp_client_service_clear, 2, 0),
 	SHELL_CMD_ARG(test_srp_client_add_service_remove, NULL,
-		      "Test SRP client service remove API",
-		      cmd_test_srp_client_service_remove, 2, 0),
+		      "Test SRP client service remove API", cmd_test_srp_client_service_remove, 2,
+		      0),
 	SHELL_CMD_ARG(test_srp_client_host_address_auto, NULL,
 		      "Test SRP client host address auto API",
 		      cmd_test_srp_client_host_address_auto, 1, 0),
 	SHELL_CMD_ARG(test_srp_client_host_addresses, NULL, "Test SRP client host addresses API",
 		      cmd_test_srp_client_host_addresses, 2, MAX_HOST_ADDRESSES - 1),
+	SHELL_CMD_ARG(test_dns_client_config_get, NULL, "Get default config",
+		      cmd_dns_client_config_get, 1, 0),
+	SHELL_CMD_ARG(test_dns_client_config_set, NULL,
+		      "Set default config, args:\n"
+		      "\t<address> <port> <timeout> <attempts> <recursion>"
+		      " <nat mode> <service_mode> <transport>",
+		      cmd_dns_client_config_set, 3, 6),
+	SHELL_CMD_ARG(test_dns_client_resolve, NULL, "Resolve IPv6 address, args: <name> <server>",
+		      cmd_dns_client_resolve, 3, 0),
+	SHELL_CMD_ARG(test_dns_client_resolve4, NULL, "Resolve IPv4 address, args: <name> <server>",
+		      cmd_dns_client_resolve, 3, 0),
+	SHELL_CMD_ARG(test_dns_client_service, NULL,
+		      "Service instance resolution, args: <instance>"
+		      "<service> <server>",
+		      cmd_dns_client_service, 4, 0),
+	SHELL_CMD_ARG(test_dns_client_servicehost, NULL,
+		      "Service instance resolution, args:"
+		      " <instance> <service> <server>",
+		      cmd_dns_client_service, 4, 0),
+	SHELL_CMD_ARG(test_dns_client_browse, NULL, "Service browsing, args <service> <server>",
+		      cmd_dns_client_browse, 3, 0),
+	SHELL_CMD_ARG(test_vendor_data, NULL,
+		      "Vendor data, args: <vendor-name> <vendor-model>"
+		      " <vendor-sw-version>",
+		      cmd_test_vendor_data, 4, 0),
+	SHELL_CMD_ARG(test_net_diag, NULL,
+		      "Network diag, args: <get|reset> <IPv6-address>"
+		      " <tlv-type ...>",
+		      cmd_test_net_diag, 4, 255),
+	SHELL_CMD_ARG(test_mesh_diag, NULL,
+		      "Mesh diag topology discovery, args: <start|cancel>"
+		      "[ip6] [children]",
+		      cmd_test_mesh_diag, 2, 2),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_ARG_REGISTER(ot, &ot_cmds,

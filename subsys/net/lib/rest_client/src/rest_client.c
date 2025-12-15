@@ -10,14 +10,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#if defined(CONFIG_POSIX_API)
-#include <zephyr/posix/arpa/inet.h>
-#include <zephyr/posix/unistd.h>
-#include <zephyr/posix/netdb.h>
-#include <zephyr/posix/sys/socket.h>
-#else
 #include <zephyr/net/socket.h>
-#endif
 #include <zephyr/net/tls_credentials.h>
 #include <zephyr/net/http/client.h>
 #include <zephyr/net/http/parser.h>
@@ -30,14 +23,41 @@ LOG_MODULE_REGISTER(rest_client, CONFIG_REST_CLIENT_LOG_LEVEL);
 
 #define HTTP_PROTOCOL "HTTP/1.1"
 
-static void rest_client_http_response_cb(struct http_response *rsp,
-					  enum http_final_call final_data,
-					  void *user_data)
+static int rest_client_http_response_cb(struct http_response *rsp,
+					enum http_final_call final_data,
+					void *user_data)
 {
 	struct rest_client_resp_context *resp_ctx = NULL;
+	size_t buf_remaining_len;
+	size_t resp_buff_len;
+	uint8_t *resp_buff;
+	size_t copy_len;
 
 	if (user_data) {
 		resp_ctx = (struct rest_client_resp_context *)user_data;
+	}
+
+	if (resp_ctx == NULL) {
+		LOG_WRN("REST response context not provided");
+		return 0;
+	}
+
+	/* Ensure receive buffer stays NULL terminated */
+	resp_buff_len = resp_ctx->req_ctx->resp_buff_len - 1;
+	resp_buff = resp_ctx->req_ctx->resp_buff;
+	buf_remaining_len = resp_ctx->total_response_len < resp_buff_len ?
+			    resp_buff_len - resp_ctx->total_response_len : 0;
+	copy_len = MIN(rsp->data_len, buf_remaining_len);
+
+	if (copy_len < rsp->data_len) {
+		LOG_DBG("Receive buffer too small, dropping %zd bytes",
+			rsp->data_len - copy_len);
+	}
+
+	/* Copy data to the REST buffer. */
+	if (copy_len > 0) {
+		memcpy(resp_buff + resp_ctx->total_response_len,
+		       rsp->recv_buf, copy_len);
 	}
 
 	/* If the entire HTTP response is not received in a single "recv" call
@@ -45,20 +65,17 @@ static void rest_client_http_response_cb(struct http_response *rsp,
 	 * rsp->body_start. Only set rest_ctx->response once, the first time,
 	 * which will be the start of the body.
 	 */
-	if (resp_ctx) {
-		if (!resp_ctx->response && rsp->body_found && rsp->body_frag_start) {
-			resp_ctx->response = rsp->body_frag_start;
-		}
-		resp_ctx->total_response_len += rsp->data_len;
+	if (!resp_ctx->response && rsp->body_found && rsp->body_frag_start) {
+		size_t cur_body_offset = rsp->body_frag_start - rsp->recv_buf;
+
+		resp_ctx->response = resp_buff + resp_ctx->total_response_len +
+				     cur_body_offset;
 	}
+	resp_ctx->total_response_len += rsp->data_len;
 
 	if (final_data == HTTP_DATA_MORE) {
 		LOG_DBG("Partial data received(%zd bytes)", rsp->data_len);
 	} else if (final_data == HTTP_DATA_FINAL) {
-		if (!resp_ctx) {
-			LOG_WRN("REST response context not provided");
-			return;
-		}
 		resp_ctx->http_status_code = rsp->http_status_code;
 		resp_ctx->response_len = rsp->processed;
 		strcpy(resp_ctx->http_status_code_str, rsp->http_status);
@@ -69,6 +86,8 @@ static void rest_client_http_response_cb(struct http_response *rsp,
 			rsp->http_status_code,
 			rsp->http_status);
 	}
+
+	return 0;
 }
 
 static int rest_client_sckt_tls_setup(int fd, const char *const tls_hostname,
@@ -87,13 +106,15 @@ static int rest_client_sckt_tls_setup(int fd, const char *const tls_hostname,
 		verify = tls_peer_verify;
 	}
 
-	err = setsockopt(fd, SOL_TLS, TLS_PEER_VERIFY, &verify, sizeof(verify));
+	err = zsock_setsockopt(fd, SOL_TLS, TLS_PEER_VERIFY, &verify,
+			       sizeof(verify));
 	if (err) {
 		LOG_ERR("Failed to setup peer verification, error: %d", errno);
 		return err;
 	}
 
-	err = setsockopt(fd, SOL_TLS, TLS_SEC_TAG_LIST, tls_sec_tag, sizeof(tls_sec_tag));
+	err = zsock_setsockopt(fd, SOL_TLS, TLS_SEC_TAG_LIST, tls_sec_tag,
+			       sizeof(tls_sec_tag));
 	if (err) {
 		LOG_ERR("Failed to setup TLS sec tag, error: %d", errno);
 		return err;
@@ -105,14 +126,16 @@ static int rest_client_sckt_tls_setup(int fd, const char *const tls_hostname,
 		cache = TLS_SESSION_CACHE_DISABLED;
 	}
 
-	err = setsockopt(fd, SOL_TLS, TLS_SESSION_CACHE, &cache, sizeof(cache));
+	err = zsock_setsockopt(fd, SOL_TLS, TLS_SESSION_CACHE, &cache,
+			       sizeof(cache));
 	if (err) {
 		LOG_ERR("Unable to set session cache, errno %d", errno);
 		return err;
 	}
 
 	if (tls_hostname) {
-		err = setsockopt(fd, SOL_TLS, TLS_HOSTNAME, tls_hostname, strlen(tls_hostname));
+		err = zsock_setsockopt(fd, SOL_TLS, TLS_HOSTNAME, tls_hostname,
+				       strlen(tls_hostname));
 		if (err) {
 			LOG_ERR("Failed to setup TLS hostname, error: %d", errno);
 			return err;
@@ -130,13 +153,15 @@ static int rest_client_sckt_timeouts_set(int fd, int32_t timeout_ms)
 		/* Send TO also affects TCP connect */
 		timeout.tv_sec = timeout_ms / MSEC_PER_SEC;
 		timeout.tv_usec = (timeout_ms % MSEC_PER_SEC) * USEC_PER_MSEC;
-		err = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+		err = zsock_setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout,
+				       sizeof(timeout));
 		if (err) {
 			LOG_ERR("Failed to set socket send timeout, error: %d", errno);
 			return err;
 		}
 
-		err = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+		err = zsock_setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+				       sizeof(timeout));
 		if (err) {
 			LOG_ERR("Failed to set socket recv timeout, error: %d", errno);
 			return err;
@@ -154,10 +179,10 @@ static int rest_client_sckt_connect(int *const fd,
 				    int32_t *timeout_ms)
 {
 	int ret;
-	struct addrinfo *addr_info;
+	struct zsock_addrinfo *addr_info;
 	char peer_addr[INET6_ADDRSTRLEN];
 	char portstr[6] = { 0 };
-	struct addrinfo hints = {
+	struct zsock_addrinfo hints = {
 		.ai_flags = AI_NUMERICSERV, /* Let getaddrinfo() set port to addrinfo */
 		.ai_family = AF_UNSPEC, /* Both IPv4 and IPv6 addresses accepted */
 		.ai_socktype = SOCK_STREAM,
@@ -177,17 +202,17 @@ static int rest_client_sckt_connect(int *const fd,
 
 	LOG_DBG("Doing getaddrinfo() with connect addr %s port %s", hostname, portstr);
 
-	ret = getaddrinfo(hostname, portstr, &hints, &addr_info);
+	ret = zsock_getaddrinfo(hostname, portstr, &hints, &addr_info);
 	if (ret) {
 		LOG_ERR("getaddrinfo() failed, error: %d", ret);
 		return -EFAULT;
 	}
 
 	sa = addr_info->ai_addr;
-	inet_ntop(sa->sa_family,
-		  (void *)&((struct sockaddr_in *)sa)->sin_addr,
-		  peer_addr,
-		  INET6_ADDRSTRLEN);
+	zsock_inet_ntop(sa->sa_family,
+			(void *)&((struct sockaddr_in *)sa)->sin_addr,
+			peer_addr,
+			INET6_ADDRSTRLEN);
 	LOG_DBG("getaddrinfo() %s", peer_addr);
 
 	if (*timeout_ms != SYS_FOREVER_MS) {
@@ -202,15 +227,15 @@ static int rest_client_sckt_connect(int *const fd,
 		}
 	}
 
-	proto = (sec_tag == REST_CLIENT_SEC_TAG_NO_SEC) ? IPPROTO_TCP : IPPROTO_TLS_1_2;
-	*fd = socket(addr_info->ai_family, SOCK_STREAM, proto);
+	proto = (sec_tag == SEC_TAG_TLS_INVALID) ? IPPROTO_TCP : IPPROTO_TLS_1_2;
+	*fd = zsock_socket(addr_info->ai_family, SOCK_STREAM, proto);
 	if (*fd == -1) {
 		LOG_ERR("Failed to open socket, error: %d", errno);
 		ret = -ENOTCONN;
 		goto clean_up;
 	}
 
-	if (sec_tag >= 0) {
+	if (sec_tag != SEC_TAG_TLS_INVALID) {
 		ret = rest_client_sckt_tls_setup(*fd, hostname, sec_tag, tls_peer_verify);
 		if (ret) {
 			ret = -EACCES;
@@ -227,7 +252,7 @@ static int rest_client_sckt_connect(int *const fd,
 
 	LOG_DBG("Connecting to %s port %s", hostname, portstr);
 
-	ret = connect(*fd, addr_info->ai_addr, addr_info->ai_addrlen);
+	ret = zsock_connect(*fd, addr_info->ai_addr, addr_info->ai_addrlen);
 	if (ret) {
 		LOG_ERR("Failed to connect socket, error: %d", errno);
 		if (errno == ETIMEDOUT) {
@@ -253,10 +278,10 @@ static int rest_client_sckt_connect(int *const fd,
 
 clean_up:
 
-	freeaddrinfo(addr_info);
+	zsock_freeaddrinfo(addr_info);
 	if (ret) {
 		if (*fd > -1) {
-			(void)close(*fd);
+			(void)zsock_close(*fd);
 			*fd = -1;
 		}
 	}
@@ -270,7 +295,7 @@ static void rest_client_close_connection(struct rest_client_req_context *const r
 	int ret;
 
 	if (!req_ctx->keep_alive) {
-		ret = close(req_ctx->connect_socket);
+		ret = zsock_close(req_ctx->connect_socket);
 		if (ret) {
 			LOG_WRN("Failed to close socket, error: %d", errno);
 		} else {
@@ -301,6 +326,7 @@ static int rest_client_do_api_call(struct http_request *http_req,
 				   struct rest_client_req_context *const req_ctx,
 				   struct rest_client_resp_context *const resp_ctx)
 {
+	uint8_t http_recv_buf[128];
 	int err = 0;
 
 	if (req_ctx->connect_socket < 0) {
@@ -315,15 +341,13 @@ static int rest_client_do_api_call(struct http_request *http_req,
 		}
 	}
 
-	/* Assign the user provided receive buffer into the http request */
-	http_req->recv_buf = req_ctx->resp_buff;
-	http_req->recv_buf_len = req_ctx->resp_buff_len;
+	/* Assign the receive buffer into the http request */
+	http_req->recv_buf = http_recv_buf;
+	http_req->recv_buf_len = sizeof(http_recv_buf);
 
-	memset(http_req->recv_buf, 0, http_req->recv_buf_len);
+	memset(req_ctx->resp_buff, 0, req_ctx->resp_buff_len);
 
-	/* Ensure receive buffer stays NULL terminated */
-	--http_req->recv_buf_len;
-
+	resp_ctx->req_ctx = req_ctx;
 	resp_ctx->response = NULL;
 	resp_ctx->response_len = 0;
 	resp_ctx->total_response_len = 0;
@@ -353,7 +377,7 @@ void rest_client_request_defaults_set(struct rest_client_req_context *req_ctx)
 
 	req_ctx->connect_socket = REST_CLIENT_SCKT_CONNECT;
 	req_ctx->keep_alive = false;
-	req_ctx->sec_tag = REST_CLIENT_SEC_TAG_NO_SEC;
+	req_ctx->sec_tag = SEC_TAG_TLS_INVALID;
 	req_ctx->tls_peer_verify = REST_CLIENT_TLS_DEFAULT_PEER_VERIFY;
 	req_ctx->http_method = HTTP_GET;
 	req_ctx->timeout_ms = CONFIG_REST_CLIENT_REQUEST_TIMEOUT * MSEC_PER_SEC;

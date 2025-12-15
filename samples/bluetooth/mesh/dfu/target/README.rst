@@ -45,8 +45,7 @@ To distribute this sample as a new image over Bluetooth Mesh network, use the :r
 Provisioning
 ============
 
-The sample supports provisioning over both the Advertising and the GATT Provisioning Bearers (i.e.
-PB-ADV and PB-GATT).
+The sample supports provisioning over both the Advertising and the GATT Provisioning Bearers (that is PB-ADV and PB-GATT).
 The provisioning is handled by the :ref:`bt_mesh_dk_prov`.
 It supports four types of out-of-band (OOB) authentication methods, and uses the Hardware Information driver to generate a deterministic UUID to uniquely represent the device.
 
@@ -142,7 +141,8 @@ The sample can also be the Target node updated by any firmware image that is com
 In both cases, the firmware needs to be signed and the firmware version increased to pass the validation when the MCUboot swaps the images.
 
 To set a new version, alter the Kconfig option :kconfig:option:`CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION` to a version that is higher than the default version of: ``"1.0.0+0"``.
-Then, after rebuilding the sample, the binary of the updated sample can be found in :file:`samples/bluetooth/mesh_dfu/target/build/zephyr/app_update.bin`.
+Then, after rebuilding the sample, the binary of the updated sample can be found in :file:`samples/bluetooth/mesh/dfu/target/build/target/zephyr/zephyr.signed.bin` or :file:`samples/bluetooth/mesh/dfu/target/build/dfu_application.zip`.
+The file format to use depends on the tool you are using for the DFU procedure.
 
 To perform a DFU with this sample, the following additional information is required:
 
@@ -165,7 +165,7 @@ This has an effect on the Distributor and the Target node.
 Only 2 options are supported by this sample:
 
 :c:enum:`BT_MESH_DFU_EFFECT_NONE`
-   This effect is chosen if the composition data of the new firmware doesn't change.
+   This effect is chosen if the composition data of the new firmware does not change.
    In this case the device will stay provisioned after the new firmware is programmed.
 
 :c:enum:`BT_MESH_DFU_EFFECT_UNPROV`
@@ -180,7 +180,7 @@ In this sample, the device flash is split into partitions using the :ref:`partit
 When the DFU transfer starts, the sample stores the new firmware at the MCUboot secondary slot using the :ref:`zephyr:flash_map_api`.
 
 .. note::
-   For the :ref:`zephyr:nrf52840dongle_nrf52840`, the sample has a static partition management file :file:`pm_static_nrf52840dongle_nrf52840.yml` to reserve the space for the `nRF5 SDK Bootloader`_.
+   For the :zephyr:board:`nrf52840dongle`, the sample has a static partition management file :file:`pm_static_nrf52840dongle_nrf52840.yml` to reserve the space for the `nRF5 SDK Bootloader`_.
 
 When the DFU transfer ends, the sample requests the MCUboot to replace slot-0 with slot-1 and reboots the device.
 The MCUboot performs the validation of the image located at slot-1.
@@ -190,7 +190,7 @@ After booting, the sample confirms the image so the old image does not get rever
 When the sample is used as a new firmware, independently of the provisioning state, it sets the Firmware Update Server model to Idle state after booting.
 If the device stays provisioned, it lets the Distributor successfully finalize the firmware distribution process.
 If the device is unprovisioned, it has no effect on the DFU Server.
-The firmware distribution process then succeeds on the Distributor side, if the Target node doesn't respond to the Distributor after programming the new firmware.
+The firmware distribution process then succeeds on the Distributor side, if the Target node does not respond to the Distributor after programming the new firmware.
 
 For more information about the firmware distribution process, see :ref:`zephyr:bluetooth_mesh_dfu`.
 
@@ -200,7 +200,37 @@ Logging
 In this sample, UART and SEGGER RTT are available as logging backends.
 
 .. note::
-   With the :ref:`zephyr:nrf52840dongle_nrf52840`, only logging over UART is available.
+   With the :zephyr:board:`nrf52840dongle`, only logging over UART is available.
+
+External flash support
+======================
+
+This sample supports two types of external flash usage: DFU firmware image storage and settings partition storage.
+
+DFU firmware image storage
+--------------------------
+
+This sample supports external flash memory as secondary storage partition for saving of the incoming firmware images.
+See :ref:`ug_bootloader_external_flash` for more information on external flash support as a partition in the :ref:`ug_bootloader_mcuboot_nsib`.
+The default configuration does not support external flash memory.
+To enable external flash support, set :makevar:`FILE_SUFFIX` to ``dfu_ext_flash`` when building the sample.
+
+Build the sample using the following command:
+
+.. code-block:: console
+
+   west build -p -b *board_name* -- -DFILE_SUFFIX=dfu_ext_flash
+
+Currently, DFU external flash is supported on the ``nrf52840dk/nrf52840`` and ``nrf54l15dk/nrf54l15/cpuapp`` board targets.
+
+Settings partition storage
+--------------------------
+
+.. include:: /includes/mesh_ext_flash_settings.txt
+
+.. note::
+   You can use only one :makevar:`FILE_SUFFIX` at a time.
+   The sample does not support both DFU firmware image storage and settings partition storage on external flash simultaneously.
 
 Dependencies
 ************

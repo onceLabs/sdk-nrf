@@ -143,7 +143,7 @@ static void bt_rpc_gatt_ccc_cfg_changed_cb_rpc_handler(const struct nrf_rpc_grou
 	uint32_t attr_index;
 	uint16_t ccc_value;
 	const struct bt_gatt_attr *attr;
-	struct _bt_gatt_ccc *ccc;
+	struct bt_gatt_ccc_managed_user_data *ccc;
 
 	attr_index = nrf_rpc_decode_uint(ctx);
 	ccc_value = nrf_rpc_decode_uint(ctx);
@@ -157,7 +157,7 @@ static void bt_rpc_gatt_ccc_cfg_changed_cb_rpc_handler(const struct nrf_rpc_grou
 		return;
 	}
 
-	ccc = (struct _bt_gatt_ccc *) attr->user_data;
+	ccc = (struct bt_gatt_ccc_managed_user_data *) attr->user_data;
 
 	if (ccc->cfg_changed) {
 		ccc->cfg_changed(attr, ccc_value);
@@ -181,7 +181,7 @@ static void bt_rpc_gatt_ccc_cfg_write_cb_rpc_handler(const struct nrf_rpc_group 
 	uint32_t attr_index;
 	struct bt_conn *conn;
 	const struct bt_gatt_attr *attr;
-	struct _bt_gatt_ccc *ccc;
+	struct bt_gatt_ccc_managed_user_data *ccc;
 	uint16_t ccc_value;
 	ssize_t write_len = 0;
 
@@ -198,7 +198,7 @@ static void bt_rpc_gatt_ccc_cfg_write_cb_rpc_handler(const struct nrf_rpc_group 
 		return;
 	}
 
-	ccc = (struct _bt_gatt_ccc *) attr->user_data;
+	ccc = (struct bt_gatt_ccc_managed_user_data *) attr->user_data;
 
 	if (ccc->cfg_write) {
 		write_len = ccc->cfg_write(conn, attr, ccc_value);
@@ -222,7 +222,7 @@ static void bt_rpc_gatt_ccc_cfg_match_cb_rpc_handler(const struct nrf_rpc_group 
 	uint32_t attr_index;
 	struct bt_conn *conn;
 	const struct bt_gatt_attr *attr;
-	struct _bt_gatt_ccc *ccc;
+	struct bt_gatt_ccc_managed_user_data *ccc;
 	bool match = false;
 
 	conn = bt_rpc_decode_bt_conn(ctx);
@@ -237,7 +237,7 @@ static void bt_rpc_gatt_ccc_cfg_match_cb_rpc_handler(const struct nrf_rpc_group 
 		return;
 	}
 
-	ccc = (struct _bt_gatt_ccc *) attr->user_data;
+	ccc = (struct bt_gatt_ccc_managed_user_data *) attr->user_data;
 
 	if (ccc->cfg_match) {
 		match = ccc->cfg_match(conn, attr);
@@ -511,9 +511,10 @@ static int bt_rpc_gatt_send_desc_attr(uint8_t special_attr, uint16_t param, uint
 
 static int send_ccc_attr(uint8_t special_attr, const struct bt_gatt_attr *attr)
 {
-	struct _bt_gatt_ccc *ccc = (struct _bt_gatt_ccc *)attr->user_data;
+	struct bt_gatt_ccc_managed_user_data *ccc;
 	uint16_t data = attr->perm;
 
+	ccc = (struct bt_gatt_ccc_managed_user_data *)attr->user_data;
 	if (ccc->cfg_changed) {
 		data |= BT_RPC_GATT_CCC_CFG_CHANGE_PRESENT_FLAG;
 	}
@@ -682,6 +683,48 @@ int bt_rpc_gatt_init(void)
 	return 0;
 }
 
+static int remove_service(const struct bt_gatt_service *svc)
+{
+	struct nrf_rpc_cbor_ctx ctx;
+	int result;
+	size_t buffer_size_max = 3;
+	uint16_t svc_index;
+	int err;
+
+	err = bt_rpc_gatt_service_to_index(svc, &svc_index);
+	if (err) {
+		return err;
+	}
+
+	NRF_RPC_CBOR_ALLOC(&bt_rpc_grp, ctx, buffer_size_max);
+	nrf_rpc_encode_uint(&ctx, svc_index);
+	nrf_rpc_cbor_cmd_no_err(&bt_rpc_grp, BT_RPC_GATT_SERVICE_UNREGISTER_RPC_CMD, &ctx,
+				nrf_rpc_rsp_decode_i32, &result);
+
+	if (result) {
+		return result;
+	}
+
+	return bt_rpc_gatt_remove_service(svc);
+}
+
+int bt_rpc_gatt_uninit(void)
+{
+	int err = 0;
+
+	STRUCT_SECTION_FOREACH(bt_gatt_service_static, svc)
+	{
+		int rc = remove_service((const struct bt_gatt_service *)svc);
+
+		/* Continue removing services even if removing one fails. */
+		if (err == 0) {
+			err = rc;
+		}
+	}
+
+	return err;
+}
+
 #if defined(CONFIG_BT_GATT_DYNAMIC_DB)
 int bt_gatt_service_register(struct bt_gatt_service *svc)
 {
@@ -690,29 +733,7 @@ int bt_gatt_service_register(struct bt_gatt_service *svc)
 
 int bt_gatt_service_unregister(struct bt_gatt_service *svc)
 {
-	struct nrf_rpc_cbor_ctx ctx;
-	int result;
-	size_t buffer_size_max = 3;
-	uint16_t svc_index;
-	int err;
-
-	NRF_RPC_CBOR_ALLOC(&bt_rpc_grp, ctx, buffer_size_max);
-
-	err = bt_rpc_gatt_service_to_index(svc, &svc_index);
-	if (err) {
-		return err;
-	}
-
-	nrf_rpc_encode_uint(&ctx, svc_index);
-
-	nrf_rpc_cbor_cmd_no_err(&bt_rpc_grp, BT_RPC_GATT_SERVICE_UNREGISTER_RPC_CMD,
-				&ctx, nrf_rpc_rsp_decode_i32, &result);
-
-	if (result) {
-		return result;
-	}
-
-	return bt_rpc_gatt_remove_service(svc);
+	return remove_service(svc);
 }
 #endif /* defined(CONFIG_BT_GATT_DYNAMIC_DB) */
 

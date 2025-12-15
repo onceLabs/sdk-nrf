@@ -31,16 +31,15 @@ public:
 
 	CHIP_ERROR StartApp();
 
-	void UpdateClusterState(BoltLockManager::State state, BoltLockManager::OperationSource source);
-	static void IdentifyStartHandler(Identify *);
-	static void IdentifyStopHandler(Identify *);
+	void UpdateClusterState(const BoltLockManager::StateData &stateData);
 
 private:
 	CHIP_ERROR Init();
 
 	static void LockActionEventHandler();
 	static void ButtonEventHandler(Nrf::ButtonState state, Nrf::ButtonMask hasChanged);
-	static void LockStateChanged(BoltLockManager::State state, BoltLockManager::OperationSource source);
+	static void LockStateChanged(const BoltLockManager::StateData &stateData);
+	static void UpdateClusterStateHandler(const BoltLockManager::StateData &stateData);
 
 #ifdef CONFIG_THREAD_WIFI_SWITCHING
 	static void SwitchTransportEventHandler();
@@ -54,7 +53,8 @@ private:
 #endif
 
 #ifdef CONFIG_NCS_SAMPLE_MATTER_TEST_EVENT_TRIGGERS
-	constexpr static Nrf::Matter::TestEventTrigger::EventTriggerId kDoorLockJammedEventTriggerId = 0xFFFF'FFFF'3277'4000;
+	constexpr static Nrf::Matter::TestEventTrigger::EventTriggerId kDoorLockJammedEventTriggerId =
+		0xFFFF'FFFF'3277'4000;
 	static CHIP_ERROR DoorLockJammedEventCallback(Nrf::Matter::TestEventTrigger::TriggerValue);
 #endif
 };

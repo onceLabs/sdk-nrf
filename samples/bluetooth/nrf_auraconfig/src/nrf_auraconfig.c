@@ -13,6 +13,7 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/shell/shell.h>
 #include <nrfx_clock.h>
+#include <audio_defines.h>
 
 #include "presets.h"
 #include "broadcast_source.h"
@@ -20,11 +21,9 @@
 #include "macros_common.h"
 #include "bt_mgmt.h"
 #include "lc3_streamer.h"
-
-#if CONFIG_BOARD_NRF5340_AUDIO_DK
+#include "led_assignments.h"
 #include "led.h"
 #include "sd_card.h"
-#endif /* CONFIG_BOARD_NRF5340_AUDIO_DK */
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
@@ -40,6 +39,8 @@ static bool sd_card_present = true;
 static struct k_thread le_audio_msg_sub_thread_data;
 static k_tid_t le_audio_msg_sub_thread_id;
 K_THREAD_STACK_DEFINE(le_audio_msg_sub_thread_stack, CONFIG_LE_AUDIO_MSG_SUB_STACK_SIZE);
+NET_BUF_POOL_FIXED_DEFINE(ble_tx_pool, CONFIG_BT_ISO_TX_BUF_COUNT, CONFIG_BT_ISO_TX_MTU,
+			  sizeof(struct audio_metadata), NULL);
 
 static void lecture_set(const struct shell *shell);
 static int big_enable(const struct shell *shell, uint8_t big_index);
@@ -215,24 +216,40 @@ static void subgroup_send(struct stream_index stream_idx)
 
 	uint8_t num_bis = subgroups[stream_idx.lvl1][stream_idx.lvl2].num_bises;
 	size_t frame_size = lc3_stream_infos[stream_idx.lvl1][stream_idx.lvl2].frame_size;
-	uint8_t frame_buffer[num_bis][frame_size];
+	struct net_buf *audio_frame = net_buf_alloc(&ble_tx_pool, K_NO_WAIT);
+	struct audio_metadata *meta = net_buf_user_data(audio_frame);
+
+	if (audio_frame == NULL) {
+		LOG_ERR("Out of RX buffers");
+		return;
+	}
 
 	for (int i = 0; i < num_bis; i++) {
 		uint8_t *frame_ptr =
 			lc3_stream_infos[stream_idx.lvl1][stream_idx.lvl2].frame_ptrs[i];
 
-		if (frame_ptr == NULL) {
-			memset(frame_buffer[i], 0, frame_size);
-		} else {
-			memcpy(frame_buffer[i], frame_ptr, frame_size);
-		}
+		net_buf_add_mem(audio_frame, frame_ptr, frame_size);
+
+		meta->locations |=
+			(uint32_t)subgroups[stream_idx.lvl1][stream_idx.lvl2].location[i];
 	}
 
-	struct le_audio_encoded_audio enc_audio = {
-		.data = (uint8_t *)frame_buffer, .size = frame_size * num_bis, .num_ch = num_bis};
+	meta->data_coding = LC3;
 
-	ret = broadcast_source_send(stream_idx.lvl1, stream_idx.lvl2, enc_audio);
+	struct bt_audio_codec_cfg *codec_cfg =
+		&subgroups[stream_idx.lvl1][stream_idx.lvl2].group_lc3_preset.codec_cfg;
 
+	ret = le_audio_freq_hz_get(codec_cfg, &meta->sample_rate_hz);
+	if (ret) {
+		LOG_ERR("Failed to get frequency: %d", ret);
+	}
+
+	ret = le_audio_duration_us_get(codec_cfg, &meta->data_len_us);
+	if (ret) {
+		LOG_ERR("Failed to get frame duration: %d", ret);
+	}
+
+	ret = broadcast_source_send(audio_frame, stream_idx.lvl1, stream_idx.lvl2);
 	if (ret != 0 && ret != prev_ret) {
 		if (ret == -ECANCELED) {
 			LOG_WRN("Sending cancelled");
@@ -240,6 +257,8 @@ static void subgroup_send(struct stream_index stream_idx)
 			LOG_WRN("broadcast_source_send returned: %d", ret);
 		}
 	}
+
+	net_buf_unref(audio_frame);
 
 	prev_ret = ret;
 }
@@ -461,13 +480,15 @@ static int zbus_link_producers_observers(void)
 		return -ENOTSUP;
 	}
 
-	ret = zbus_chan_add_obs(&bt_mgmt_chan, &bt_mgmt_evt_listen, ZBUS_ADD_OBS_TIMEOUT_MS);
+	ret = zbus_chan_add_obs(&bt_mgmt_chan, &bt_mgmt_evt_listen,
+				ZBUS_ADD_OBS_TIMEOUT_MS);
 	if (ret) {
 		LOG_ERR("Failed to add bt_mgmt listener");
 		return ret;
 	}
 
-	ret = zbus_chan_add_obs(&le_audio_chan, &le_audio_evt_sub, ZBUS_ADD_OBS_TIMEOUT_MS);
+	ret = zbus_chan_add_obs(&le_audio_chan, &le_audio_evt_sub,
+				ZBUS_ADD_OBS_TIMEOUT_MS);
 	if (ret) {
 		LOG_ERR("Failed to add le_audio sub");
 		return ret;
@@ -499,6 +520,19 @@ static int ext_adv_populate(uint8_t big_index, struct broadcast_source_ext_adv_d
 
 	ext_adv_buf[ext_adv_buf_cnt].type = BT_DATA_UUID16_ALL;
 	ext_adv_buf[ext_adv_buf_cnt].data = ext_adv_data->uuid_buf->data;
+	ext_adv_buf_cnt++;
+
+	ext_adv_buf[ext_adv_buf_cnt].type = BT_DATA_NAME_COMPLETE;
+	if (strnlen(broadcast_param[big_index].adv_name,
+		    ARRAY_SIZE(broadcast_param[big_index].adv_name)) > 0) {
+		/* Use custom advertising name */
+		ext_adv_buf[ext_adv_buf_cnt].data = broadcast_param[big_index].adv_name;
+		ext_adv_buf[ext_adv_buf_cnt].data_len = strlen(broadcast_param[big_index].adv_name);
+	} else {
+		/* Use default device name */
+		ext_adv_buf[ext_adv_buf_cnt].data = CONFIG_BT_DEVICE_NAME;
+		ext_adv_buf[ext_adv_buf_cnt].data_len = strlen(CONFIG_BT_DEVICE_NAME);
+	}
 	ext_adv_buf_cnt++;
 
 	ret = bt_mgmt_manufacturer_uuid_populate(ext_adv_data->uuid_buf,
@@ -645,7 +679,7 @@ static uint32_t num_files_added;
 
 static int sd_card_toc_gen(void)
 {
-#if CONFIG_BOARD_NRF5340_AUDIO_DK
+
 	/* Traverse SD tree */
 	int ret;
 
@@ -658,7 +692,6 @@ static int sd_card_toc_gen(void)
 	num_files_added = ret;
 
 	LOG_INF("Number of *.lc3 files on SD card: %d", num_files_added);
-#endif /* CONFIG_BOARD_NRF5340_AUDIO_DK */
 
 	return 0;
 }
@@ -670,16 +703,13 @@ void nrf_auraconfig_main(void)
 	LOG_DBG("Main started");
 
 	ret = nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
-	ret -= NRFX_ERROR_BASE_NUM;
 	ERR_CHK_MSG(ret, "Failed to set HFCLK divider");
 
-#if CONFIG_BOARD_NRF5340_AUDIO_DK
 	ret = led_init();
 	ERR_CHK_MSG(ret, "Failed to initialize LED module");
 
-	ret = led_on(LED_APP_RGB, LED_COLOR_GREEN);
+	ret = led_on(LED_AUDIO_APP_STATUS, LED_COLOR_GREEN);
 	ERR_CHK(ret);
-#endif /* CONFIG_BOARD_NRF5340_AUDIO_DK */
 
 	ret = bt_mgmt_init();
 	ERR_CHK(ret);
@@ -720,18 +750,18 @@ static void context_print(const struct shell *shell)
 	}
 }
 
-static void codec_qos_print(const struct shell *shell, struct bt_audio_codec_qos *qos)
+static void codec_qos_print(const struct shell *shell, struct bt_bap_qos_cfg *qos)
 {
-	if (qos->phy == BT_AUDIO_CODEC_QOS_1M || qos->phy == BT_AUDIO_CODEC_QOS_2M) {
+	if (qos->phy == BT_BAP_QOS_CFG_1M || qos->phy == BT_BAP_QOS_CFG_2M) {
 		shell_print(shell, "\t\t\tPHY: %dM", qos->phy);
-	} else if (qos->phy == BT_AUDIO_CODEC_QOS_CODED) {
+	} else if (qos->phy == BT_BAP_QOS_CFG_CODED) {
 		shell_print(shell, "\t\t\tPHY: LE Coded");
 	} else {
 		shell_print(shell, "\t\t\tPHY: Unknown");
 	}
 
 	shell_print(shell, "\t\t\tFraming: %s",
-		    (qos->framing == BT_AUDIO_CODEC_QOS_FRAMING_UNFRAMED ? "unframed" : "framed"));
+		    (qos->framing == BT_BAP_QOS_CFG_FRAMING_UNFRAMED ? "unframed" : "framed"));
 	shell_print(shell, "\t\t\tRTN: %d", qos->rtn);
 	shell_print(shell, "\t\t\tSDU size: %d", qos->sdu);
 	shell_print(shell, "\t\t\tMax Transport Latency: %d ms", qos->latency);
@@ -1102,9 +1132,7 @@ static int cmd_start(const struct shell *shell, size_t argc, char **argv)
 		}
 	}
 
-#if CONFIG_BOARD_NRF5340_AUDIO_DK
-	led_blink(LED_APP_RGB, LED_COLOR_GREEN);
-#endif /* CONFIG_BOARD_NRF5340_AUDIO_DK */
+	led_blink(LED_AUDIO_APP_STATUS, LED_COLOR_GREEN);
 
 	return 0;
 }
@@ -1184,9 +1212,7 @@ static int cmd_stop(const struct shell *shell, size_t argc, char **argv)
 		}
 	}
 
-#if CONFIG_BOARD_NRF5340_AUDIO_DK
-	led_on(LED_APP_RGB, LED_COLOR_GREEN);
-#endif /* CONFIG_BOARD_NRF5340_AUDIO_DK */
+	led_on(LED_AUDIO_APP_STATUS, LED_COLOR_GREEN);
 
 	return 0;
 }
@@ -1685,7 +1711,7 @@ static int cmd_program_info(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_file_list(const struct shell *shell, size_t argc, char **argv)
 {
-#if CONFIG_BOARD_NRF5340_AUDIO_DK
+
 	int ret;
 	char buf[FILE_LIST_BUF_SIZE];
 	size_t buf_size = FILE_LIST_BUF_SIZE;
@@ -1712,7 +1738,6 @@ static int cmd_file_list(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	shell_print(shell, "%s", buf);
-#endif /* CONFIG_BOARD_NRF5340_AUDIO_DK */
 
 	return 0;
 }
@@ -1829,8 +1854,7 @@ static int cmd_phy(const struct shell *shell, size_t argc, char **argv)
 
 	uint8_t phy = (uint8_t)atoi(argv[1]);
 
-	if (phy != BT_AUDIO_CODEC_QOS_1M && phy != BT_AUDIO_CODEC_QOS_2M &&
-	    phy != BT_AUDIO_CODEC_QOS_CODED) {
+	if (phy != BT_BAP_QOS_CFG_1M && phy != BT_BAP_QOS_CFG_2M && phy != BT_BAP_QOS_CFG_CODED) {
 		shell_error(shell, "Invalid PHY");
 		return -EINVAL;
 	}
@@ -1865,11 +1889,11 @@ static int cmd_framing(const struct shell *shell, size_t argc, char **argv)
 
 	if (strcasecmp(argv[1], "unframed") == 0) {
 		broadcast_param[big_index].subgroups[sub_index].group_lc3_preset.qos.framing =
-			BT_AUDIO_CODEC_QOS_FRAMING_UNFRAMED;
+			BT_BAP_QOS_CFG_FRAMING_UNFRAMED;
 		broadcast_param[big_index].subgroups[sub_index].preset_name = "Custom";
 	} else if (strcasecmp(argv[1], "framed") == 0) {
 		broadcast_param[big_index].subgroups[sub_index].group_lc3_preset.qos.framing =
-			BT_AUDIO_CODEC_QOS_FRAMING_FRAMED;
+			BT_BAP_QOS_CFG_FRAMING_FRAMED;
 		broadcast_param[big_index].subgroups[sub_index].preset_name = "Custom";
 	} else {
 		shell_error(shell, "Invalid framing type");

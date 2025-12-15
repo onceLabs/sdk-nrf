@@ -36,7 +36,7 @@ Build and configuration system
    * Sysbuild now handles the following MCUboot image ID assignments:
 
      * MCUboot updates (using b0) are automatically assigned to MCUboot.
-       The ``SB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES`` Kconfig option must not be incremented to include this image.
+       The :kconfig:option:`SB_CONFIG_MCUBOOT_UPDATEABLE_IMAGES` Kconfig option must not be incremented to include this image.
      * Applications and MCUboot must now use the MCUboot assigned image ID Kconfig values to refer to image IDs instead of hardcoding them.
      * Applications interacting with the device using MCUboot serial recovery MCUmgr must use the image IDs assigned to them, as well as MCUboot or MCUmgr hooks.
      * Depending upon enabled images, some image IDs might differ in |NCS| 2.8 and higher than from previous releases.
@@ -76,6 +76,8 @@ nRF70 Series
        For example, ``CONFIG_WPA_SUPP=y`` to ``CONFIG_WIFI_NM_WPA_SUPPLICANT=y``.
        Update your application configurations to use the new namespace.
 
+     * You need to reconcile the application heap and kernel heap usage appropriately to accommodate this switch from application to kernel heap.
+
    * The SR co-existence feature should now be explicitly enabled using the :kconfig:option:`CONFIG_NRF70_SR_COEX` Kconfig option.
      The RF switch feature should be enabled using the :kconfig:option:`CONFIG_NRF70_SR_COEX_RF_SWITCH` Kconfig option.
 
@@ -85,7 +87,7 @@ nRF54L Series
 .. toggle::
 
    * Use the :ref:`ZMS (Zephyr Memory Storage) <zephyr:zms_api>` storage system for all devices with RRAM memory technology.
-     See the :ref:`memory_storage` page for more details on how to enable ZMS for an nRF54L Series.
+     See the :ref:`zms_memory_storage` page for more details on how to enable ZMS for an nRF54L Series.
 
 .. _migration_2.8_nrf54h:
 
@@ -124,7 +126,7 @@ nRF54H20 BICR
 
     To update the BICR of your development kit while in Root of Trust, do the following:
 
-    1. Download the `BICR new binary file`_.
+    1. Download the `nRF54H20 DK BICR binary file`_.
     #. Connect the nRF54H20 DK to your computer using the **DEBUGGER** port on the DK.
 
        .. note::
@@ -153,8 +155,8 @@ nRF54H20 SoC binaries
 
     1. Download the nRF54H20 SoC binaries v0.7.0:
 
-       * `nRF54H20 SoC Binaries v0.7.0 for EngC DKs`_, compatible with the nRF54H20 DK v0.8.3 and later revisions
-       * `nRF54H20 SoC Binaries v0.7.0 for EngB DKs`_, compatible with the nRF54H20 DKs ranging from v0.8.0 to v0.8.2.
+       * `nRF54H20 SoC binaries v0.7.0 for EngC DKs`_, compatible with the nRF54H20 DK v0.8.3 and later revisions
+       * `nRF54H20 SoC binaries v0.7.0 for EngB DKs`_, compatible with the nRF54H20 DKs ranging from v0.8.0 to v0.8.2.
 
        .. note::
           On MacOS, ensure that the ZIP file is not unpacked automatically upon download.
@@ -304,7 +306,7 @@ nRF54H20
 
             APP_ROOT_SEQ_NUM = <N>
 
-    For the list of all variables, set through the :file:`VERSION`, refer to the :ref:`ug_nrf54h20_suit_customize_dfu`.
+    For the list of all variables, set through the :file:`VERSION`, refer to the ``ug_nrf54h20_suit_customize_dfu``.
 
   * When using MCU Manager, the ``Confirm`` command is now needed to trigger a device firmware update.
   * The build command to enable DFU from the external flash is now the following::
@@ -438,7 +440,7 @@ Wi-Fi®
 
 .. toggle::
 
-   * For :ref:`lib_wifi_credentials` library:
+   * For Wi-Fi credentials library:
 
      * Syntax for ``add`` command has been modified to support ``getopt`` model.
        For example, the following command with old syntax:
@@ -545,14 +547,14 @@ AT command parser
 
 .. toggle::
 
-   * The :ref:`at_cmd_parser_readme` library has been deprecated in favor of the :ref:`at_parser_readme` library and will be removed in a future version.
+   * The AT command parser library has been deprecated in favor of the :ref:`at_parser_readme` library and will be removed in a future version.
 
      You can follow this guide to migrate your application to use the :ref:`at_parser_readme` library.
      This will reduce the footprint of the application and will decrease memory requirements on the heap.
 
-     To replace :ref:`at_cmd_parser_readme` with the :ref:`at_parser_readme`, complete the following steps:
+     To replace AT command parser with the :ref:`at_parser_readme`, complete the following steps:
 
-     1. Replace the :kconfig:option:`CONFIG_AT_CMD_PARSER` Kconfig option with the :kconfig:option:`CONFIG_AT_PARSER` Kconfig option.
+     1. Replace the ``CONFIG_AT_CMD_PARSER`` Kconfig option with the :kconfig:option:`CONFIG_AT_PARSER` Kconfig option.
 
      #. Replace header files:
 

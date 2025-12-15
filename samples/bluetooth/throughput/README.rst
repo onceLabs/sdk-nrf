@@ -21,8 +21,6 @@ The sample supports the following development kits:
 
 You can use any two of the development kits listed above and mix different development kits.
 
-.. include:: /includes/hci_ipc_overlay.txt
-
 The sample also requires a connection to a computer with a serial terminal |ANSI| for each of the development kits.
 
 Overview
@@ -117,10 +115,12 @@ Building and running
 
 .. include:: /includes/build_and_run_ns.txt
 
-.. include:: /includes/nRF54H20_erase_UICR.txt
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
 
-.. note::
-   |54H_engb_2_8|
+.. include:: /includes/ipc_radio_conf.txt
+
+.. include:: /includes/nRF54H20_erase_UICR.txt
 
 Testing
 =======
@@ -181,7 +181,7 @@ The result should look similar to the following output.
 For the tester::
 
    *** Booting Zephyr OS build v3.0.99-ncs1  ***
-   Starting Bluetooth Throughput example
+   Starting Bluetooth Throughput sample
    I: SoftDevice Controller build revision:
    I: 33 78 2a 18 20 f5 61 61 |3x*. .aa
    I: a6 8b 77 60 62 83 39 2a |..w`b.9*
@@ -230,7 +230,7 @@ For the tester::
 For the peer::
 
    *** Booting Zephyr OS build v3.0.99-ncs1  ***
-   Starting Bluetooth Throughput example
+   Starting Bluetooth Throughput sample
    I: SoftDevice Controller build revision:
    I: 33 78 2a 18 20 f5 61 61 |3x*. .aa
    I: a6 8b 77 60 62 83 39 2a |..w`b.9*

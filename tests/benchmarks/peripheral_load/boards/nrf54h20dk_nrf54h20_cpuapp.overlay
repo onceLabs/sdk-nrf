@@ -6,12 +6,24 @@
 
 / {
 	aliases {
+		i2s-node0 = &tdm130;
 		test-counter = &timer137;
 		watchdog0 = &wdt010;
 	};
 
 	zephyr,user {
 		io-channels = <&adc 0>, <&adc 1>;
+	};
+};
+
+&pinctrl {
+	tdm130_default_alt: tdm130_default_alt {
+		group1 {
+			psels = <NRF_PSEL(TDM_SCK_M, 2, 1)>,
+				<NRF_PSEL(TDM_FSYNC_M, 2, 11)>,
+				<NRF_PSEL(TDM_SDOUT, 2, 9)>,
+				<NRF_PSEL(TDM_SDIN, 2, 10)>;
+		};
 	};
 };
 
@@ -38,8 +50,25 @@
 	};
 };
 
+&gpio6 {
+	status = "okay";
+	zephyr,pm-device-runtime-auto;
+};
+
+&exmif {
+	status = "okay";
+	zephyr,pm-device-runtime-auto;
+};
+
 &mx25uw63 {
 	status = "okay";
+};
+
+&tdm130 {
+	status = "okay";
+	pinctrl-0 = <&tdm130_default_alt>;
+	pinctrl-names = "default";
+	memory-regions = <&cpuapp_dma_region>;
 };
 
 &timer137 {
@@ -52,5 +81,19 @@ temp_sensor: &temp_nrfs {
 };
 
 &wdt010 {
+	status = "okay";
+};
+
+&zephyr_udc0 {
+	cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+};
+
+&fll16m {
+	status = "okay";
+};
+
+&lfclk {
 	status = "okay";
 };

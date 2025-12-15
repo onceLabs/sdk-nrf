@@ -38,7 +38,7 @@ Supported modem firmware
 See `Modem firmware compatibility matrix`_ for an overview of which modem firmware versions have been tested with this version of |NCS|.
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Known issues
 ************
@@ -48,4 +48,4 @@ See `known issues for nRF Connect SDK v1.6.1`_ for the list of issues valid for 
 Documentation
 =============
 
-* :ref:`zigbee_memory` - corrected KB to B for stack memory requirements.
+* Zigbee memory requirements - corrected KB to B for stack memory requirements.

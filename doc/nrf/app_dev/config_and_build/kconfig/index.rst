@@ -22,7 +22,7 @@ The resulting configuration is written to the :file:`zephyr/.config` file in you
 This means that this file is available when building the application until you clean the build directory pristinely.
 
 .. note::
-    While it is possible to edit the :file:`.config` file directly, you should use the nRF Kconfig GUI in the |nRFVSC| or a tool like menuconfig or guiconfig to update it.
+    While it is possible to edit the :file:`.config` file directly, you should use the nRF Kconfig GUI in |nRFVSC| or a tool like menuconfig or guiconfig to update it.
     These tools present all available options and allow you to select the ones that you need.
     They also show the dependencies between the options and their limitations.
 
@@ -30,13 +30,13 @@ This means that this file is available when building the application until you c
 
    .. group-tab:: nRF Connect for VS Code
 
-      Use the nRF Kconfig GUI in the |nRFVSC| to select the desired options.
+      Use the nRF Kconfig GUI in |nRFVSC| to select the desired options.
       The GUI organizes the Kconfig options in a hierarchical list and lets you view and manage your selection.
 
       To locate a specific configuration option, use the **Search modules** field.
       Read the `Configuring with nRF Kconfig`_ page in the |nRFVSC| documentation for more information.
 
-      Alternatively, you can configure your application in the |nRFVSC| using menuconfig.
+      Alternatively, you can configure your application in |nRFVSC| using menuconfig.
       Open the **More actions..** menu next to `Kconfig action in the Actions View`_ to start menuconfig in the extension.
 
    .. group-tab:: Command line

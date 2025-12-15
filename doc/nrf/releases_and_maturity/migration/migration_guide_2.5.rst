@@ -26,9 +26,9 @@ The following changes are mandatory to make your application work in the same wa
   See release notes for changes related to each component.
 * For the Serial LTE Modem (SLM) application:
 
-  * The :kconfig:option:`CONFIG_SLM_AGPS` Kconfig option has been replaced by :kconfig:option:`CONFIG_NRF_CLOUD_AGNSS` and is now enabled by default.
-  * The :kconfig:option:`CONFIG_SLM_PGPS` Kconfig option has been replaced by :kconfig:option:`CONFIG_NRF_CLOUD_PGPS`.
-  * The :kconfig:option:`CONFIG_SLM_LOCATION` Kconfig option has been replaced by :kconfig:option:`CONFIG_NRF_CLOUD_LOCATION` and is now enabled by default.
+  * The ``CONFIG_SLM_AGPS`` Kconfig option has been replaced by :kconfig:option:`CONFIG_NRF_CLOUD_AGNSS` and is now enabled by default.
+  * The ``CONFIG_SLM_PGPS`` Kconfig option has been replaced by :kconfig:option:`CONFIG_NRF_CLOUD_PGPS`.
+  * The ``CONFIG_SLM_LOCATION`` Kconfig option has been replaced by :kconfig:option:`CONFIG_NRF_CLOUD_LOCATION` and is now enabled by default.
   * The ``#XCELLPOS`` and ``#XWIFIPOS`` AT commands have been replaced by ``#XNRFCLOUDPOS``.
   * The ``#XAGPS`` and ``#XPGPS`` AT commands have been replaced by ``#XGPS``.
   * The operations to update bootloader (``3``) and read (``6``) or erase (``8``) the MCUboot secondary slot have been removed from the ``#XFOTA`` AT command.
@@ -41,10 +41,10 @@ The following changes are mandatory to make your application work in the same wa
     This will be fixed in the next |NCS| release.
 
   * Hardware flow control is now required for the UART.
-    If hardware flow control for the UART cannot be enabled, use the :kconfig:option:`CONFIG_SLM_UART_RX_BUF_SIZE` Kconfig option to ensure that there is adequate buffer space for the worst case scenario.
+    If hardware flow control for the UART cannot be enabled, use the ``CONFIG_SLM_UART_RX_BUF_SIZE`` Kconfig option to ensure that there is adequate buffer space for the worst case scenario.
   * UART TX now allows multiple AT command responses and notifications to be bundled together in a single transmission.
     Ensure that you correctly parse multiple responses and notifications, and do not rely on UART disablement between them.
-  * The Kconfig option ``CONFIG_SLM_CARRIER_APP_DATA_CONTAINER_BUFFER_LEN`` has been renamed to :kconfig:option:`CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN`.
+  * The Kconfig option ``CONFIG_SLM_CARRIER_APP_DATA_CONTAINER_BUFFER_LEN`` has been renamed to ``CONFIG_SLM_CARRIER_APP_DATA_BUFFER_LEN``.
   * The ``#XDFUGET``, ``#XDFUSIZE`` and ``#XDFURUN`` AT commands have been removed.
   * The ``#XSOCKETOPT`` option ``SO_BINDTODEVICE`` has been replaced by ``SO_BINDTOPDN``.
   * The value of the ``#XSSOCKETOPT`` option ``TLS_DTLS_HANDSHAKE_TIMEO`` has been updated.
@@ -57,7 +57,7 @@ Recommended changes
 
 The following changes are recommended for your application to work optimally after the migration.
 
-* Latest changes in Zephyr and nRF Connect SDK allow power optimization for the LwM2M Client.
+* Latest changes in Zephyr and |NCS| allow power optimization for the LwM2M Client.
   Using DTLS Connection Identifier reduces the DTLS handshake overhead when performing the LwM2M Update operation.
   This is enabled using the :kconfig:option:`CONFIG_LWM2M_CLIENT_UTILS_DTLS_CID` Kconfig option and requires modem firmware v1.3.5 or newer.
   Zephyr's LwM2M engine now support tickless operation mode when the Kconfig option :kconfig:option:`CONFIG_LWM2M_TICKLESS` is enabled.

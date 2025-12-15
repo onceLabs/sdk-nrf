@@ -3,13 +3,12 @@
  *
  *  SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
-#include "../include/sxsymcrypt/hash.h"
-#include "../include/sxsymcrypt/sha3.h"
+#include <sxsymcrypt/hash.h>
+#include <sxsymcrypt/hashdefs.h>
 #include <cracen/statuscodes.h>
 #include "crypmasterregs.h"
 #include "hw.h"
 #include "cmdma.h"
-#include "hashdefs.h"
 
 static const struct sx_digesttags ba418tags = {.cfg = DMATAG_BA418 | DMATAG_CONFIG(0),
 					       .initialstate = DMATAG_BA418 | DMATAG_DATATYPE(1) |
@@ -21,8 +20,8 @@ static const struct sx_digesttags ba418tags = {.cfg = DMATAG_BA418 | DMATAG_CONF
  * in https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf
  * (section 5.1 and B.2).
  */
-static size_t fips202_pad(unsigned char prefix, unsigned char suffix, size_t capacity, size_t msgsz,
-			  unsigned char *padding)
+static size_t fips202_pad(uint8_t prefix, uint8_t suffix, size_t capacity, size_t msgsz,
+			  uint8_t *padding)
 {
 	size_t r = (1600 / 8) - capacity;
 	size_t q;
@@ -59,113 +58,100 @@ static size_t fips202_pad(unsigned char prefix, unsigned char suffix, size_t cap
 #define SHA3_MODE_SHAKE(x, outlen) ((x) | SHA3_SHAKE_ENABLE | ((outlen) << 8))
 #define SHA3_SW_PAD		   0
 
-static void shake256_digest(struct sxhash *c, char *digest)
+static void shake256_digest(struct sxhash *hash_ctx, uint8_t *digest)
 {
-	unsigned char *padding = (unsigned char *)&c->extramem;
+	uint8_t *padding = (uint8_t *)&hash_ctx->extramem;
 	int padsz;
 
 	/* For SHAKE256, the capacity is 64 bytes. */
-	padsz = fips202_pad(SHAKE_MODE_PREFIX, SHAKE_MODE_SUFFIX, 64, c->feedsz, padding);
+	padsz = fips202_pad(SHAKE_MODE_PREFIX, SHAKE_MODE_SUFFIX, 64, hash_ctx->feedsz, padding);
 
 	/* Use ADD_INDESC_PRIV_RAW instead of ADD_INDESC_PRIV.
 	 * BA418 hardware cannot work with ADD_INDESC_PRIV as BA418 does not
 	 * support byte ignore flags.
 	 */
-	ADD_INDESC_PRIV_RAW(c->dma, OFFSET_EXTRAMEM(c), padsz, c->dmatags->data);
+	ADD_INDESC_PRIV_RAW(hash_ctx->dma, OFFSET_EXTRAMEM(hash_ctx), padsz,
+			    hash_ctx->dmatags->data);
 
-	struct sxdesc *out = c->dma.dmamem.outdescs;
-
-	ADD_OUTDESCA(out, digest, c->algo->digestsz, CMDMA_BA413_BUS_MSK);
-	sx_cmdma_finalize_descs(c->dma.dmamem.outdescs, out - 1);
+	ADD_OUTDESCA(hash_ctx->dma, digest, hash_ctx->algo->digestsz, CMDMA_BA413_BUS_MSK);
 }
 
-static void sha3_digest(struct sxhash *c, char *digest)
+static void sha3_digest(struct sxhash *hash_ctx, uint8_t *digest)
 {
-	unsigned char *padding = (unsigned char *)&c->extramem;
+	uint8_t *padding = (uint8_t *)&hash_ctx->extramem;
 	int padsz;
 
-	padsz = fips202_pad(SHA3_MODE_PREFIX, SHA3_MODE_SUFFIX, 2 * c->algo->digestsz, c->feedsz,
-			    padding);
+	padsz = fips202_pad(SHA3_MODE_PREFIX, SHA3_MODE_SUFFIX, 2 * hash_ctx->algo->digestsz,
+			    hash_ctx->feedsz, padding);
 	/* Use ADD_INDESC_PRIV_RAW instead of ADD_INDESC_PRIV.
 	 * BA418 hardware cannot work with ADD_INDESC_PRIV as BA418 does not
 	 * support byte ignore flags.
 	 */
-	ADD_INDESC_PRIV_RAW(c->dma, OFFSET_EXTRAMEM(c), padsz, c->dmatags->data);
+	ADD_INDESC_PRIV_RAW(hash_ctx->dma, OFFSET_EXTRAMEM(hash_ctx), padsz,
+			    hash_ctx->dmatags->data);
 
-	struct sxdesc *out = c->dma.dmamem.outdescs;
-
-	ADD_OUTDESCA(out, digest, c->algo->digestsz, CMDMA_BA413_BUS_MSK);
-	sx_cmdma_finalize_descs(c->dma.dmamem.outdescs, out - 1);
+	ADD_OUTDESCA(hash_ctx->dma, digest, hash_ctx->algo->digestsz, CMDMA_BA413_BUS_MSK);
 }
 
-static int sx_hash_create_ba418(struct sxhash *c, size_t csz)
+static int sx_hash_create_ba418(struct sxhash *hash_ctx, size_t csz)
 {
-	if ((csz < sizeof(*c)) || (c->algo->maxpadsz > sizeof(c->extramem))) {
+	if ((csz < sizeof(*hash_ctx)) || (hash_ctx->algo->maxpadsz > sizeof(hash_ctx->extramem))) {
 		return SX_ERR_ALLOCATION_TOO_SMALL;
 	}
 
-	sx_hw_reserve(&c->dma);
+	sx_hw_reserve(&hash_ctx->dma);
 
-	c->dmatags = &ba418tags;
-	sx_cmdma_newcmd(&c->dma, c->allindescs, c->algo->cfgword, c->dmatags->cfg);
-	c->digest = sha3_digest;
-	c->feedsz = 0;
-	c->totalsz = 0;
+	hash_ctx->dmatags = &ba418tags;
+	sx_cmdma_newcmd(&hash_ctx->dma, hash_ctx->descs, hash_ctx->algo->cfgword,
+			hash_ctx->dmatags->cfg);
+	hash_ctx->digest = sha3_digest;
+	hash_ctx->feedsz = 0;
+	hash_ctx->totalfeedsz = 0;
 
-	c->cntindescs = 2; /* reserve 1 extra descriptor for padding */
+	hash_ctx->cntindescs = 2; /* reserve 1 extra descriptor for padding */
 
 	return SX_OK;
 }
 
-static int sx_hash_create_ba418_shake256(struct sxhash *c, size_t csz)
+static int sx_hash_create_ba418_shake256(struct sxhash *hash_ctx, size_t csz)
 {
-	int r = sx_hash_create_ba418(c, csz);
+	int status = sx_hash_create_ba418(hash_ctx, csz);
 
-	if (r != SX_OK) {
-		return r;
+	if (status != SX_OK) {
+		return status;
 	}
 
-	c->digest = shake256_digest;
+	hash_ctx->digest = shake256_digest;
 
-	return r;
+	return status;
 }
 
 const struct sxhashalg sxhashalg_sha3_224 = {
-	SHA3_MODE(6), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, 28, 1152 / 8, 200, 144, sx_hash_create_ba418};
-
-int sx_hash_create_sha3_224(struct sxhash *c, size_t csz)
-{
-	c->algo = &sxhashalg_sha3_224;
-	return sx_hash_create_ba418(c, csz);
-}
+	SHA3_MODE(6), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, SX_HASH_DIGESTSZ_SHA3_224,
+	SX_HASH_BLOCKSZ_SHA3_224, 200, 144, sx_hash_create_ba418
+};
 
 const struct sxhashalg sxhashalg_sha3_256 = {
-	SHA3_MODE(7), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, 32, 1088 / 8, 200, 136, sx_hash_create_ba418};
-
-int sx_hash_create_sha3_256(struct sxhash *c, size_t csz)
-{
-	c->algo = &sxhashalg_sha3_256;
-	return sx_hash_create_ba418(c, csz);
-}
+	SHA3_MODE(7), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, SX_HASH_DIGESTSZ_SHA3_256,
+	SX_HASH_BLOCKSZ_SHA3_256, 200, 136, sx_hash_create_ba418
+};
 
 const struct sxhashalg sxhashalg_sha3_384 = {
-	SHA3_MODE(11), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, 48, 832 / 8, 200, 104, sx_hash_create_ba418};
-
-int sx_hash_create_sha3_384(struct sxhash *c, size_t csz)
-{
-	c->algo = &sxhashalg_sha3_384;
-	return sx_hash_create_ba418(c, csz);
-}
+	SHA3_MODE(11), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, SX_HASH_DIGESTSZ_SHA3_384,
+	SX_HASH_BLOCKSZ_SHA3_384, 200, 104, sx_hash_create_ba418
+};
 
 const struct sxhashalg sxhashalg_sha3_512 = {
-	SHA3_MODE(15), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, 64, 576 / 8, 200, 72, sx_hash_create_ba418};
-
-int sx_hash_create_sha3_512(struct sxhash *c, size_t csz)
-{
-	c->algo = &sxhashalg_sha3_512;
-	return sx_hash_create_ba418(c, csz);
-}
+	SHA3_MODE(15), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, SX_HASH_DIGESTSZ_SHA3_512,
+	SX_HASH_BLOCKSZ_SHA3_512, 200, 72, sx_hash_create_ba418
+};
 
 const struct sxhashalg sxhashalg_shake256_114 = {
-	SHA3_MODE_SHAKE(7, 114),      SHA3_SW_PAD, SHA3_SAVE_CONTEXT, 114, 1088 / 8, 200, 136,
-	sx_hash_create_ba418_shake256};
+	SHA3_MODE_SHAKE(7, 114), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, 114,
+	SX_HASH_BLOCKSZ_SHA3_256, 200, 136, sx_hash_create_ba418_shake256
+};
+
+const struct sxhashalg sxhashalg_shake256_64 = {
+	SHA3_MODE_SHAKE(7, 64), SHA3_SW_PAD, SHA3_SAVE_CONTEXT, 64,
+	SX_HASH_BLOCKSZ_SHA3_256, 200, 136, sx_hash_create_ba418_shake256
+};

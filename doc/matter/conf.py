@@ -1,13 +1,12 @@
 #
-# Copyright (c) 2024 Nordic Semiconductor
+# Copyright (c) 2025 Nordic Semiconductor
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
 import os
-from pathlib import Path
 import sys
-
+from pathlib import Path
 
 # Paths ------------------------------------------------------------------------
 
@@ -61,15 +60,15 @@ warnings_filter_config = str(NRF_BASE / "doc" / "matter" / "known-warnings.txt")
 external_content_contents = [
     (NRF_BASE / "doc" / "matter", "*.rst"),
     (MATTER_BASE / "docs" / "guides", "images"),
-    (MATTER_BASE / "docs" / "guides", "nrfconnect_platform_overview.md"),
-    (MATTER_BASE / "docs" / "guides", "nrfconnect_examples_configuration.md"),
-    (MATTER_BASE / "docs" / "guides", "nrfconnect_examples_cli.md"),
-    (MATTER_BASE / "docs" / "guides", "nrfconnect_examples_software_update.md"),
-    (MATTER_BASE / "docs" / "guides", "openthread_border_router_pi.md"),
-    (MATTER_BASE / "docs" / "guides", "openthread_rcp_nrf_dongle.md"),
-    (MATTER_BASE / "docs" / "guides", "nrfconnect_factory_data_configuration.md"),
+    (MATTER_BASE / "docs" / "platforms" / "nrf", "nrfconnect_platform_overview.md"),
+    (MATTER_BASE / "docs" / "platforms" / "nrf", "nrfconnect_examples_configuration.md"),
+    (MATTER_BASE / "docs" / "platforms" / "nrf", "nrfconnect_examples_cli.md"),
+    (MATTER_BASE / "docs" / "platforms" / "nrf", "nrfconnect_examples_software_update.md"),
+    (MATTER_BASE / "docs" / "platforms" / "openthread", "openthread_border_router_pi.md"),
+    (MATTER_BASE / "docs" / "platforms" / "openthread", "openthread_rcp_nrf_dongle.md"),
+    (MATTER_BASE / "docs" / "platforms" / "nrf", "nrfconnect_factory_data_configuration.md"),
     (MATTER_BASE / "docs" / "guides", "BUILDING.md"),
-    (MATTER_BASE / "docs" / "guides", "chip_tool_guide.md"),
+    (MATTER_BASE / "docs" / "development_controllers" / "chip-tool", "chip_tool_guide.md"),
     (MATTER_BASE / "docs" / "guides", "access-control-guide.md"),
     (MATTER_BASE / "src" / "tools" / "chip-cert", "README.md"),
 

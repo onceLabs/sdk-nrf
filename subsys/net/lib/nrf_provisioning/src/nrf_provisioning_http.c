@@ -4,11 +4,19 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#endif
+/* Define _POSIX_C_SOURCE before including <string.h> in order to use `strtok_r`. */
+#define _POSIX_C_SOURCE 200809L
+
 #include <string.h>
 #include <zephyr/kernel.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <version.h>
+#include <ncs_version.h>
 #if defined(CONFIG_POSIX_API)
 #include <zephyr/posix/unistd.h>
 #include <zephyr/posix/sys/socket.h>
@@ -46,8 +54,9 @@ LOG_MODULE_REGISTER(nrf_provisioning_http, CONFIG_NRF_PROVISIONING_LOG_LEVEL);
 #define CMDS_MAX_RX_SZ "rxMaxSize=%s"
 #define CMDS_MAX_TX_SZ "txMaxSize=%s"
 #define CMDS_MVER "mver=%s"
+#define CMDS_LIMIT "limit=%s"
 #define API_CMDS_TEMPLATE (API_GET_CMDS "?" \
-	CMDS_AFTER "&" CMDS_MAX_RX_SZ "&" CMDS_MAX_TX_SZ "&" CMDS_MVER "&" CMDS_CVER)
+	CMDS_AFTER "&" CMDS_MAX_RX_SZ "&" CMDS_MAX_TX_SZ "&" CMDS_MVER "&" CMDS_CVER "&" CMDS_LIMIT)
 
 #define API_POST_RSLT API_VER API_PRV "/response"
 
@@ -76,12 +85,12 @@ LOG_MODULE_REGISTER(nrf_provisioning_http, CONFIG_NRF_PROVISIONING_LOG_LEVEL);
 #define USER_AGENT_HDR (HDR_TYPE_USER_AGENT "/" ZEPHYR_VER CRLF)
 
 
-int nrf_provisioning_http_init(struct nrf_provisioning_mm_change *mmode)
+int nrf_provisioning_http_init(nrf_provisioning_event_cb_t callback)
 {
 	static bool initialized;
 	int ret;
 
-	nrf_provisioning_codec_init(mmode);
+	nrf_provisioning_codec_init(callback);
 
 	if (initialized) {
 		return 0;
@@ -250,36 +259,26 @@ static int gen_provisioning_url(struct rest_client_req_context *const req)
 {
 	char *url;
 	size_t buff_sz;
-	char *rx_buf_sz = STRINGIFY(CONFIG_NRF_PROVISIONING_RX_BUF_SZ);
-	char *tx_buf_sz = STRINGIFY(CONFIG_NRF_PROVISIONING_TX_BUF_SZ);
-	char mver[128];
-	char *cver = STRINGIFY(1);
+	const char *rx_buf_sz = STRINGIFY(CONFIG_NRF_PROVISIONING_RX_BUF_SZ);
+	const char *tx_buf_sz = STRINGIFY(CONFIG_NRF_PROVISIONING_TX_BUF_SZ);
+	const char *limit = STRINGIFY(CONFIG_NRF_PROVISIONING_CBOR_RECORDS);
+	const char *cver = NCS_VERSION_STRING;
+	char mver[MODEM_INFO_FWVER_SIZE];
 	int ret;
-	char *mvernmb;
-	int cnt;
 	char after[NRF_PROVISIONING_CORRELATION_ID_SIZE];
 
 	memcpy(after, nrf_provisioning_codec_get_latest_cmd_id(),
 		NRF_PROVISIONING_CORRELATION_ID_SIZE);
 
-	ret = modem_info_string_get(MODEM_INFO_FW_VERSION, mver, sizeof(mver));
-
-	if (ret <= 0) {
+	ret = modem_info_get_fw_version(mver, sizeof(mver));
+	if (ret < 0) {
 		LOG_ERR("Failed to get modem FW version");
-		return ret ? ret : -ENODATA;
-	}
-
-	mvernmb = strtok(mver, "_-");
-	cnt = 1;
-
-	/* mfw_nrf9160_1.3.2-FOTA-TEST - for example */
-	while (cnt++ < 3) {
-		mvernmb = strtok(NULL, "_-");
+		return ret;
 	}
 
 	buff_sz = sizeof(API_CMDS_TEMPLATE) +
 		strlen(after) + strlen(rx_buf_sz) + strlen(tx_buf_sz) +
-		strlen(mvernmb) + strlen(cver);
+		strlen(mver) + strlen(cver) + strlen(limit);
 	url = k_malloc(buff_sz);
 	if (!url) {
 		ret = -ENOMEM;
@@ -289,14 +288,42 @@ static int gen_provisioning_url(struct rest_client_req_context *const req)
 	req->url = url;
 
 	ret = snprintk(url, buff_sz,
-		API_CMDS_TEMPLATE, after, rx_buf_sz, tx_buf_sz, mvernmb, cver);
-
+		API_CMDS_TEMPLATE, after, rx_buf_sz, tx_buf_sz, mver, cver, limit);
 	if ((ret < 0) || (ret >= buff_sz)) {
 		LOG_ERR("Could not format URL");
 		return -ETXTBSY;
 	}
 
 	return 0;
+}
+
+static int status_code_to_error(int status_code)
+{
+	switch (status_code) {
+	case NRF_PROVISIONING_HTTP_STATUS_OK:
+		return 0;
+	case NRF_PROVISIONING_HTTP_STATUS_NO_CONTENT:
+		LOG_ERR("No commands to process on server side");
+		return -ENODATA;
+	case NRF_PROVISIONING_HTTP_STATUS_BAD_REQ:
+		LOG_ERR("Bad request");
+		return -EINVAL;
+	case NRF_PROVISIONING_HTTP_STATUS_UNAUTH:
+		LOG_ERR("Device not authorized");
+		return -EACCES;
+	case NRF_PROVISIONING_HTTP_STATUS_FORBIDDEN:
+		LOG_ERR("Device provided wrong auth credentials");
+		return -EPERM;
+	case NRF_PROVISIONING_HTTP_STATUS_UNS_MEDIA_TYPE:
+		LOG_ERR("Unsupported content format");
+		return -ENOMSG;
+	case NRF_PROVISIONING_HTTP_STATUS_INTERNAL_SERVER_ERR:
+		LOG_ERR("Internal server error");
+		return -EBUSY;
+	default:
+		LOG_ERR("Unsupported HTTP response code: %d", status_code);
+		return -ENOTSUP;
+	}
 }
 
 /**
@@ -351,28 +378,7 @@ static int nrf_provisioning_responses_req(struct nrf_provisioning_http_context *
 		goto clean_up;
 	}
 
-	if (resp->http_status_code == NRF_PROVISIONING_HTTP_STATUS_OK) {
-		ret = 0;
-	} else if (resp->http_status_code == NRF_PROVISIONING_HTTP_STATUS_BAD_REQ) {
-		LOG_ERR("Bad request");
-		ret = -EINVAL;
-	} else if (resp->http_status_code == NRF_PROVISIONING_HTTP_STATUS_UNAUTH) {
-		LOG_ERR("Device didn't send auth credentials");
-		ret = -EACCES;
-	} else if (resp->http_status_code == NRF_PROVISIONING_HTTP_STATUS_FORBIDDEN) {
-		LOG_ERR("Device provided wrong auth credentials");
-		ret = -EACCES;
-	} else if (resp->http_status_code == NRF_PROVISIONING_HTTP_STATUS_UNS_MEDIA_TYPE) {
-		LOG_ERR("Wrong content format");
-		ret = -ENOMSG;
-	} else if (resp->http_status_code == NRF_PROVISIONING_HTTP_STATUS_INTERNAL_SERVER_ERR) {
-		LOG_WRN("Server busy");
-		ret = -EBUSY;
-	} else {
-		__ASSERT(false, "Unsupported HTTP response code");
-		LOG_ERR("Unsupported HTTP response code");
-		ret = -ENOSYS;
-	}
+	ret = status_code_to_error(resp->http_status_code);
 
 clean_up:
 	if (req->url) {
@@ -447,19 +453,7 @@ int nrf_provisioning_http_req(struct nrf_provisioning_http_context *const rest_c
 
 		LOG_INF("Connected");
 
-		if (resp.http_status_code == NRF_PROVISIONING_HTTP_STATUS_NO_CONTENT) {
-			LOG_INF("No more commands to process on server side");
-			ret = 0;
-		} else if (resp.http_status_code == NRF_PROVISIONING_HTTP_STATUS_BAD_REQ) {
-			LOG_ERR("Bad request");
-			ret = -EINVAL;
-		} else if (resp.http_status_code == NRF_PROVISIONING_HTTP_STATUS_UNAUTH) {
-			LOG_ERR("Device didn't send auth credentials");
-			ret = -EACCES;
-		} else if (resp.http_status_code == NRF_PROVISIONING_HTTP_STATUS_FORBIDDEN) {
-			LOG_ERR("Device provided wrong auth credentials");
-			ret = -EACCES;
-		} else if (resp.http_status_code == NRF_PROVISIONING_HTTP_STATUS_OK) {
+		if (resp.http_status_code == NRF_PROVISIONING_HTTP_STATUS_OK) {
 
 			/* Codec state tracking spawns over
 			 * - Commands request
@@ -504,17 +498,11 @@ int nrf_provisioning_http_req(struct nrf_provisioning_http_context *const rest_c
 			}
 			nrf_provisioning_codec_teardown();
 			continue;
-		} else if (
-			resp.http_status_code == NRF_PROVISIONING_HTTP_STATUS_INTERNAL_SERVER_ERR) {
-			LOG_WRN("Internal server error");
-			ret = -EBUSY;
 		} else if (!resp.http_status_code) {
 			LOG_WRN("Null response - socket closed");
 			ret = -ESHUTDOWN;
 		} else {
-			LOG_ERR("Unknown HTTP response code: %d", resp.http_status_code);
-			__ASSERT(false, "Unknown HTTP response code: %d", resp.http_status_code);
-			ret = -ENOTSUP;
+			ret = status_code_to_error(resp.http_status_code);
 		}
 		break;
 	}

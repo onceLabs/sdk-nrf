@@ -21,8 +21,6 @@ The sample supports the following development kits:
 
 .. include:: /includes/tfm.txt
 
-.. include:: /includes/hci_ipc_overlay.txt
-
 Overview
 ********
 
@@ -172,12 +170,8 @@ You can control the sample using predefined buttons, while LEDs are used to disp
          Press this button to start time measuring.
          The second press stops time measuring.
 
-         During the pairing procedure, press this button to accept pairing.
-
       Button 2:
          Triggers the ``button_state_changed`` trace event.
-
-         During the pairing procedure, press this button to reject pairing.
 
       Button 3:
          Every press of this button is counted under the ``button_press_count`` metric.
@@ -197,12 +191,8 @@ You can control the sample using predefined buttons, while LEDs are used to disp
          Press this button to start time measuring.
          The second press stops time measuring.
 
-         During the pairing procedure, press this button to accept pairing.
-
       Button 1:
          Triggers the ``button_state_changed`` trace event.
-
-         During the pairing procedure, press this button to reject pairing.
 
       Button 2:
          Every press of this button is counted under the ``button_press_count`` metric.
@@ -231,6 +221,11 @@ Building and running
 
 .. include:: /includes/build_and_run_ns.txt
 
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
+
 Testing
 =======
 
@@ -255,6 +250,15 @@ You can also use them for your custom applications using the Memfault Diagnostic
 #. Wait for the application to establish connection with your development kit.
 
    In the mobile application, observe that Memfault chunks are forwarded from your device to the Memfault Cloud.
+#. Upload the symbol file generated from your build to your Memfault account so that the information from your application can be parsed.
+   The symbol file is located in the build folder: :file:`peripheral_mds/build/peripheral_mds/zephyr/zephyr.elf`:
+
+   a. Open `Memfault`_ in a web browser.
+   #. Log in to your account and select the project you created earlier.
+   #. Navigate to :guilabel:`Fleet` > :guilabel:`Devices` in the left side menu.
+      You can see your newly connected device and the software version in the list.
+   #. Select the software version number for your device and click :guilabel:`Upload` to upload the symbol file.
+
 #. Return to the terminal and press Tab to confirm that the Memfault shell is working.
    The shell commands available are displayed.
 
@@ -291,13 +295,6 @@ Testing with MDS BLE gateway script
             python3 mds_ble_gateway.py --snr 682900407 --com COM0
 
       #. Wait for the script to establish a connection with your development kit.
-      #. Use the buttons on the development kit to confirm or reject a pairing request.
-
-         .. code-block:: console
-
-            Pairing confirmation required for 6D:99:66:6E:19:72 (random)
-            Press Button 1 to confirm, Button 2 to reject.
-
       #. Upon connection, data already collected by the `Memfault SDK`_ is forwarded to the cloud for further analysis.
          When connected, the new data is periodically transferred to the cloud with the interval configured in the :kconfig:option:`CONFIG_BT_MDS_DATA_POLL_INTERVAL` Kconfig option.
       #. On the terminal running the script, you can observe the Memfault chunk counter:
@@ -308,7 +305,7 @@ Testing with MDS BLE gateway script
             Forwarded 2 Memfault Chunks
 
       #. Upload the symbol file generated from your build to your Memfault account so that the information from your application can be parsed.
-         The symbol file is located in the build folder: :file:`peripheral_memfault/build/zephyr/zephyr.elf`:
+         The symbol file is located in the build folder: :file:`peripheral_mds/build/peripheral_mds/zephyr/zephyr.elf`:
 
          a. Open `Memfault`_ in a web browser.
          #. Log in to your account and select the project you created earlier.
@@ -344,13 +341,6 @@ Testing with MDS BLE gateway script
             python3 mds_ble_gateway.py --snr 682900407 --com COM0
 
       #. Wait for the script to establish a connection with your development kit.
-      #. Use the buttons on the development kit to confirm or reject a pairing request.
-
-         .. code-block:: console
-
-            Pairing confirmation required for 6D:99:66:6E:19:72 (random)
-            Press Button 0 to confirm, Button 1 to reject.
-
       #. Upon connection, data already collected by the `Memfault SDK`_ is forwarded to the cloud for further analysis.
          When connected, the new data is periodically transferred to the cloud with the interval configured in the :kconfig:option:`CONFIG_BT_MDS_DATA_POLL_INTERVAL` Kconfig option.
       #. On the terminal running the script, you can observe the Memfault chunk counter:
@@ -361,7 +351,7 @@ Testing with MDS BLE gateway script
             Forwarded 2 Memfault Chunks
 
       #. Upload the symbol file generated from your build to your Memfault account so that the information from your application can be parsed.
-         The symbol file is located in the build folder: :file:`peripheral_memfault/build/zephyr/zephyr.elf`:
+         The symbol file is located in the build folder: :file:`peripheral_mds/build/peripheral_mds/zephyr/zephyr.elf`:
 
          a. Open `Memfault`_ in a web browser.
          #. Log in to your account and select the project you created earlier.
@@ -397,17 +387,10 @@ Testing with Memfault WebBluetooth Client
          For more details, see the `Memfault WebBluetooth Client source code`_.
       #. Make sure that your development kit is advertising.
       #. In the browser, click the :guilabel:`Connect` button and select your device from the list.
-      #. Use the buttons on your development kit to confirm or reject a pairing request:
-
-         .. code-block:: console
-
-            Pairing confirmation required for 6D:99:66:6E:19:72 (random)
-            Press Button 1 to confirm, Button 2 to reject.
-
       #. Upon connection, data already collected by the `Memfault SDK`_ is forwarded to the cloud for further the analysis.
          When connected, the new data is periodically flushed to the cloud with the interval configured by the Kconfig option :kconfig:option:`CONFIG_BT_MDS_DATA_POLL_INTERVAL`.
       #. Upload the symbol file generated from your build to your Memfault account so that the information from your application can be parsed.
-         The :file:`zephyr.elf` symbol file is located in the build folder :file:`peripheral_memfault/build/zephyr`.
+         The :file:`zephyr.elf` symbol file is located in the build folder :file:`peripheral_mds/build/peripheral_mds/zephyr`.
 
          a. In a web browser, navigate to `Memfault`_.
          #. Log in to your account and select the project you created earlier.
@@ -437,17 +420,10 @@ Testing with Memfault WebBluetooth Client
          For more details, see the `Memfault WebBluetooth Client source code`_.
       #. Make sure that your development kit is advertising.
       #. In the browser, click the :guilabel:`Connect` button and select your device from the list.
-      #. Use the buttons on your development kit to confirm or reject a pairing request:
-
-         .. code-block:: console
-
-            Pairing confirmation required for 6D:99:66:6E:19:72 (random)
-            Press Button 0 to confirm, Button 1 to reject.
-
       #. Upon connection, data already collected by the `Memfault SDK`_ is forwarded to the cloud for further the analysis.
          When connected, the new data is periodically flushed to the cloud with the interval configured by the Kconfig option :kconfig:option:`CONFIG_BT_MDS_DATA_POLL_INTERVAL`.
       #. Upload the symbol file generated from your build to your Memfault account so that the information from your application can be parsed.
-         The :file:`zephyr.elf` symbol file is located in the build folder :file:`peripheral_memfault/build/zephyr`.
+         The :file:`zephyr.elf` symbol file is located in the build folder :file:`peripheral_mds/build/peripheral_mds/zephyr`.
 
          a. In a web browser, navigate to `Memfault`_.
          #. Log in to your account and select the project you created earlier.

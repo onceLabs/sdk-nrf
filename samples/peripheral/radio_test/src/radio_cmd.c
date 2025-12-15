@@ -189,7 +189,8 @@ static int cmd_time_set(const struct shell *shell, size_t argc, char **argv)
 
 static int cmd_cancel(const struct shell *shell, size_t argc, char **argv)
 {
-	radio_test_cancel();
+	radio_test_cancel(test_config.type);
+	test_in_progress = false;
 	return 0;
 }
 
@@ -207,7 +208,7 @@ static int cmd_data_rate_set(const struct shell *shell, size_t argc,
 	}
 
 	if (argc == 2) {
-		shell_error(shell, "Uknown argument: %s", argv[1]);
+		shell_error(shell, "Unknown argument: %s", argv[1]);
 		return -EINVAL;
 	}
 
@@ -218,7 +219,7 @@ static int cmd_tx_carrier_start(const struct shell *shell, size_t argc,
 				char **argv)
 {
 	if (test_in_progress) {
-		radio_test_cancel();
+		radio_test_cancel(test_config.type);
 		test_in_progress = false;
 	}
 
@@ -281,7 +282,7 @@ static int cmd_tx_modulated_carrier_start(const struct shell *shell,
 					  char **argv)
 {
 	if (test_in_progress) {
-		radio_test_cancel();
+		radio_test_cancel(test_config.type);
 		test_in_progress = false;
 	}
 
@@ -418,7 +419,7 @@ static int cmd_output_power_set(const struct shell *shell, size_t argc,
 	}
 
 	if (argc == 2) {
-		shell_error(shell, "Uknown argument: %s", argv[1]);
+		shell_error(shell, "Unknown argument: %s", argv[1]);
 		return -EINVAL;
 	}
 
@@ -439,7 +440,7 @@ static int cmd_transmit_pattern_set(const struct shell *shell, size_t argc,
 	}
 
 	if (argc == 2) {
-		shell_error(shell, "Uknown argument: %s.", argv[1]);
+		shell_error(shell, "Unknown argument: %s.", argv[1]);
 		return -EINVAL;
 	}
 
@@ -632,7 +633,7 @@ static int cmd_tx_sweep_start(const struct shell *shell, size_t argc,
 static int cmd_rx_start(const struct shell *shell, size_t argc, char **argv)
 {
 	if (test_in_progress) {
-		radio_test_cancel();
+		radio_test_cancel(test_config.type);
 		test_in_progress = false;
 	}
 
@@ -1173,7 +1174,7 @@ static int cmd_fem(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	if (argc == 2) {
-		shell_error(shell, "Uknown argument: %s.", argv[1]);
+		shell_error(shell, "Unknown argument: %s.", argv[1]);
 		return -EINVAL;
 	}
 
@@ -1220,7 +1221,7 @@ static int cmd_fem_antenna_select(const struct shell *shell, size_t argc,
 	}
 
 	if (argc == 2) {
-		shell_error(shell, "Uknown argument: %s.", argv[1]);
+		shell_error(shell, "Unknown argument: %s.", argv[1]);
 		return -EINVAL;
 	}
 
@@ -1364,7 +1365,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_transmit_pattern,
 		  "Set the transmission pattern to 11110000.",
 		  cmd_pattern_11110000),
 	SHELL_CMD(pattern_11001100, NULL,
-		  "Set the transmission pattern to 10101010.",
+		  "Set the transmission pattern to 11001100.",
 		  cmd_pattern_11001100),
 	SHELL_SUBCMD_SET_END
 );

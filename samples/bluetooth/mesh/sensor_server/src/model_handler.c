@@ -89,45 +89,45 @@ static uint32_t prev_pres_detect;
 
 static uint32_t prev_mot_sensed;
 
-#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_CONF)
+#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_BASELINE)
 static const uint8_t cmp2_elem_offset_ambient_light[1] = { 0 };
 static const uint8_t cmp2_elem_offset_presence[1] = { 1 };
 static const uint8_t cmp2_elem_offset_motion[1] = { 2 };
 static const uint8_t cmp2_elem_offset_people_count[1] = { 3 };
 
 static const struct bt_mesh_comp2_record comp_rec[4] = {
-	{
+	{/* Ambient Light Sensor NLC Profile 1.0.1 */
 	.id = BT_MESH_NLC_PROFILE_ID_AMBIENT_LIGHT_SENSOR,
 	.version.x = 1,
 	.version.y = 0,
-	.version.z = 0,
+	.version.z = 1,
 	.elem_offset_cnt = 1,
 	.elem_offset = cmp2_elem_offset_ambient_light,
 	.data_len = 0
 	},
-	{
+	{/* Occupancy Sensor NLC Profile 1.0.1 */
 	.id = BT_MESH_NLC_PROFILE_ID_OCCUPANCY_SENSOR,
 	.version.x = 1,
 	.version.y = 0,
-	.version.z = 0,
+	.version.z = 1,
 	.elem_offset_cnt = 1,
 	.elem_offset = cmp2_elem_offset_presence,
 	.data_len = 0
 	},
-	{
+	{/* Occupancy Sensor NLC Profile 1.0.1 */
 	.id = BT_MESH_NLC_PROFILE_ID_OCCUPANCY_SENSOR,
 	.version.x = 1,
 	.version.y = 0,
-	.version.z = 0,
+	.version.z = 1,
 	.elem_offset_cnt = 1,
 	.elem_offset = cmp2_elem_offset_motion,
 	.data_len = 0
 	},
-	{
+	{/* Occupancy Sensor NLC Profile 1.0.1 */
 	.id = BT_MESH_NLC_PROFILE_ID_OCCUPANCY_SENSOR,
 	.version.x = 1,
 	.version.y = 0,
-	.version.z = 0,
+	.version.z = 1,
 	.elem_offset_cnt = 1,
 	.elem_offset = cmp2_elem_offset_people_count,
 	.data_len = 0
@@ -1085,7 +1085,7 @@ static const struct bt_mesh_comp comp = {
 
 const struct bt_mesh_comp *model_handler_init(void)
 {
-#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_CONF)
+#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_BASELINE)
 	if (bt_mesh_comp2_register(&comp_p2)) {
 		printf("Failed to register comp2\n");
 	}
@@ -1103,7 +1103,9 @@ const struct bt_mesh_comp *model_handler_init(void)
 	dk_button_handler_add(&button_handler);
 
 	if (IS_ENABLED(CONFIG_BT_SETTINGS)) {
-		settings_subsys_init();
+		if (!settings_subsys_init()) {
+			printf("Failed to initialize setting subsystem");
+		}
 		settings_register(&temp_range_conf);
 		settings_register(&presence_motion_threshold_conf);
 		settings_register(&amb_light_level_gain_conf);

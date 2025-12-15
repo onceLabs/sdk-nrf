@@ -33,7 +33,7 @@ The sample requires a smartphone (configurator) with Nordic Semiconductor's nRF 
 Overview
 ********
 
-With this sample, you can provision a Wi-Fi device that lacks input or output capability, using the :ref:`wifi_prov_readme` library.
+With this sample, you can provision a Wi-Fi device that lacks input or output capability, using the :ref:`lib_wifi_prov_ble` library.
 The sample is divided into three parts:
 
 * Task and event handling component: Handles provisioning-related tasks and events.
@@ -103,9 +103,16 @@ Building and running
 
 .. include:: /includes/build_and_run.txt
 
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
+
 The sample generates header and source files based on protocol buffer definitions in :file:`.proto` files during the build process.
 You must install a protocol buffer compiler to generate the files.
 See the :zephyr:code-sample:`nanopb` in the Zephyr documentation for more information.
+
+.. include:: /includes/wifi_refer_sample_yaml_file.txt
 
 Testing
 =======
@@ -144,8 +151,8 @@ Dependencies
 
 This sample uses the following |NCS| libraries:
 
-* :ref:`wifi_prov_readme`
-* :ref:`lib_wifi_credentials`
+* :ref:`lib_wifi_prov_ble`
+* :ref:`Wi-Fi credentials <zephyr:lib_wifi_credentials>`
 
 This sample also uses a module that can be found in the following location in the |NCS| folder structure:
 

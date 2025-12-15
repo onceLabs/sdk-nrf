@@ -23,17 +23,9 @@
 #include "rpc/host/dm_rpc_host.h"
 #include "rpc/common/dm_rpc_common.h"
 
-#if defined(DPPI_PRESENT)
-#include <nrfx_dppi.h>
-
-static nrfx_dppi_t dppi = NRFX_DPPI_INSTANCE(0);
-
-#define gppi_channel_t uint8_t
-#define gppi_channel_alloc(x) nrfx_dppi_channel_alloc(&dppi, x)
-#else
-#include <nrfx_ppi.h>
-#define gppi_channel_t nrf_ppi_channel_t
-#define gppi_channel_alloc nrfx_ppi_channel_alloc
+#include <helpers/nrfx_gppi.h>
+#ifdef NRFX_GPPI_MULTI_DOMAIN
+#error "Not supported"
 #endif
 
 #include <zephyr/logging/log.h>
@@ -60,7 +52,7 @@ LOG_MODULE_REGISTER(nrf_dm, CONFIG_DM_MODULE_LOG_LEVEL);
 #define DM_THREAD_STACK_SIZE         1536
 #endif
 
-#define DM_TIMESLOT_OVERHEAD_US      400
+#define DM_TIMESLOT_OVERHEAD_US      420
 #define DM_REFLECTOR_OVERHEAD_US     2000
 
 static K_MUTEX_DEFINE(ranging_mtx);
@@ -207,7 +199,11 @@ static mpsl_timeslot_signal_return_param_t *mpsl_timeslot_callback(
 		dm_api_call = TIMESLOT_RESCHEDULE;
 		k_msgq_put(&dm_api_msgq, &dm_api_call, K_NO_WAIT);
 		break;
+	case MPSL_TIMESLOT_SIGNAL_OVERSTAYED:
+		LOG_ERR("overstayed the timeslot: consider increasing DM_TIMESLOT_OVERHEAD_US");
+		break;
 	default:
+		LOG_ERR("Unexpected timeslot signal (%u)", signal_type);
 		break;
 	}
 
@@ -500,15 +496,15 @@ int dm_init(struct dm_init_param *init_param)
 	nrf_dm_antenna_config_t ant_conf = NRF_DM_DEFAULT_SINGLE_ANTENNA_CONFIG;
 
 	for (size_t i = 0; i < PPI_CH_COUNT; i++) {
-		gppi_channel_t channel;
+		nrfx_gppi_handle_t handle;
 
-		err = gppi_channel_alloc(&channel);
-		if (err != NRFX_SUCCESS) {
+		err = nrfx_gppi_domain_conn_alloc(0, 0, &handle);
+		if (err < 0) {
 			LOG_ERR("(D)PPI channel allocation error: %08x", err);
-			return -ENOMEM;
+			return err;
 		}
 
-		ppi_ch[i] = (uint8_t)channel;
+		ppi_ch[i] = (uint8_t)handle;
 	}
 
 	nrf_dm_init(&ppi_conf, &ant_conf, DM_TIMER);

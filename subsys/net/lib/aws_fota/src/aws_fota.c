@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <stdio.h>
 #include <zephyr/data/json.h>
+#include <zephyr/net/tls_credentials.h>
 #include <net/fota_download.h>
 #include <net/aws_jobs.h>
 #include <net/aws_fota.h>
@@ -61,8 +62,8 @@ static uint8_t get_topic[AWS_JOBS_TOPIC_MAX_LEN];
 /* Allocated buffers for keeping hostname, json payload and file_path. */
 static uint8_t payload_buf[CONFIG_AWS_FOTA_PAYLOAD_SIZE];
 static uint8_t protocol[sizeof("https://")];
-static uint8_t hostname[CONFIG_DOWNLOAD_CLIENT_MAX_HOSTNAME_SIZE];
-static uint8_t file_path[CONFIG_DOWNLOAD_CLIENT_MAX_FILENAME_SIZE];
+static uint8_t hostname[CONFIG_DOWNLOADER_MAX_HOSTNAME_SIZE];
+static uint8_t file_path[CONFIG_DOWNLOADER_MAX_FILENAME_SIZE];
 
 /* Allocated buffer used to keep track the job ID currently being handled by the library. */
 static uint8_t job_id_handling[AWS_JOBS_JOB_ID_MAX_LEN] = AWS_JOB_ID_DEFAULT;
@@ -344,7 +345,7 @@ cleanup:
 static int job_update_accepted(struct mqtt_client *const client, uint32_t payload_len)
 {
 	int err;
-	int sec_tag = -1;
+	int sec_tag = SEC_TAG_TLS_INVALID;
 
 	err = get_published_payload(client, payload_buf, payload_len);
 	if (err) {

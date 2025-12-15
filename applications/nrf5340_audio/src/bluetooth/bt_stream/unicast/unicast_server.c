@@ -37,6 +37,7 @@ enum csip_set_rank {
 
 static le_audio_receive_cb receive_cb;
 static struct bt_csip_set_member_svc_inst *csip;
+static uint8_t concurrent_sink_streams_num;
 
 /* Advertising data for peer connection */
 static uint8_t csip_rsi_adv_data[BT_CSIP_RSI_SIZE];
@@ -53,7 +54,7 @@ static const uint8_t cap_adv_data[] = {
 #if defined(CONFIG_BT_AUDIO_RX)
 #define AVAILABLE_SINK_CONTEXT (BT_AUDIO_CONTEXT_TYPE_ANY)
 #else
-#define AVAILABLE_SINK_CONTEXT BT_AUDIO_CONTEXT_TYPE_PROHIBITED
+#define AVAILABLE_SINK_CONTEXT BT_AUDIO_CONTEXT_TYPE_NONE
 #endif /* CONFIG_BT_AUDIO_RX */
 
 static struct bt_cap_stream *cap_tx_streams[CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT];
@@ -61,11 +62,10 @@ static struct bt_cap_stream *cap_tx_streams[CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT];
 #if defined(CONFIG_BT_AUDIO_TX)
 #define AVAILABLE_SOURCE_CONTEXT (BT_AUDIO_CONTEXT_TYPE_ANY)
 #else
-#define AVAILABLE_SOURCE_CONTEXT BT_AUDIO_CONTEXT_TYPE_PROHIBITED
+#define AVAILABLE_SOURCE_CONTEXT BT_AUDIO_CONTEXT_TYPE_NONE
 #endif /* CONFIG_BT_AUDIO_TX */
 
-static struct bt_bap_unicast_server_register_param unicast_server_params = {
-	CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT, CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT};
+static struct bt_bap_unicast_server_register_param unicast_server_params = {0, 0};
 
 static uint8_t unicast_server_adv_data[] = {
 	BT_UUID_16_ENCODE(BT_UUID_ASCS_VAL),
@@ -138,7 +138,7 @@ static enum bt_audio_dir caps_dirs[] = {
 #endif /* (CONFIG_BT_AUDIO_TX) */
 };
 
-static const struct bt_audio_codec_qos_pref qos_pref = BT_AUDIO_CODEC_QOS_PREF(
+static struct bt_bap_qos_cfg_pref qos_pref = BT_BAP_QOS_CFG_PREF(
 	true, BT_GAP_LE_PHY_2M, CONFIG_BT_AUDIO_RETRANSMITS, BLE_ISO_LATENCY_MS,
 	CONFIG_AUDIO_MIN_PRES_DLY_US, CONFIG_AUDIO_MAX_PRES_DLY_US,
 	CONFIG_BT_AUDIO_PREFERRED_MIN_PRES_DLY_US, CONFIG_BT_AUDIO_PREFERRED_MAX_PRES_DLY_US);
@@ -168,7 +168,7 @@ BUILD_ASSERT(CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT <= 1,
 
 static int lc3_config_cb(struct bt_conn *conn, const struct bt_bap_ep *ep, enum bt_audio_dir dir,
 			 const struct bt_audio_codec_cfg *codec, struct bt_bap_stream **stream,
-			 struct bt_audio_codec_qos_pref *const pref, struct bt_bap_ascs_rsp *rsp)
+			 struct bt_bap_qos_cfg_pref *const pref, struct bt_bap_ascs_rsp *rsp)
 {
 	int ret;
 	LOG_DBG("LC3 config callback");
@@ -224,14 +224,14 @@ static int lc3_config_cb(struct bt_conn *conn, const struct bt_bap_ep *ep, enum 
 
 static int lc3_reconfig_cb(struct bt_bap_stream *stream, enum bt_audio_dir dir,
 			   const struct bt_audio_codec_cfg *codec,
-			   struct bt_audio_codec_qos_pref *const pref, struct bt_bap_ascs_rsp *rsp)
+			   struct bt_bap_qos_cfg_pref *const pref, struct bt_bap_ascs_rsp *rsp)
 {
 	LOG_DBG("ASE Codec Reconfig: stream %p", (void *)stream);
 
 	return 0;
 }
 
-static int lc3_qos_cb(struct bt_bap_stream *stream, const struct bt_audio_codec_qos *qos,
+static int lc3_qos_cb(struct bt_bap_stream *stream, const struct bt_bap_qos_cfg *qos,
 		      struct bt_bap_ascs_rsp *rsp)
 {
 	enum bt_audio_dir dir;
@@ -335,21 +335,23 @@ static const struct bt_bap_unicast_server_cb unicast_server_cb = {
 
 #if (CONFIG_BT_AUDIO_RX)
 static void stream_recv_cb(struct bt_bap_stream *stream, const struct bt_iso_recv_info *info,
-			   struct net_buf *buf)
+			   struct net_buf *audio_frame)
 {
-	bool bad_frame = false;
+	int ret;
+	struct audio_metadata meta;
 
 	if (receive_cb == NULL) {
 		LOG_ERR("The RX callback has not been set");
 		return;
 	}
 
-	if (!(info->flags & BT_ISO_FLAGS_VALID)) {
-		bad_frame = true;
+	ret = le_audio_metadata_populate(&meta, stream, info, audio_frame);
+	if (ret) {
+		LOG_ERR("Failed to populate meta data: %d", ret);
+		return;
 	}
 
-	receive_cb(buf->data, buf->len, bad_frame, info->ts, 0,
-		   bt_audio_codec_cfg_get_octets_per_frame(stream->codec_cfg));
+	receive_cb(audio_frame, &meta, 0);
 }
 #endif /* (CONFIG_BT_AUDIO_RX) */
 
@@ -406,6 +408,10 @@ static void stream_started_cb(struct bt_bap_stream *stream)
 
 	LOG_INF("Stream %p started", stream);
 
+	if (dir == BT_AUDIO_DIR_SINK) {
+		concurrent_sink_streams_num++;
+	}
+
 	if (dir == BT_AUDIO_DIR_SOURCE && IS_ENABLED(CONFIG_BT_AUDIO_TX)) {
 		struct stream_index idx = {
 			.lvl1 = 0,
@@ -430,6 +436,10 @@ static void stream_stopped_cb(struct bt_bap_stream *stream, uint8_t reason)
 
 	LOG_DBG("Stream %p stopped. Reason: %d", stream, reason);
 
+	if (dir == BT_AUDIO_DIR_SINK) {
+		concurrent_sink_streams_num--;
+	}
+
 	le_audio_event_publish(LE_AUDIO_EVT_NOT_STREAMING, stream->conn, dir);
 }
 
@@ -452,6 +462,59 @@ static struct bt_bap_stream_ops stream_ops = {
 	.stopped = stream_stopped_cb,
 	.released = stream_released_cb,
 };
+
+int unicast_server_pd_min_set(uint32_t dly_min_in_us)
+{
+	if (dly_min_in_us > qos_pref.pd_max) {
+		LOG_WRN("Min pres delay (%u) cannot be higher than max (%u), keeping old min (%u)",
+			dly_min_in_us, qos_pref.pd_max, qos_pref.pd_min);
+		return -EINVAL;
+	}
+
+	if (dly_min_in_us < CONFIG_AUDIO_MIN_PRES_DLY_US) {
+		LOG_WRN("Min pres delay (%u) too low, setting to %u", dly_min_in_us,
+			CONFIG_AUDIO_MIN_PRES_DLY_US);
+		return -EINVAL;
+	}
+
+	qos_pref.pd_min = dly_min_in_us;
+	qos_pref.pref_pd_min = dly_min_in_us;
+
+	return 0;
+}
+
+int le_audio_concurrent_sync_num_get(uint8_t *num_streams, enum bt_audio_location *locations)
+{
+	int ret;
+
+	if (num_streams == NULL || locations == NULL) {
+		LOG_ERR("Invalid input parameters");
+		return -EINVAL;
+	}
+
+	*num_streams = concurrent_sink_streams_num;
+	*locations = 0;
+
+	for (int i = 0; i < ARRAY_SIZE(cap_audio_streams); i++) {
+		if (!cap_audio_streams[i].bap_stream.conn ||
+		    !cap_audio_streams[i].bap_stream.codec_cfg) {
+			continue;
+		}
+
+		enum bt_audio_location chan_allocation;
+
+		ret = bt_audio_codec_cfg_get_chan_allocation(
+			cap_audio_streams[i].bap_stream.codec_cfg, &chan_allocation, false);
+		if (ret) {
+			LOG_WRN("Failed to get channel allocation");
+			return ret;
+		}
+
+		*locations |= chan_allocation;
+	}
+
+	return 0;
+}
 
 int unicast_server_config_get(struct bt_conn *conn, enum bt_audio_dir dir, uint32_t *bitrate,
 			      uint32_t *sampling_rate_hz, uint32_t *pres_delay_us)
@@ -601,7 +664,7 @@ int unicast_server_adv_populate(struct bt_data *adv_buf, uint8_t adv_buf_vacant)
 	return adv_buf_cnt;
 }
 
-int unicast_server_send(struct le_audio_encoded_audio enc_audio)
+int unicast_server_send(struct net_buf const *const audio_frame)
 {
 #if (CONFIG_BT_AUDIO_TX)
 	int ret;
@@ -622,14 +685,12 @@ int unicast_server_send(struct le_audio_encoded_audio enc_audio)
 		tx[num_active_streams].idx.lvl1 = 0;
 		tx[num_active_streams].idx.lvl2 = 0;
 		tx[num_active_streams].idx.lvl3 = i;
-
-		/* Set channel location */
-		tx[num_active_streams].audio_channel = AUDIO_MIC;
+		tx[num_active_streams].audio_location = 0;
 
 		num_active_streams++;
 	}
 
-	ret = bt_le_audio_tx_send(tx, num_active_streams, enc_audio);
+	ret = bt_le_audio_tx_send(audio_frame, tx, num_active_streams);
 	if (ret) {
 		return ret;
 	}
@@ -649,6 +710,13 @@ int unicast_server_enable(le_audio_receive_cb recv_cb, enum bt_audio_location lo
 {
 	int ret;
 	static bool initialized;
+	/* clang-format off */
+	const struct bt_pacs_register_param pacs_param = {
+		IF_ENABLED(CONFIG_BT_AUDIO_RX, (.snk_pac = true,))
+		IF_ENABLED(CONFIG_BT_AUDIO_RX, (.snk_loc = true,))
+		IF_ENABLED(CONFIG_BT_AUDIO_TX, (.src_pac = true,))
+		IF_ENABLED(CONFIG_BT_AUDIO_TX, (.src_loc = true,))};
+	/* clang-format on */
 
 	__ASSERT(strlen(CONFIG_BT_SET_IDENTITY_RESOLVING_KEY) == BT_CSIP_SIRK_SIZE,
 		 "SIRK incorrect size, must be 16 bytes");
@@ -665,8 +733,35 @@ int unicast_server_enable(le_audio_receive_cb recv_cb, enum bt_audio_location lo
 
 	receive_cb = recv_cb;
 
-	bt_bap_unicast_server_register(&unicast_server_params);
-	bt_bap_unicast_server_register_cb(&unicast_server_cb);
+	/* For this application, we create one sink endpoint for each location */
+	unicast_server_params.snk_cnt = POPCOUNT(location);
+	if (unicast_server_params.snk_cnt == 0) {
+		LOG_ERR("No sink endpoint requested");
+		return -EINVAL;
+	}
+
+	if (unicast_server_params.snk_cnt > CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT) {
+		LOG_WRN("Too many sink endpoints requested (%d), max %d, will just use first "
+			"location",
+			unicast_server_params.snk_cnt, CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT);
+		unicast_server_params.snk_cnt = CONFIG_BT_ASCS_MAX_ASE_SNK_COUNT;
+		/* Use lowest valid set location */
+		location = location & ~(location - 1);
+	}
+
+	unicast_server_params.src_cnt = CONFIG_BT_ASCS_MAX_ASE_SRC_COUNT;
+
+	ret = bt_bap_unicast_server_register(&unicast_server_params);
+	if (ret) {
+		LOG_ERR("Could not register unicast server (err %d)", ret);
+		return ret;
+	}
+
+	ret = bt_bap_unicast_server_register_cb(&unicast_server_cb);
+	if (ret) {
+		LOG_ERR("Could not register unicast server callbacks (err %d)", ret);
+		return ret;
+	}
 
 	if (IS_ENABLED(CONFIG_BT_CSIP_SET_MEMBER_TEST_SAMPLE_DATA)) {
 		LOG_WRN("CSIP test sample data is used, must be changed "
@@ -681,24 +776,33 @@ int unicast_server_enable(le_audio_receive_cb recv_cb, enum bt_audio_location lo
 		memcpy(csip_param.sirk, CONFIG_BT_SET_IDENTITY_RESOLVING_KEY, BT_CSIP_SIRK_SIZE);
 	}
 
+	ret = bt_pacs_register(&pacs_param);
+	if (ret) {
+		LOG_ERR("Could not register PACS (err %d)\n", ret);
+		return ret;
+	}
+
 	for (int i = 0; i < ARRAY_SIZE(caps); i++) {
 		ret = bt_pacs_cap_register(caps_dirs[i], &caps[i]);
 		if (ret) {
-			LOG_ERR("Capability register failed. Err: %d", ret);
+			LOG_ERR("Capability register failed. Err: %d (%d)", ret, i);
 			return ret;
 		}
 	}
 
-	if (IS_ENABLED(CONFIG_BT_AUDIO_RX)) {
-		if (location == BT_AUDIO_LOCATION_FRONT_LEFT) {
-			csip_param.rank = CSIP_HL_RANK;
-		} else if (location == BT_AUDIO_LOCATION_FRONT_RIGHT) {
-			csip_param.rank = CSIP_HR_RANK;
-		} else {
-			LOG_ERR("Channel not supported");
-			return -ECANCELED;
-		}
+	if (location == BT_AUDIO_LOCATION_FRONT_LEFT) {
+		csip_param.rank = CSIP_HL_RANK;
+	} else if (location == BT_AUDIO_LOCATION_FRONT_RIGHT) {
+		csip_param.rank = CSIP_HR_RANK;
+	} else if (location == (BT_AUDIO_LOCATION_FRONT_LEFT | BT_AUDIO_LOCATION_FRONT_RIGHT)) {
+		csip_param.rank = CSIP_HL_RANK;
+		csip_param.set_size = 1;
+	} else {
+		LOG_ERR("Location not supported");
+		return -ECANCELED;
+	}
 
+	if (IS_ENABLED(CONFIG_BT_AUDIO_RX)) {
 		ret = bt_pacs_set_location(BT_AUDIO_DIR_SINK, location);
 		if (ret) {
 			LOG_ERR("Location set failed. Err: %d", ret);
@@ -716,30 +820,33 @@ int unicast_server_enable(le_audio_receive_cb recv_cb, enum bt_audio_location lo
 		}
 	}
 
-	ret = bt_pacs_set_supported_contexts(BT_AUDIO_DIR_SINK, AVAILABLE_SINK_CONTEXT);
+	if (IS_ENABLED(CONFIG_BT_AUDIO_RX)) {
+		ret = bt_pacs_set_supported_contexts(BT_AUDIO_DIR_SINK, AVAILABLE_SINK_CONTEXT);
 
-	if (ret) {
-		LOG_ERR("Supported context set failed. Err: %d", ret);
-		return ret;
+		if (ret) {
+			LOG_ERR("Supported context set failed (sink). Err: %d", ret);
+			return ret;
+		}
+
+		ret = bt_pacs_set_available_contexts(BT_AUDIO_DIR_SINK, AVAILABLE_SINK_CONTEXT);
+		if (ret) {
+			LOG_ERR("Available context set failed (sink). Err: %d", ret);
+			return ret;
+		}
 	}
 
-	ret = bt_pacs_set_available_contexts(BT_AUDIO_DIR_SINK, AVAILABLE_SINK_CONTEXT);
-	if (ret) {
-		LOG_ERR("Available context set failed. Err: %d", ret);
-		return ret;
-	}
+	if (IS_ENABLED(CONFIG_BT_AUDIO_TX)) {
+		ret = bt_pacs_set_supported_contexts(BT_AUDIO_DIR_SOURCE, AVAILABLE_SOURCE_CONTEXT);
+		if (ret) {
+			LOG_ERR("Supported context set failed (source). Err: %d", ret);
+			return ret;
+		}
 
-	ret = bt_pacs_set_supported_contexts(BT_AUDIO_DIR_SOURCE, AVAILABLE_SOURCE_CONTEXT);
-
-	if (ret) {
-		LOG_ERR("Supported context set failed. Err: %d", ret);
-		return ret;
-	}
-
-	ret = bt_pacs_set_available_contexts(BT_AUDIO_DIR_SOURCE, AVAILABLE_SOURCE_CONTEXT);
-	if (ret) {
-		LOG_ERR("Available context set failed. Err: %d", ret);
-		return ret;
+		ret = bt_pacs_set_available_contexts(BT_AUDIO_DIR_SOURCE, AVAILABLE_SOURCE_CONTEXT);
+		if (ret) {
+			LOG_ERR("Available context set failed (source). Err: %d", ret);
+			return ret;
+		}
 	}
 
 	for (int i = 0; i < ARRAY_SIZE(cap_audio_streams); i++) {

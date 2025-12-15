@@ -7,6 +7,8 @@
 #include <ot_rpc_ids.h>
 #include <ot_rpc_types.h>
 #include <ot_rpc_common.h>
+#include <ot_rpc_macros.h>
+#include <ot_rpc_os.h>
 
 #include <nrf_rpc/nrf_rpc_serialize.h>
 
@@ -15,7 +17,7 @@ bool otDatasetIsCommissioned(otInstance *aInstance)
 	struct nrf_rpc_cbor_ctx ctx;
 	bool result;
 
-	ARG_UNUSED(aInstance);
+	OT_RPC_UNUSED(aInstance);
 
 	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 0);
 
@@ -25,86 +27,114 @@ bool otDatasetIsCommissioned(otInstance *aInstance)
 	return result;
 }
 
-otError otDatasetSetActiveTlvs(otInstance *aInstance, const otOperationalDatasetTlvs *aDataset)
+static otError ot_rpc_dataset_set_tlvs(uint8_t cmd, const otOperationalDatasetTlvs *dataset)
 {
 	struct nrf_rpc_cbor_ctx ctx;
-	size_t cbor_buffer_size;
 	otError error;
 
-	ARG_UNUSED(aInstance);
+	OT_RPC_ASSERT(dataset);
 
-	if (aDataset == NULL || aDataset->mLength > OT_OPERATIONAL_DATASET_MAX_LENGTH) {
+	if (dataset->mLength > OT_OPERATIONAL_DATASET_MAX_LENGTH) {
 		return OT_ERROR_INVALID_ARGS;
 	}
 
-	cbor_buffer_size = aDataset->mLength + 2;
-
-	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, cbor_buffer_size);
-
-	nrf_rpc_encode_buffer(&ctx, aDataset->mTlvs, aDataset->mLength);
-
-	nrf_rpc_cbor_cmd_no_err(&ot_group, OT_RPC_CMD_DATASET_SET_ACTIVE_TLVS, &ctx,
-				ot_rpc_decode_error, &error);
+	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 2 + dataset->mLength);
+	nrf_rpc_encode_buffer(&ctx, dataset->mTlvs, dataset->mLength);
+	nrf_rpc_cbor_cmd_no_err(&ot_group, cmd, &ctx, ot_rpc_decode_error, &error);
 
 	return error;
+}
+
+static otError ot_rpc_dataset_get_tlvs(uint8_t cmd, otOperationalDatasetTlvs *dataset)
+{
+	struct nrf_rpc_cbor_ctx ctx;
+
+	OT_RPC_ASSERT(dataset);
+
+	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 0);
+	nrf_rpc_cbor_cmd_no_err(&ot_group, cmd, &ctx, ot_rpc_decode_dataset_tlvs, &dataset);
+
+	return dataset ? OT_ERROR_NONE : OT_ERROR_NOT_FOUND;
+}
+
+static otError ot_rpc_dataset_set(uint8_t cmd, const otOperationalDataset *dataset)
+{
+	struct nrf_rpc_cbor_ctx ctx;
+	otError error;
+
+	OT_RPC_ASSERT(dataset);
+
+	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, OPERATIONAL_DATASET_LENGTH(dataset));
+	ot_rpc_encode_dataset(&ctx, dataset);
+	nrf_rpc_cbor_cmd_no_err(&ot_group, cmd, &ctx, ot_rpc_decode_error, &error);
+
+	return error;
+}
+
+static otError ot_rpc_dataset_get(uint8_t cmd, otOperationalDataset *dataset)
+{
+	struct nrf_rpc_cbor_ctx ctx;
+
+	OT_RPC_ASSERT(dataset);
+
+	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 0);
+	nrf_rpc_cbor_cmd_no_err(&ot_group, cmd, &ctx, ot_rpc_decode_dataset, &dataset);
+
+	return dataset ? OT_ERROR_NONE : OT_ERROR_NOT_FOUND;
+}
+
+otError otDatasetSetActiveTlvs(otInstance *aInstance, const otOperationalDatasetTlvs *aDataset)
+{
+	OT_RPC_UNUSED(aInstance);
+
+	return ot_rpc_dataset_set_tlvs(OT_RPC_CMD_DATASET_SET_ACTIVE_TLVS, aDataset);
 }
 
 otError otDatasetGetActiveTlvs(otInstance *aInstance, otOperationalDatasetTlvs *aDataset)
 {
-	struct nrf_rpc_cbor_ctx ctx;
-	otOperationalDatasetTlvs *dataset = aDataset;
+	OT_RPC_UNUSED(aInstance);
 
-	ARG_UNUSED(aInstance);
-
-	if (aDataset == NULL) {
-		return OT_ERROR_NOT_FOUND;
-	}
-
-	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 0);
-
-	nrf_rpc_cbor_cmd_no_err(&ot_group, OT_RPC_CMD_DATASET_GET_ACTIVE_TLVS, &ctx,
-				ot_rpc_decode_dataset_tlvs, &dataset);
-
-	return dataset ? OT_ERROR_NONE : OT_ERROR_NOT_FOUND;
+	return ot_rpc_dataset_get_tlvs(OT_RPC_CMD_DATASET_GET_ACTIVE_TLVS, aDataset);
 }
 
 otError otDatasetSetActive(otInstance *aInstance, const otOperationalDataset *aDataset)
 {
-	struct nrf_rpc_cbor_ctx ctx;
-	size_t cbor_buffer_size;
-	otError error;
+	OT_RPC_UNUSED(aInstance);
 
-	ARG_UNUSED(aInstance);
-
-	if (aDataset == NULL) {
-		return OT_ERROR_INVALID_ARGS;
-	}
-
-	cbor_buffer_size = OPERATIONAL_DATASET_LENGTH(aDataset);
-
-	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, cbor_buffer_size);
-	ot_rpc_encode_dataset(&ctx, aDataset);
-	nrf_rpc_cbor_cmd_no_err(&ot_group, OT_RPC_CMD_DATASET_SET_ACTIVE, &ctx, ot_rpc_decode_error,
-				&error);
-
-	return error;
+	return ot_rpc_dataset_set(OT_RPC_CMD_DATASET_SET_ACTIVE, aDataset);
 }
 
 otError otDatasetGetActive(otInstance *aInstance, otOperationalDataset *aDataset)
 {
-	struct nrf_rpc_cbor_ctx ctx;
-	otOperationalDataset *dataset = aDataset;
+	OT_RPC_UNUSED(aInstance);
 
-	ARG_UNUSED(aInstance);
+	return ot_rpc_dataset_get(OT_RPC_CMD_DATASET_GET_ACTIVE, aDataset);
+}
 
-	if (aDataset == NULL) {
-		return OT_ERROR_NOT_FOUND;
-	}
+otError otDatasetSetPendingTlvs(otInstance *aInstance, const otOperationalDatasetTlvs *aDataset)
+{
+	OT_RPC_UNUSED(aInstance);
 
-	NRF_RPC_CBOR_ALLOC(&ot_group, ctx, 0);
+	return ot_rpc_dataset_set_tlvs(OT_RPC_CMD_DATASET_SET_PENDING_TLVS, aDataset);
+}
 
-	nrf_rpc_cbor_cmd_no_err(&ot_group, OT_RPC_CMD_DATASET_GET_ACTIVE, &ctx,
-				ot_rpc_decode_dataset, &dataset);
+otError otDatasetGetPendingTlvs(otInstance *aInstance, otOperationalDatasetTlvs *aDataset)
+{
+	OT_RPC_UNUSED(aInstance);
 
-	return dataset ? OT_ERROR_NONE : OT_ERROR_NOT_FOUND;
+	return ot_rpc_dataset_get_tlvs(OT_RPC_CMD_DATASET_GET_PENDING_TLVS, aDataset);
+}
+
+otError otDatasetSetPending(otInstance *aInstance, const otOperationalDataset *aDataset)
+{
+	OT_RPC_UNUSED(aInstance);
+
+	return ot_rpc_dataset_set(OT_RPC_CMD_DATASET_SET_PENDING, aDataset);
+}
+
+otError otDatasetGetPending(otInstance *aInstance, otOperationalDataset *aDataset)
+{
+	OT_RPC_UNUSED(aInstance);
+
+	return ot_rpc_dataset_get(OT_RPC_CMD_DATASET_GET_PENDING, aDataset);
 }

@@ -12,6 +12,8 @@ As part of this guide, you will modify the :ref:`Matter template <matter_templat
 The sensor will periodically generate the simulated temperature sensor value and update the corresponding cluster attributes.
 This application will form a Matter device within a Matter network.
 
+See the :ref:`Creating custom clusters in Matter application <ug_matter_creating_custom_cluster>` guide on how to add a custom cluster to the Matter application.
+
 .. note::
    The sensor sample used in this instruction is used here as an example, and does not follow the Matter Device Type Library Specification.
    When creating an official product, follow the Matter Device Type Library Specification.
@@ -245,12 +247,12 @@ To add a new timer for the measurement task, edit the :file:`src/app_task.cpp` f
    }
 
 The timer must be initialized in the ``Init()`` method of the ``AppTask`` class.
-If :c:func:`StartSensorTimer()` is called, the ``Sensor Measure`` task is added to the tasks queue every *aTimeoutMs* milliseconds, until :c:func:`StopSensorTimer()` is called.
+If :c:func:`StartSensorTimer` is called, the ``Sensor Measure`` task is added to the tasks queue every *aTimeoutMs* milliseconds, until :c:func:`StopSensorTimer` is called.
 
 Implement task handlers
 -----------------------
 
-When a task is dequeued, the ``task_executor`` module calls the task handler passed to the :c:func:`PostTask()` function.
+When a task is dequeued, the ``task_executor`` module calls the task handler passed to the :c:func:`PostTask` function.
 Because you need to handle new tasks, you must implement the corresponding handlers.
 
 To add new task handlers, complete the following steps:
@@ -276,7 +278,7 @@ To add new task handlers, complete the following steps:
       }
 
    With this addition, when the sensor is active, the timer expiration event happens every half a second.
-   This causes an invocation of :c:func:`SensorMeasureHandler()` and triggers an update of the ``MeasuredValue`` attribute of the Temperature Measurement cluster.
+   This causes an invocation of :c:func:`SensorMeasureHandler` and triggers an update of the ``MeasuredValue`` attribute of the Temperature Measurement cluster.
 
    .. note::
       In the code fragment, the example value is updated randomly, but in a real sensor application it would be updated with the value obtained from external measurement.
@@ -301,7 +303,7 @@ Create a callback for sensor activation and deactivation
 
 Handlers for the ``Sensor Activate`` and ``Sensor Deactivate`` tasks are now ready, but the tasks are not posted to the task queue.
 The sensor is supposed to be turned on and off remotely by changing the ``OnOff`` attribute of the On/off cluster, for example using the Matter controller.
-This means that we need to implement a callback function to post one of these tasks every time the ``OnOff`` attribute changes.
+This means that you need to implement a callback function to post one of these tasks every time the ``OnOff`` attribute changes.
 
 To implement the callback function, complete the following steps:
 
@@ -309,8 +311,8 @@ To implement the callback function, complete the following steps:
 2. Implement the callback in this file:
 
    a. Open :file:`ncs/modules/lib/matter/src/app/util/generic-callback-stubs.cpp` to check the list of customizable callback functions, marked with ``__attribute__((weak))``.
-   #. Read the description of :c:func:`MatterPostAttributeChangeCallback()` in the :file:`ncs/modules/lib/matter/src/app/util/generic-callbacks.h` file.
-   #. Implement :c:func:`MatterPostAttributeChangeCallback()` in the :file:`src/zcl_callbacks.cpp` file.
+   #. Read the description of :c:func:`MatterPostAttributeChangeCallback` in the :file:`ncs/modules/lib/matter/src/app/util/generic-callbacks.h` file.
+   #. Implement :c:func:`MatterPostAttributeChangeCallback` in the :file:`src/zcl_callbacks.cpp` file.
 
 For example, the implementation can look as follows:
 

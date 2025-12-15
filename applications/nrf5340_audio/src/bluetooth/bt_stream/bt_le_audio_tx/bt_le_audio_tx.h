@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+/** @file
+ * @addtogroup audio_app_bt_stream
+ * @{
+ * @defgroup le_audio_tx Functions for LE Audio TX functionality.
+ * @{
+ * @brief Helper functions to manage LE Audio TX functionality.
+ */
+
 #ifndef _LE_AUDIO_TX_H_
 #define _LE_AUDIO_TX_H_
 
@@ -16,7 +24,7 @@
 struct le_audio_tx_info {
 	struct stream_index idx;
 	struct bt_cap_stream *cap_stream;
-	uint8_t audio_channel;
+	uint8_t audio_location;
 };
 
 /**
@@ -25,14 +33,14 @@ struct le_audio_tx_info {
  * @note	Send all available channels in a single call.
  *		Do not call this for each channel.
  *
+ * @param[in]	audio_frame	Pointer to the encoded audio data.
  * @param[in]	tx		Pointer to an array of le_audio_tx_info elements.
  * @param[in]	num_tx		Number of elements in @p tx.
- * @param[in]	enc_audio	Encoded audio data.
  *
  * @return	0 if successful, error otherwise.
  */
-int bt_le_audio_tx_send(struct le_audio_tx_info *tx, uint8_t num_tx,
-			struct le_audio_encoded_audio enc_audio);
+int bt_le_audio_tx_send(struct net_buf const *const audio_frame, struct le_audio_tx_info *tx,
+			uint8_t num_tx);
 
 /**
  * @brief	Initializes a stream. Must be called when a TX stream is started.
@@ -58,5 +66,11 @@ int bt_le_audio_tx_stream_sent(struct stream_index stream_idx);
  * @brief	Initializes the TX path for ISO transmission.
  */
 void bt_le_audio_tx_init(void);
+
+/**
+ * @}
+ * @}
+ */
+
 
 #endif /* _LE_AUDIO_TX_H_ */

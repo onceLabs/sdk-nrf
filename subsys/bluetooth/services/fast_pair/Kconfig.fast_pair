@@ -48,6 +48,7 @@ config BT_FAST_PAIR_BN
 rsource "fp_crypto/Kconfig.fp_crypto"
 rsource "fp_storage/Kconfig.fp_storage"
 rsource "fmdn/Kconfig"
+rsource "adv_manager/Kconfig"
 
 config BT_FAST_PAIR_ACTIVATION
 	bool
@@ -122,7 +123,7 @@ config BT_BUF_ACL_RX_SIZE
 	  If Fast Pair is enabled, use MTU value of 83 (recommended by the specification).
 
 config BT_CTLR_DATA_LENGTH_MAX
-	default 87 if BT_CTLR
+	default 87 if HAS_BT_CTLR
 	help
 	  If Fast Pair is enabled, use MTU value of 83 (recommended by the specification).
 
@@ -131,7 +132,6 @@ endif # BT_FAST_PAIR_GATT_SERVICE
 config BT_FAST_PAIR_REGISTRATION_DATA
 	bool
 	default y
-	select PM_SINGLE_IMAGE if !(SOC_SERIES_NRF54HX)
 	help
 	  Add Fast Pair registration data source files.
 
@@ -199,6 +199,6 @@ config BT_FAST_PAIR_BOND_MANAGER
 
 module = BT_FAST_PAIR
 module-str = Fast Pair Service
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 endif # BT_FAST_PAIR

@@ -11,10 +11,9 @@ Signature keys
 A signature key can be used by :ref:`bootloader` to validate the next image in the boot chain.
 Dedicated host tools like :doc:`mcuboot:imgtool` can be used to sign application update images.
 
-When you use |NSIB|, a private/public key pair is by default generated during the build when you are :ref:`ug_bootloader_adding_immutable_keys`.
+When you use MCUboot or :ref:`enable a bootloader chain through sysbuild <ug_bootloader_adding_sysbuild_upgradable_mcuboot>`, the default configuration uses keys that were generated once and are stored in the public MCUboot Git repository.
+When you use |NSIB|, a private/public key pair is by default generated during the build when you are :ref:`ug_bootloader_adding_sysbuild_immutable_keys`.
 You can use the methods described in the following sections to explicitly define how the key pair is to be generated.
-
-When you use MCUboot or you are :ref:`ug_bootloader_adding_upgradable_mcuboot`, MCUboot uses keys that were generated once and are stored in the public MCUboot Git repository by default.
 
 .. note::
     These key pairs should only be used during development.
@@ -133,25 +132,47 @@ Key revocation can be a useful security measure for devices that have already be
 If a private key has been compromised or lost, you can invalidate its public key by uploading a new firmware image signed by another key known to the bootloader.
 
 These keys are kept internally by the bootloader, so the list of available public keys cannot change once it is deployed.
-See :kconfig:option:`CONFIG_SB_PUBLIC_KEY_FILES` for details on how this mechanism is implemented.
+For nRF54L SoCs, the KMU is used to store the public keys and to handle the revocation policy.
+For description, see the :kconfig:option:`CONFIG_SB_CRYPTO_KMU_KEYS_REVOCATION` Kconfig option.
+For other devices, see :kconfig:option:`SB_CONFIG_SECURE_BOOT_PUBLIC_KEY_FILES` for details on how this mechanism is implemented.
 
 You can add this feature to your own project and check its functionality as follows:
 
 1. Generate two or more private keys for the application and extract a public key for each one (for example, using :ref:`OpenSSL <ug_fw_update_keys_openssl>`).
 
-#. Compile the application and bootloader with the relevant configurations, using only absolute paths:
+#. Compile the application and bootloader with the following sysbuild Kconfig options set:
 
-   .. code-block:: console
+   .. note::
 
-      CONFIG_SECURE_BOOT=y
-      CONFIG_SB_SIGNING_KEY_FILE="/path/to/priv_a.pem"
-      CONFIG_SB_PUBLIC_KEY_FILES="/path/to/pub_b.pem,/path/to/pub_c.pem"
+      Use only absolute paths for :kconfig:option:`SB_CONFIG_SECURE_BOOT_SIGNING_KEY_FILE` and :kconfig:option:`SB_CONFIG_SECURE_BOOT_PUBLIC_KEY_FILES`.
+
+   .. tabs::
+
+      .. group-tab:: software keys storage
+
+         .. code-block:: console
+
+            SB_CONFIG_SECURE_BOOT_APPCORE=y
+            SB_CONFIG_SECURE_BOOT_SIGNING_KEY_FILE="/path/to/priv_a.pem"
+            SB_CONFIG_SECURE_BOOT_PUBLIC_KEY_FILES="/path/to/pub_b.pem,/path/to/pub_c.pem"
+
+      .. group-tab:: KMU
+
+         .. code-block:: console
+
+            SB_CONFIG_SECURE_BOOT_APPCORE=y
+            b0_CONFIG_SB_CRYPTO_KMU_KEYS_REVOCATION=y
 
    .. caution::
 
       The public key associated with the original private signing key must not be included in the public key list.
 
-#. Program the application to the target development kit and :ref:`check its console output <ug_bootloader_testing>`.
+#. Provision KMU with the public keys.
+
+   You must do this for devices using KMU as keys storage.
+   This description assumes that KMU is provisioned with key files :file:`/path/to/priv_a.pem`, :file:`/path/to/pub_b.pem`, and :file:`/path/to/pub_c.pem`.
+
+#. Program the application to the target development kit and check its console output.
    With the first firmware version, ``priv_a.pem`` and ``pub_a.pem`` are used for signing and validating the image.
 
    .. code-block:: console
@@ -167,11 +188,16 @@ You can add this feature to your own project and check its functionality as foll
       ...
 
 #. To revoke keys, rebuild the application modifying the configuration setting to use the private key associated with a key listed *after* the currently used key in the list.
+   Make the following sysbuild Kconfig changes on top of the existing ones:
 
    .. code-block:: console
 
-      CONFIG_BUILD_S1_VARIANT=y
-      CONFIG_SB_SIGNING_KEY_FILE="/path/to/priv_c.pem"
+      SB_CONFIG_SECURE_BOOT_SIGNING_KEY_FILE="/path/to/priv_c.pem"
+
+   And the following application Kconfig changes:
+
+   .. code-block:: console
+
       CONFIG_FW_INFO_FIRMWARE_VERSION=2
 
    In this example, when compiling with the ``priv_c.pem`` key, images signed with ``priv_a.pem`` or ``priv_b.pem`` no longer boot when uploaded into an image slot.
@@ -204,21 +230,24 @@ You can add this feature to your own project and check its functionality as foll
 
 To test that the bootloader no longer boots images signed with the earlier keys, upload an image signed with one of them.
 
-1. Recompile the application with the following options:
+1. Recompile the application with the following options.
+   Make the following sysbuild Kconfig changes on top of the existing ones:
 
    .. code-block:: console
 
-      CONFIG_SB_SIGNING_KEY_FILE="/path/to/priv_b.pem"
+      SB_CONFIG_SECURE_BOOT_SIGNING_KEY_FILE="/path/to/priv_b.pem"
+
+   And the following application Kconfig changes:
+
+   .. code-block:: console
+
       CONFIG_FW_INFO_FIRMWARE_VERSION=3
 
-#. To facilitate testing, use nrfjprog to program this image directly into a slot:
+#. To facilitate testing, use `nRF Util`_ to program this image directly into a slot (where ``<app_name>`` is the name of the application):
 
    .. code-block:: console
 
-      nrfjprog -f nRF52 -r --verify --program build/zephyr/signed_by_b0_s0_image.hex --sectorerase
-
-   .. note::
-      |nrfjprog_deprecation_note|
+      nrfutil device program --x-family nrf52 --options chip_erase_mode=ERASE_RANGES_TOUCHED_BY_FIRMWARE,verify=VERIFY_HASH,reset=RESET_SOFT --firmware build/signed_by_b0_<app_name>.hex
 
 #. Observe the bootloader skipping the invalid image and booting the valid image in the other slot:
 

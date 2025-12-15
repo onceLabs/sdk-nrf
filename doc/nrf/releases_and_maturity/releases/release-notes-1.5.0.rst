@@ -49,7 +49,7 @@ This version of the |NCS| has been tested with the following modem firmware for 
 
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Changelog
 *********
@@ -61,7 +61,7 @@ nRF9160
 
 * Added:
 
-  * :ref:`asset_tracker_v2` application, which is a low-power asset tracking example for nRF9160 DK and Thingy:91.
+  * Asset Tracker v2 application, which is a low-power asset tracking example for nRF9160 DK and Thingy:91.
   * :ref:`fmfu_smp_svr_sample` sample, which shows how to add the full modem serial update functionality to an application using SMP Server.
   * :ref:`http_modem_full_update_sample` sample, which demonstrates how to add full modem upgrade support to an application. Note that this requires an external flash memory of a minimum of 2 MB to work, hence the sample will only work on the nRF9160 DK v0.14.0 or later.
   * :ref:`http_modem_delta_update_sample` sample, which demonstrates how to add delta modem upgrade support to an application.
@@ -70,7 +70,7 @@ nRF9160
 * Updated:
 
   * nRF9160: Asset Tracker application - Updated to use the new FOTA (fota_v2) based on nRF Connect for Cloud.
-  * :ref:`serial_lte_modem` application:
+  * Serial LTE modem application:
 
     * Fixed an issue where FOTA downloads were interrupted if an AT command was issued.
     * Fixed an issue with overflowing HTTP request buffers.
@@ -88,7 +88,7 @@ nRF9160
   * nRF9160: Simple MQTT sample - Updated the default server URL to ``mqtt.eclipseprojects.io``.
   * Extracted the certificate, button, and LED handling functionality from :ref:`http_application_update_sample` sample to :file:`samples/nrf9160/http_update/common`, to share them with :ref:`http_modem_delta_update_sample` sample.
   * Moved the :ref:`http_application_update_sample` sample from ``samples/nrf9160/http_application_update/`` to ``samples/nrf9160/http_update/application_update``.
-  * :ref:`lib_download_client` library:
+  * Download client library:
 
     * Reintroduced the optional TCP timeout (enabled by default) on the TCP socket that is used for the download.
       Upon timeout on a TCP socket, the HTTP download will fail and the ``ETIMEDOUT`` error will be returned via the callback handler.
@@ -107,7 +107,7 @@ nRF9160
     * Removed :kconfig:option:`CONFIG_CLOUD_API` dependency from :kconfig:option:`CONFIG_NRF_CLOUD_CONNECTION_POLL_THREAD`.
     * Added a new API :c:func:`nrf_cloud_send` that can be used for sending pre-encoded data to specified endpoint topics in nRF Connect for Cloud.
 
-  * :ref:`at_cmd_parser_readme` library - The library can now parse AT command strings with negative numbers in the range supported by the int32_t type.
+  * AT command parser library - The library can now parse AT command strings with negative numbers in the range supported by the int32_t type.
   * :ref:`lib_azure_iot_hub` library - Improved the internal connection state handling.
   * :ref:`lte_lc_readme` library - Added support for manufacturer-specific default eDRX/PSM values.
   * :ref:`liblwm2m_carrier_readme` library - Updated to v0.10.2. See :ref:`liblwm2m_carrier_changelog` for details.
@@ -146,7 +146,7 @@ nRF5340 SoC
 
 * Added:
 
-  * :ref:`multiprotocol-rpmsg-sample` sample for network core, which enables support for multiprotocol, IEEE 802.15.4, and Bluetooth LE applications.
+  * ``nRF5340: Multiprotocol RPMsg`` sample for network core, which enables support for multiprotocol, IEEE 802.15.4, and Bluetooth LE applications.
 
 * Updated:
 
@@ -263,24 +263,24 @@ Zigbee
 
 * Added:
 
-  * Development support for :ref:`NCP (Network Co-Processor) <ug_zigbee_platform_design_ncp_details>`.
-  * Development support for the nRF5340 DK in single and multi-protocol (Zigbee and Bluetooth LE) configuration for the :ref:`zigbee_light_switch_sample`, :ref:`zigbee_light_bulb_sample`, and :ref:`zigbee_network_coordinator_sample` samples.
+  * Development support for NCP (Network Co-Processor).
+  * Development support for the nRF5340 DK in single and multi-protocol (Zigbee and Bluetooth LE) configuration for the Zigbee light switch sample, Zigbee light bulb sample, and Zigbee network coordinator sample.
   * PA/LNA GPIO interface support for RF front-end modules (FEM) in Zigbee. The front-end module feature in Zigbee currently has support for SKY66112-11 device, but does not support nRF21540 revision 1 or older.
-  * :ref:`zigbee_ncp_sample` sample, which is a Network Co-Processor example for nRF52840 (DK and dongle) and nRF52833 DK.
+  * The Zigbee NCP sample, which is a Network Co-Processor example for nRF52840 (DK and dongle) and nRF52833 DK.
 
 	* Supports USB and UART transports.
 	* Enables USB DFU when USB transport is used.
 
-  * New ``zcl ping`` command in the :ref:`lib_zigbee_shell` library.
+  * New ``zcl ping`` command in the Zigbee Shell library.
   * New libraries that were extracted from common code under :file:`subsys/zigbee/common`:
 
-    * :ref:`lib_zigbee_application_utilities` library
-    * :ref:`lib_zigbee_logger_endpoint` library
+    * Zigbee application utilities library
+    * Zigbee endpoint logger library
 
 * Updated:
 
-  * ZBOSS Zigbee stack to version 3_3_0_6+11_30_2020. See :ref:`zboss_configuration` for detailed information.
-  * Added development (unstable) :ref:`zboss` libraries (v3.5.0.0). See :ref:`zboss_configuration` for detailed information.
+  * ZBOSS Zigbee stack to version 3_3_0_6+11_30_2020. See ZBOSS configuration for detailed information.
+  * Added development (unstable) ZBOSS libraries (v3.5.0.0). See ZBOSS configuration for detailed information.
 
 nRF Desktop
 -----------
@@ -499,7 +499,7 @@ The following list summarizes the most important changes inherited from upstream
   * Added support for :ref:`board versioning <zephyr:application_board_version>`.
     With this concept, multiple board revisions can now share a single folder and board name.
   * Fixed arguments for the J-Link runners for nRF5340 DK and added the DAP Link (CMSIS-DAP) interface to the OpenOCD runner for nRF5340.
-  * Marked the nRF5340 PDK as deprecated and updated the nRF5340 documentation to point to the :ref:`zephyr:nrf5340dk_nrf5340`.
+  * Marked the nRF5340 PDK as deprecated and updated the nRF5340 documentation to point to the :zephyr:board:`nrf5340dk`.
   * Added enabling of LFXO pins (XL1 and XL2) for nRF5340.
   * Removed non-existing documentation links from partition definitions in the board devicetree files.
   * Updated documentation related to QSPI use.
@@ -788,7 +788,7 @@ The following list summarizes the most important changes inherited from upstream
 
     * Fixed mutex protection on :c:func:`mqtt_disconnect`.
     * Switched the library to use ``zsock_*`` socket functions instead of POSIX names.
-    * Changed the return value of :c:func:`mqtt_keepalive_time_left` to -1 when keep alive is disabled.
+    * Changed the return value of :c:func:`mqtt_keepalive_time_left` to –1 when keep alive is disabled.
 
   * Sockets:
 
@@ -980,8 +980,8 @@ In addition to documentation related to the changes listed above, the following 
   * :ref:`ug_thread_tools` - Added information on installing `wpantund`_.
 * :ref:`ug_zigbee`:
 
-  * Updated :ref:`zigbee_ug_supported_features`, :ref:`ug_zigbee_platform_design_ncp`, and :ref:`ug_zigbee_tools`.
-  * :ref:`ug_zigbee_configuring` - Updated mandatory and optional configuration options, logger options, section on power saving during sleep and added IEEE 802.15.4 EUI-64 configuration.
+  * Updated Supported Zigbee features, Co-processor designs, and Zigbee tools.
+  * Configuring Zigbee in the |NCS| - Updated mandatory and optional configuration options, logger options, section on power saving during sleep and added IEEE 802.15.4 EUI-64 configuration.
 * Documentation updates for Homekit.
 
 
@@ -990,7 +990,7 @@ Applications and samples
 
 * nRF9160:
 
-  * :ref:`serial_lte_modem` - Added documentation for new commands.
+  * Serial LTE modem - Added documentation for new commands.
     Fixed the syntax and examples of some existing commands.
   * Added a note about :kconfig:option:`CONFIG_MQTT_KEEPALIVE` option to the :ref:`aws_iot`, :ref:`azure_iot_hub`, and cloud client samples.
 * Bluetooth:
@@ -1013,7 +1013,7 @@ Applications and samples
 * Zigbee:
 
   * Added information on FEM support and updated the dependencies sections.
-  * :ref:`zigbee_light_switch_sample` - Added a section on :ref:`zigbee_light_switch_activating_variants`.
+  * Zigbee light switch sample - Added a section on configuration files for sample extensions.
 * Updated the configuration sections of the following samples:
 
   * :ref:`download_sample`
@@ -1044,7 +1044,7 @@ nrfxlib
 * :ref:`nrf_802154_sl` - Added.
 * :ref:`nrf_security` - Updated to reflect the features supported by different backends.
 * :ref:`softdevice_controller` - Updated the Bluetooth LE feature support.
-* :ref:`zboss` - Added the types of ZBOSS libraries that are available.
+* ZBOSS Zigbee stack - Added the types of ZBOSS libraries that are available.
 
 
 Known issues

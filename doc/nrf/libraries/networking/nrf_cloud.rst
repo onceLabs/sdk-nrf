@@ -12,7 +12,7 @@ It abstracts and hides the details of the transport and the encoding scheme that
 The current implementation supports the following technologies:
 
 * GNSS, TEMP, and other application-specific sensor data
-* Cellular and Wi-Fi location data
+* Cellular and Wi-Fi® location data
 * TLS-secured MQTT, TLS-secured REST, or DTLS-secured CoAP as the communication protocol
 * JSON as the data format for MQTT and REST
 * CBOR and JSON as the data format for CoAP
@@ -25,7 +25,8 @@ The current implementation supports the following technologies:
 
 Initializing
 ************
-Before using any other APIs of the module, the application must call the :c:func:`nrf_cloud_init` function.
+
+Before using any other APIs of the module, set the :kconfig:option:`CONFIG_NRF_CLOUD` Kconfig option and call the :c:func:`nrf_cloud_init` function in the application.
 If this call fails, the application must not use any functions of the module.
 
 .. note::
@@ -160,9 +161,8 @@ nRF Cloud FOTA enables the following additional features and libraries:
 
 * :kconfig:option:`CONFIG_FOTA_DOWNLOAD` enables :ref:`lib_fota_download`
 * :kconfig:option:`CONFIG_DFU_TARGET` enables :ref:`lib_dfu_target`
-* :kconfig:option:`CONFIG_DOWNLOAD_CLIENT` enables :ref:`lib_download_client`
+* :kconfig:option:`CONFIG_DOWNLOADER` enables :ref:`lib_downloader`
 * :kconfig:option:`CONFIG_FOTA_DOWNLOAD_PROGRESS_EVT`
-* :kconfig:option:`CONFIG_FOTA_PROGRESS_EVT_INCREMENT`
 * :kconfig:option:`CONFIG_REBOOT`
 * :kconfig:option:`CONFIG_CJSON_LIB`
 * :kconfig:option:`CONFIG_SETTINGS`

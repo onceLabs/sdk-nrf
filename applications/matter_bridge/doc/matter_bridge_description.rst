@@ -19,7 +19,7 @@ The application supports the following development kits:
 
 .. table-from-sample-yaml::
 
-To test the Matter bridge application with the :ref:`Bluetooth LE bridged device <matter_bridge_app_bridged_support>`, you also need the following:
+To test the Matter bridge application with the :ref:`Bluetooth® LE bridged device <matter_bridge_app_bridged_support>`, you also need the following:
 
 * An additional development kit compatible with one of the following Bluetooth LE samples:
 
@@ -28,7 +28,7 @@ To test the Matter bridge application with the :ref:`Bluetooth LE bridged device
 
 * A micro-USB cable for every development kit to connect it to the PC.
 
-To commission the Matter bridge device and control it remotely through a Wi-Fi network, you also need a Matter controller device :ref:`configured on PC or smartphone <ug_matter_configuring>`.
+To commission the Matter bridge device and control it remotely through a Wi-Fi® network, you also need a Matter controller device :ref:`configured on PC or smartphone <ug_matter_configuring>`.
 This requires additional hardware depending on your setup.
 
 .. note::
@@ -98,9 +98,6 @@ For example:
 
 For information about how to upgrade the device firmware using a PC or a smartphone, see the :ref:`matter_bridge_app_dfu` section.
 
-.. note::
-    Currently the DFU over Bluetooth LE SMP and Matter OTA are not available for the ``nrf54h20dk/nrf54h20/cpuapp`` board target.
-
 The Matter bridge device has an additional functionality, enabling it to work as a smart plug.
 This feature provides an additional endpoint with an ID equal to 2, which represents Matter on/off smart plug device type functionality.
 This means that you can integrate the Matter bridge functionality into your end product, such as a smart plug, and avoid having to use a standalone bridge device.
@@ -131,13 +128,16 @@ Remote testing in a network
 ===========================
 
 By default, the Matter accessory device has no IPv6 network configured.
-To use the device within a Wi-Fi network, you must pair it with the Matter controller over Bluetooth® LE to get the configuration from the controller.
+To use the device within a Wi-Fi network, you must pair it with the Matter controller over Bluetooth LE to get the configuration from the controller.
 
 The Bluetooth LE advertising starts automatically upon device startup, but only for a predefined period of time (1 hour by default).
 If the Bluetooth LE advertising times out, you can re-enable it manually (see the :ref:`matter_bridge_app_ui` section).
 
 Additionally, the controller must get the `Onboarding information`_ from the Matter accessory device and provision the device into the network.
 For details, see the `Testing`_ section.
+
+.. note::
+   |matter_unique_discriminator_note|
 
 .. _matter_bridge_app_ui:
 
@@ -170,7 +170,7 @@ User interface
 
          .. include:: /includes/matter_segger_usb.txt
 
-   .. group-tab:: nrf54 DKs
+   .. group-tab:: nRF54LM20 DK
 
       Button 0:
          .. include:: /includes/matter_sample_button.txt
@@ -239,8 +239,8 @@ Adding a simulated bridged device to the Matter bridge
       * ``770`` - Temperature Sensor.
       * ``775`` - Humidity Sensor.
 
-   * *["node label"]*  is the node label for the bridged device.
-      The argument is optional and you can use it to better personalize the device in your application.
+   * *["node label"]* is the node label for the bridged device.
+     The argument is optional and you can use it to better personalize the device in your application.
 
    Example command:
 
@@ -303,7 +303,7 @@ Adding a Bluetooth LE bridged device to the Matter bridge
    * *<ble_device_index>* is the Bluetooth LE device index on the list returned by the ``scan`` command.
      The argument is mandatory and accepts only the values returned by the ``scan`` command.
 
-   * *["node label"]*  is the node label for the bridged device.
+   * *["node label"]* is the node label for the bridged device.
      The argument is optional and you can use it to better personalize the device in your application.
 
    Example command:
@@ -375,6 +375,29 @@ Removing a bridged device from the Matter bridge
 
       uart:~$ matter_bridge remove 3
 
+Showing a list of all bridged devices and their endpoints
+   Use the following command:
+
+   .. parsed-literal::
+      :class: highlight
+
+      matter_bridge list
+
+   The terminal output is similar to the following one:
+
+   .. code-block:: console
+
+      Bridged devices list:
+      ---------------------------------------------------------------------
+      | Endpoint ID |        Name        |           Type
+      ---------------------------------------------------------------------
+      | 3           | My Light           | OnOffLight (0x0100)
+      | 4           | My Temperature     | TemperatureSensor (0x0302)
+      | 5           | My Humidity        | HumiditySensor (0x0307)
+      | 6           | My Light Switch    | OnOffLightSwitch (0x0103)
+      ---------------------------------------------------------------------
+      Total: 4 device(s)
+
 Configuration
 *************
 
@@ -385,23 +408,15 @@ Configuration options
 
 Check and configure the following configuration options:
 
-.. _CONFIG_BRIDGED_DEVICE_IMPLEMENTATION:
+.. _CONFIG_BRIDGED_DEVICE_SIMULATED:
 
-CONFIG_BRIDGED_DEVICE_IMPLEMENTATION
-   ``bool`` - Select bridged device implementation.
-   See the :ref:`matter_bridge_app_bridged_support_configs` section for more information.
-   Accepts the following values:
+CONFIG_BRIDGED_DEVICE_SIMULATED
+   ``bool`` - Implement a simulated bridged device.
 
-   .. _CONFIG_BRIDGED_DEVICE_SIMULATED:
+.. _CONFIG_BRIDGED_DEVICE_BT:
 
-   CONFIG_BRIDGED_DEVICE_SIMULATED
-      ``bool`` - Implement a simulated bridged device.
-      You must also configure :ref:`CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_IMPLEMENTATION <CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_IMPLEMENTATION>`
-
-   .. _CONFIG_BRIDGED_DEVICE_BT:
-
-   CONFIG_BRIDGED_DEVICE_BT
-      ``bool`` - Implement a Bluetooth LE bridged device.
+CONFIG_BRIDGED_DEVICE_BT
+   ``bool`` - Implement a Bluetooth LE bridged device.
 
 .. _CONFIG_BRIDGE_HUMIDITY_SENSOR_BRIDGED_DEVICE:
 
@@ -413,21 +428,15 @@ CONFIG_BRIDGE_HUMIDITY_SENSOR_BRIDGED_DEVICE
 CONFIG_BRIDGE_ONOFF_LIGHT_BRIDGED_DEVICE
    ``bool`` - Enable support for OnOff Light bridged device.
 
-.. _CONFIG_BRIDGE_SWITCH_BRIDGED_DEVICE:
+.. _CONFIG_BRIDGE_GENERIC_SWITCH_BRIDGED_DEVICE:
 
-CONFIG_BRIDGE_SWITCH_BRIDGED_DEVICE
-   ``bool`` - Enable support for a switch bridged device.
-   Accepts the following values:
+CONFIG_BRIDGE_GENERIC_SWITCH_BRIDGED_DEVICE
+   ``bool`` - Enable support for Generic Switch bridged device.
 
-   .. _CONFIG_BRIDGE_GENERIC_SWITCH_BRIDGED_DEVICE:
+.. _CONFIG_BRIDGE_ONOFF_LIGHT_SWITCH_BRIDGED_DEVICE:
 
-   CONFIG_BRIDGE_GENERIC_SWITCH_BRIDGED_DEVICE
-      ``bool`` - Enable support for Generic Switch bridged device.
-
-   .. _CONFIG_BRIDGE_ONOFF_LIGHT_SWITCH_BRIDGED_DEVICE:
-
-   CONFIG_BRIDGE_ONOFF_LIGHT_SWITCH_BRIDGED_DEVICE
-      ``bool`` - Enable support for OnOff Light Switch bridged device.
+CONFIG_BRIDGE_ONOFF_LIGHT_SWITCH_BRIDGED_DEVICE
+   ``bool`` - Enable support for OnOff Light Switch bridged device.
 
 .. _CONFIG_BRIDGE_TEMPERATURE_SENSOR_BRIDGED_DEVICE:
 
@@ -437,30 +446,26 @@ CONFIG_BRIDGE_TEMPERATURE_SENSOR_BRIDGED_DEVICE
 .. _CONFIG_BRIDGE_MIGRATE_PRE_2_7_0:
 
 CONFIG_BRIDGE_MIGRATE_PRE_2_7_0
-``bool`` - Enable migration of bridged device data stored in old scheme from pre nRF SDK 2.7.0 releases.
+   ``bool`` - Enable migration of bridged device data stored in old scheme from pre |NCS| 2.7.0 releases.
 
 .. _CONFIG_BRIDGE_MIGRATE_VERSION_1:
 
 CONFIG_BRIDGE_MIGRATE_VERSION_1
-``bool`` - Enable migration of bridged device data stored in version 1 of new scheme.If you selected the simulated device implementation using the :ref:`CONFIG_BRIDGED_DEVICE_SIMULATED <CONFIG_BRIDGED_DEVICE_SIMULATED>` Kconfig option, also check and configure the following option:
+   ``bool`` - Enable migration of bridged device data stored in version 1 of new scheme.
 
-.. _CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_IMPLEMENTATION:
+   If you selected the simulated device implementation using the :ref:`CONFIG_BRIDGED_DEVICE_SIMULATED <CONFIG_BRIDGED_DEVICE_SIMULATED>` Kconfig option, also check and configure the following option:
 
-CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_IMPLEMENTATION
-   ``bool`` - Select the simulated OnOff device implementation.
-   Accepts the following values:
+.. _CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_AUTOMATIC:
 
-   .. _CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_AUTOMATIC:
+CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_AUTOMATIC
+   ``bool`` - Automatically simulated OnOff device.
+   The simulated device automatically changes its state periodically.
 
-   CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_AUTOMATIC
-      ``bool`` - Automatically simulated OnOff device.
-      The simulated device automatically changes its state periodically.
+.. _CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_SHELL:
 
-   .. _CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_SHELL:
-
-   CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_SHELL
-      ``bool`` - Shell-controlled simulated OnOff device.
-      The state of the simulated device is changed using shell commands.
+CONFIG_BRIDGED_DEVICE_SIMULATED_ONOFF_SHELL
+   ``bool`` - Shell-controlled simulated OnOff device.
+   The state of the simulated device is changed using shell commands.
 
 If you selected the Bluetooth LE device implementation using the :ref:`CONFIG_BRIDGED_DEVICE_BT <CONFIG_BRIDGED_DEVICE_BT>` Kconfig option, also check and configure the following options:
 
@@ -490,6 +495,41 @@ CONFIG_BRIDGE_BT_RECOVERY_SCAN_TIMEOUT_MS
 
 CONFIG_BRIDGE_BT_SCAN_TIMEOUT_MS
    ``int`` - Set the Bluetooth LE scan timeout in milliseconds.
+
+.. _CONFIG_BRIDGE_FORCE_BT_CONNECTION_PARAMS:
+
+CONFIG_BRIDGE_FORCE_BT_CONNECTION_PARAMS
+   ``bool`` - Determines whether the Matter bridge forces connection parameters or accepts the Bluetooth LE peripheral device selection.
+
+.. _CONFIG_BRIDGE_BT_SCAN_WINDOW:
+
+CONFIG_BRIDGE_BT_SCAN_WINDOW
+   ``int`` - Duration of a central actively scanning for devices within scan interval, equal to ``CONFIG_BRIDGE_BT_SCAN_WINDOW`` * 0.625 ms.
+
+.. _CONFIG_BRIDGE_BT_SCAN_INTERVAL:
+
+CONFIG_BRIDGE_BT_SCAN_INTERVAL
+   ``int`` - Time between consecutive Bluetooth scan windows, equal to ``CONFIG_BRIDGE_BT_SCAN_INTERVAL`` * 0.625 ms.
+
+.. _CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MIN:
+
+CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MIN
+   ``int`` - The minimum duration of time requested by central after the peripheral device should wake up to communicate, equal to ``CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MIN`` * 1.25 ms.
+
+.. _CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MAX:
+
+CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MAX
+   ``int`` - The maximum duration of time requested by central after the peripheral device should wake up to communicate, equal to ``CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MAX`` * 1.25 ms.
+
+.. _CONFIG_BRIDGE_BT_CONNECTION_TIMEOUT:
+
+CONFIG_BRIDGE_BT_CONNECTION_TIMEOUT
+   ``int`` - The time since the last packet was successfully received until the devices consider the connection lost, equal to ``CONFIG_BRIDGE_BT_CONNECTION_TIMEOUT`` cs.
+
+.. _CONFIG_BRIDGE_BT_CONNECTION_LATENCY:
+
+CONFIG_BRIDGE_BT_CONNECTION_LATENCY
+   ``int`` - The number of connection events the peripheral can skip waking up for if it does not have any data to send.
 
 The following options affect how many bridged devices the application supports.
 See the :ref:`matter_bridge_app_bridged_support_configs` section for more information.
@@ -539,7 +579,6 @@ Every Bluetooth LE bridged device uses a separate Bluetooth LE connection, so yo
 Since the Matter stack uses one Bluetooth LE connection for commissioning, the maximum number of connections you can use for bridged devices is one less than is configured using the :kconfig:option:`CONFIG_BT_MAX_CONN` Kconfig option.
 
 Increasing the number of Bluetooth LE connections affects the RAM usage on both the application and network cores.
-The current maximum number of Bluetooth LE connections that can be selected using the default configuration is ``10``, which effectively means 9 bridged devices.
 
 .. tabs::
 
@@ -554,24 +593,25 @@ The current maximum number of Bluetooth LE connections that can be selected usin
          .. group-tab:: Matter bridge over Wi-Fi
 
             You can increase the number of Bluetooth LE connections if you decrease the size of the Bluetooth LE TX/RX buffers used by the Bluetooth controller, but this will decrease the communication throughput.
+            The default number of Bluetooth LE connections that you can select using the default configuration is ``10`` for Matter, which effectively means 9 bridged devices.
 
             Build the target using the following command in the project directory to enable a configuration that increases the number of Bluetooth LE connections to ``20`` (which effectively means 19 bridged devices) by decreasing the size of Bluetooth LE TX/RX buffers:
 
             .. parsed-literal::
                :class: highlight
 
-               west build -b nrf5340dk/nrf5340/cpuapp -p -- -Dmatter_bridge_SHIELD=nrf7002ek -DSB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE=y -DSB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH=y -DSB_CONFIG_WIFI_NRF70=y -Dmcuboot_CONFIG_UPDATEABLE_IMAGE_NUMBER=3 -DCONFIG_BRIDGED_DEVICE_BT=y -DEXTRA_CONF_FILE="overlay-bt_max_connections_app.conf" -Dipc_radio_EXTRA_CONF_FILE="overlay-bt_max_connections_net.conf" -DFILE_SUFFIX=nrf70ek
+               west build -b nrf5340dk/nrf5340/cpuapp -p -- -Dmatter_bridge_SHIELD=nrf7002ek -DSB_CONFIG_WIFI_NRF70=y -DCONFIG_BRIDGED_DEVICE_BT=y -DEXTRA_CONF_FILE="overlay-bt_max_connections_app.conf" -Dipc_radio_EXTRA_CONF_FILE="overlay-bt_max_connections_net.conf" -DFILE_SUFFIX=nrf70ek
 
          .. group-tab:: Matter bridge over Thread
 
-            You can not increase the default number of Bluetooth LE connections in this configuration using overlays.
+            You cannot increase the default number of Bluetooth LE connections in this configuration using overlays.
             This is because the configuration uses both Thread and Bluetooth LE protocols, and limited RAM memory.
             You can still increase the number of connections by modifying the board files and decreasing the buffer sizes.
-            The default number of connections is ``10``, which effectively means 9 bridged devices.
+            The default number of connections is ``8``, which effectively means 7 bridged devices.
 
-   .. group-tab:: nRF54 DKs
+   .. group-tab:: nRF70 DKs
 
-      The nRF54 Series supports the Matter bridge over Wi-Fi and Matter bridge over Thread configurations.
+      The nRF70 Series supports the Matter bridge over Wi-Fi configuration.
 
       .. tabs::
 
@@ -584,35 +624,33 @@ The current maximum number of Bluetooth LE connections that can be selected usin
              .. parsed-literal::
                :class: highlight
 
-               west build -b nrf54h20dk/nrf54h20/cpuapp -p -- -DSB_CONFIG_WIFI_NRF70=y -DCONFIG_CHIP_WIFI=y -Dmatter_bridge_SHIELD=nrf7002eb_interposer_p1 -DCONFIG_BRIDGED_DEVICE_BT=y -DEXTRA_CONF_FILE="overlay-bt_max_connections_app.conf" -Dipc_radio_EXTRA_CONF_FILE="overlay-bt_max_connections_net.conf"
+               west build -b nrf7002dk/nrf5340/cpuapp -- -DCONFIG_BRIDGED_DEVICE_BT=y -DEXTRA_CONF_FILE="overlay-bt_max_connections_app.conf" -Dipc_radio_EXTRA_CONF_FILE="overlay-bt_max_connections_net.conf"
 
-         .. group-tab:: Matter bridge over Thread
+   .. group-tab:: nRF54LM20 DKs
 
-            You can increase the number of Bluetooth LE connections if you decrease the size of the Bluetooth LE TX/RX buffers used by the Bluetooth controller, but this will decrease the communication throughput.
-
-            Build the target using the following command in the project directory to enable a configuration that increases the number of Bluetooth LE connections to ``20`` (which effectively means 19 bridged devices) by decreasing the sizes of Bluetooth LE TX/RX buffers:
-
-             .. parsed-literal::
-               :class: highlight
-
-               west build -b nrf54h20dk/nrf54h20/cpuapp -p -- -DCONFIG_BRIDGED_DEVICE_BT=y -DEXTRA_CONF_FILE="overlay-bt_max_connections_app.conf" -Dipc_radio_EXTRA_CONF_FILE="overlay-bt_max_connections_net.conf"
-
-   .. group-tab:: nRF70 DKs
-
-      The nRF70 Series supports the Matter bridge over Wi-Fi configuration.
+      The nRF54LM20 supports the Matter bridge over Wi-Fi and Matter bridge over Thread configurations.
 
       .. tabs::
 
-         .. group-tab:: Matter-Bridge over Wi-Fi
+         .. group-tab:: Matter bridge over Wi-Fi
 
-            You can increase the number of Bluetooth LE connections if you decrease the size of the Bluetooth LE TX/RX buffers used by the Bluetooth controller, but this will decrease the communication throughput.
-
+            You can increase the number of Bluetooth LE connections, but you may need to decrease the size of the Bluetooth LE TX/RX buffers used by the Bluetooth controller to balance the memory usage, and this will decrease the communication throughput.
             Build the target using the following command in the project directory to enable a configuration that increases the number of Bluetooth LE connections to ``20`` (which effectively means 19 bridged devices) by decreasing the sizes of Bluetooth LE TX/RX buffers:
 
              .. parsed-literal::
                :class: highlight
 
-               west build -b nrf7002dk/nrf5340/cpuapp -- -DCONFIG_BRIDGED_DEVICE_BT=y -DEXTRA_CONF_FILE="overlay-bt_max_connections_app.conf" -Dipc_radio_EXTRA_CONF_FILE="overlay-bt_max_connections_net.conf"
+               west build -b nrf54lm20dk/nrf54lm20a/cpuapp -- -DSB_CONFIG_WIFI_NRF70=y -Dmatter_bridge_SHIELD=nrf7002eb2 -DCONFIG_BRIDGED_DEVICE_BT=y -DEXTRA_CONF_FILE="overlay-bt_max_connections_app.conf"
+
+         .. group-tab:: Matter bridge over Thread
+
+            You can increase the number of Bluetooth LE connections, but you may need to decrease the size of the Bluetooth LE TX/RX buffers used by the Bluetooth controller to balance the memory usage, and this will decrease the communication throughput.
+            Build the target using the following command in the project directory to enable a configuration that increases the number of Bluetooth LE connections to ``20`` (which effectively means 19 bridged devices) by decreasing the sizes of Bluetooth LE TX/RX buffers:
+
+             .. parsed-literal::
+               :class: highlight
+
+               west build -b nrf54lm20dk/nrf54lm20a/cpuapp -- -DCONFIG_BRIDGED_DEVICE_BT=y -DEXTRA_CONF_FILE="overlay-bt_max_connections_app.conf"
 
 Configuring Bluetooth LE connection and scan parameters
 -------------------------------------------------------
@@ -622,12 +660,12 @@ You can disable configuring the parameters by setting the :kconfig:option:`CONFI
 
 Use the following Kconfig options to set the desired parameters:
 
-- :kconfig:option:`CONFIG_BRIDGE_BT_SCAN_WINDOW` - The duration a central actively scans for devices within the scan interval.
-- :kconfig:option:`CONFIG_BRIDGE_BT_SCAN_INTERVAL` - Time between consecutive Bluetooth LE scan windows.
-- :kconfig:option:`CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MIN` - The minimum time requested by the central (the bridge) after which the peripheral device should wake up to communicate.
-- :kconfig:option:`CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MAX` - The maximum time requested by the central (the bridge) after which the peripheral device should wake up to communicate.
-- :kconfig:option:`CONFIG_BRIDGE_BT_CONNECTION_TIMEOUT` - The time since the last packet was successfully received until the devices consider the connection lost.
-- :kconfig:option:`CONFIG_BRIDGE_BT_CONNECTION_LATENCY` - Allows the peripheral to skip waking up for a certain number of connection events if it does not have any data to send.
+- :ref:`CONFIG_BRIDGE_BT_SCAN_WINDOW` - The duration a central actively scans for devices within the scan interval.
+- :ref:`CONFIG_BRIDGE_BT_SCAN_INTERVAL` - Time between consecutive Bluetooth LE scan windows.
+- :ref:`CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MIN` - The minimum time requested by the central (the bridge) after which the peripheral device should wake up to communicate.
+- :ref:`CONFIG_BRIDGE_BT_CONNECTION_INTERVAL_MAX` - The maximum time requested by the central (the bridge) after which the peripheral device should wake up to communicate.
+- :ref:`CONFIG_BRIDGE_BT_CONNECTION_TIMEOUT` - The time since the last packet was successfully received until the devices consider the connection lost.
+- :ref:`CONFIG_BRIDGE_BT_CONNECTION_LATENCY` - Allows the peripheral to skip waking up for a certain number of connection events if it does not have any data to send.
 
 The parameters in this application have been selected based on the :ref:`multiprotocol_bt_thread` information in the :ref:`ug_multiprotocol_support` section.
 
@@ -703,7 +741,14 @@ The application supports the following configurations:
      - nRF5340 DK with the nRF7002 EK shield attached
      - Debug version of the application with Matter over Wi-Fi enabled.
 
-       Enables the Matter Bridge to work with Wi-Fi on nRF5340 DK.
+       Enables the Matter bridge to work with Wi-Fi on nRF5340 DK.
+   * - Matter bridge with nRF54LM20 DK using internal memory only
+     - ---
+     - ``internal``
+     - nRF54LM20 DK
+     - Debug version of the application with external flash disabled.
+
+       Enables the Matter bridge to work using internal memory only.
 
 Factory data support
 ====================
@@ -712,10 +757,6 @@ Factory data support
     :start-after: matter_door_lock_sample_factory_data_start
     :end-before: matter_door_lock_sample_factory_data_end
 
-.. include:: ../../../samples/matter/lock/README.rst
-    :start-after: matter_door_lock_sample_factory_data_nrf54h20_start
-    :end-before: matter_door_lock_sample_factory_data_nrf54h20_end
-
 Building and running
 ********************
 
@@ -723,26 +764,25 @@ Building and running
 
 .. include:: /includes/build_and_run.txt
 
-.. include:: ../../../samples/matter/lock/README.rst
-    :start-after: matter_door_lock_sample_nrf70_firmware_patch_start
-    :end-before: matter_door_lock_sample_nrf70_firmware_patch_end
+.. |sample_or_app| replace:: application
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
 
-For example:
+.. include:: /includes/ipc_radio_conf.txt
 
-   .. code-block:: console
+Building the application on nRF5340 DK with nRF7002 EK shield
+=============================================================
 
-      west build -b nrf5340dk/nrf5340/cpuapp -p -- -Dmatter_bridge_SHIELD=nrf7002ek -DSB_CONFIG_WIFI_PATCHES_EXT_FLASH_STORE=y -DSB_CONFIG_DFU_MULTI_IMAGE_PACKAGE_WIFI_FW_PATCH=y -DSB_CONFIG_WIFI_NRF70=y -Dmcuboot_CONFIG_UPDATEABLE_IMAGE_NUMBER=3 -DFILE_SUFFIX=nrf70ek
+.. include:: /includes/matter_building_nrf5340dk_70ek
 
-To use the nRF54H20 DK with the ``nrf7002ek`` shield (2.4 GHz or 5 GHz), follow the :ref:`ug_nrf7002eb_nrf54h20dk_gs` user guide to connect all required pins.
-Once connected, run the following command to build the sample:
+Building the application on nRF54LM20 DK with nRF7002-EB II shield
+==================================================================
 
-   .. code-block:: console
+.. include:: /includes/matter_building_nrf54lm20dk_7002eb2
 
-      west build -b nrf54h20dk/nrf54h20/cpuapp -p -- -DSB_CONFIG_WIFI_NRF70=y -DCONFIG_CHIP_WIFI=y -Dmatter_bridge_SHIELD=nrf7002eb_interposer_p1
+Flashing the Matter over Wi-Fi application variant
+==================================================
 
-.. note::
-   |54H_engb_2_8|
-
+.. include:: /includes/matter_sample_wifi_flash.txt
 
 Selecting a configuration
 =========================
@@ -752,7 +792,7 @@ See :ref:`app_build_file_suffixes` and :ref:`cmake_options` for more information
 
 .. _matter_bridge_smart_plug_functionality:
 
-Configure the functionality of the Matter-Bridge device
+Configure the functionality of the Matter bridge device
 -------------------------------------------------------
 
 To enable the Matter smart plugin functionality, run the following command with *board_target* replaced with the board target name:
@@ -802,7 +842,7 @@ After building the sample and programming it to your development kit, complete t
 Testing with bridged device working as a client
 -----------------------------------------------
 
-To test the bridged device working as a client, you need to enable On/Off Light Switch device support (see `matter_bridge_app_overview_`).
+To test the bridged device working as a client, you need to enable On/Off Light Switch device support (see `matter_bridge_app_overview`_).
 The On/Off Light Switch device is capable of controlling the On/Off Light state of another device, such as the :ref:`Matter Light Bulb <matter_light_bulb_sample>` sample working on an additional development kit.
 After building this application and the :ref:`Matter Light Bulb <matter_light_bulb_sample>` sample, and programming them to the development kits, complete the following steps to test the bridged device working as a client:
 

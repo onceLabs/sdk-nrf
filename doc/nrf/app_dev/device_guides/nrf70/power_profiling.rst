@@ -32,12 +32,12 @@ To measure the power consumption of the nRF7002 DK, complete the following steps
    To reproduce the plots for DTIM period of 3, complete the following steps using the :ref:`wifi_shell_sample` sample:
 
      1. Configure an AP with DTIM value of 3.
-     #. Connect to the AP using the following Wi-Fi shell commands:
+     #. Connect to the AP using the following Wi-Fi® shell commands:
 
         .. code-block:: console
 
            wifi scan
-           wifi connect <SSID>
+           wifi connect -s <SSID> -k <key_management> -p <passphrase>
 
      #. Check the connection status using the following Wi-Fi shell command:
 
@@ -59,7 +59,7 @@ To measure the power consumption of the nRF7002 DK, complete the following steps
         .. code-block:: console
 
            wifi scan
-           wifi connect <SSID>
+           wifi connect -s <SSID> -k <key_management> -p <passphrase>
 
      #. Check the connection status using the following Wi-Fi shell command:
 

@@ -19,7 +19,7 @@ Highlights
 This release introduces significant, potentially breaking, changes to the SDK:
 
 * The `previous method to define a board (hardware model)`_ is deprecated and being replaced by :ref:`a new method (hardware model v2) <zephyr:board_porting_guide>`.
-* The previous method to define :ref:`multi-image builds (parent-child images) <ug_multi_image>` is deprecated and being replaced by :ref:`zephyr:sysbuild`.
+* The previous method to define multi-image builds (parent-child images) is deprecated and being replaced by :ref:`zephyr:sysbuild`.
 
 All samples and applications in the SDK have been migrated.
 Consult respective documentation as additional or changed parameters might be needed to build them successfully.
@@ -56,10 +56,10 @@ Added the following features as supported:
   * Hardware model v2 (HWMv2), an improved extensible system for defining boards.
     This is the default boards definition system from this |NCS| release and onwards.
     See `Migrating to the current hardware model`_.
-  * :ref:`zephyr:sysbuild`, an improved and extensible system for multi-image build, replacing :ref:`ug_multi_image` (parent/child images).
+  * :ref:`zephyr:sysbuild`, an improved and extensible system for multi-image build, replacing parent/child images.
     See `Migrating from multi-image builds to sysbuild`_.
   * Samples and applications that use short-range radio and run on multi-core SoCs were migrated to use the :ref:`ipc_radio` as the default image for the network/radio core.
-    Samples previously used for the network/radio core are no longer used in the default builds: :zephyr:code-sample:`bluetooth_hci_ipc`, :zephyr:code-sample:`nrf_ieee802154_rpmsg`, :ref:`multiprotocol-rpmsg-sample`, and :ref:`ble_rpc_host`.
+    Samples previously used for the network/radio core are no longer used in the default builds: :zephyr:code-sample:`bluetooth_hci_ipc`, :zephyr:code-sample:`nrf_ieee802154_rpmsg`, ``nRF5340: Multiprotocol RPMsg``, and :ref:`ble_rpc_host`.
 
 Added the following features as experimental:
 
@@ -121,11 +121,11 @@ Supported modem firmware
 
 See the following documentation for an overview of which modem firmware versions have been tested with this version of the |NCS|:
 
-* `Modem firmware compatibility matrix for the nRF9160 DK`_
-* `Modem firmware compatibility matrix for the nRF9161 DK`_
+* `Modem firmware compatibility matrix for the nRF9160 SoC`_
+* `Modem firmware compatibility matrix for the nRF9161 SoC`_
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Modem-related libraries and versions
 ====================================
@@ -357,10 +357,10 @@ Zigbee
 
 * Updated:
 
-  * :ref:`nrfxlib:zboss` to v3.11.4.0 and platform v5.1.5 (``v3.11.4.0+5.1.5``).
+  * ZBOSS Zigbee stack to v3.11.4.0 and platform v5.1.5 (``v3.11.4.0+5.1.5``).
     They contain fixes for infinite boot loop due to ZBOSS NVRAM corruption and other bugs.
-    For details, see :ref:`zboss_changelog`.
-  * :ref:`ZBOSS Network Co-processor Host <ug_zigbee_tools_ncp_host>` package to the new version v2.2.3.
+    For details, see ZBOSS changelog.
+  * ZBOSS Network Co-processor Host package to the new version v2.2.3.
 
 * Fixed:
 
@@ -372,7 +372,7 @@ Enhanced ShockBurst (ESB)
 
 * Added:
 
-  * Support for the :ref:`zephyr:nrf54h20dk_nrf54h20` and the nRF54L15 PDK.
+  * Support for the :zephyr:board:`nrf54h20dk` and the nRF54L15 PDK.
   * Fast switching between radio states for the nRF54H20 SoC.
   * Fast radio channel switching for the nRF54H20 SoC.
 
@@ -381,7 +381,7 @@ Wi-Fi
 
 * Added:
 
-  * Support for the :ref:`zephyr:nrf54h20dk_nrf54h20` and nRF54L15 PDK boards with :ref:`nRF7002 EB <ug_nrf7002eb_gs>`.
+  * Support for the :zephyr:board:`nrf54h20dk` and nRF54L15 PDK boards with :ref:`nRF7002 EB <ug_nrf7002eb_gs>`.
   * General enhancements in low-power mode including watchdog based recovery.
 
 Applications
@@ -389,7 +389,7 @@ Applications
 
 This section provides detailed lists of changes by :ref:`application <applications>`.
 
-Applications that used :zephyr:code-sample:`bluetooth_hci_ipc`, :zephyr:code-sample:`nrf_ieee802154_rpmsg`, or :ref:`multiprotocol-rpmsg-sample` radio core firmware, now use the :ref:`ipc_radio`.
+Applications that used :zephyr:code-sample:`bluetooth_hci_ipc`, :zephyr:code-sample:`nrf_ieee802154_rpmsg`, or ``nRF5340: Multiprotocol RPMsg`` radio core firmware, now use the :ref:`ipc_radio`.
 
 Asset Tracker v2
 ----------------
@@ -408,9 +408,9 @@ Serial LTE modem
 
   * Support for Thingy:91 X.
   * New behavior for when a connection is closed unexpectedly while SLM is in data mode.
-    SLM now sends the :ref:`CONFIG_SLM_DATAMODE_TERMINATOR <CONFIG_SLM_DATAMODE_TERMINATOR>` string when this happens.
+    SLM now sends the ``CONFIG_SLM_DATAMODE_TERMINATOR`` string when this happens.
   * Sending of GNSS data to carrier library when the library is enabled.
-  * New :kconfig:option:`CONFIG_SLM_CARRIER_AUTO_STARTUP` Kconfig option to enable automatic startup of the carrier library on device boot.
+  * New ``CONFIG_SLM_CARRIER_AUTO_STARTUP`` Kconfig option to enable automatic startup of the carrier library on device boot.
   * New custom carrier library commands: ``AT#XCARRIER="app_data_create"``, ``AT#XCARRIER="dereg"``, ``AT#XCARRIER="regup"`` and ``AT#XCARRIERCFG="auto_register"``.
 
 * Updated:
@@ -470,7 +470,7 @@ nRF Machine Learning (Edge Impulse)
 
 * Added:
 
-  * Support for the :ref:`zephyr:nrf54h20dk_nrf54h20`.
+  * Support for the :zephyr:board:`nrf54h20dk`.
   * Support for :ref:`configuration_system_overview_sysbuild`.
 
 * Updated:
@@ -565,7 +565,7 @@ Matter Bridge
 IPC radio firmware
 ------------------
 
-* Added support for the :ref:`zephyr:nrf54h20dk_nrf54h20` board.
+* Added support for the :zephyr:board:`nrf54h20dk` board.
 
 Samples
 =======
@@ -574,7 +574,7 @@ This section provides detailed lists of changes by :ref:`sample <samples>`.
 
 * Added:
 
-  * New categories of samples: :ref:`dect_samples` and :ref:`suit_samples`.
+  * New categories of samples: :ref:`dect_samples` and ``suit_samples``.
   * Steps for nRF54 devices across all supported samples to reflect the new button and LED numbering on the nRF54H20 DK and the nRF54L15 PDK.
 
 Bluetooth samples
@@ -584,7 +584,7 @@ Bluetooth samples
 
   * The :ref:`bluetooth_iso_combined_bis_cis` sample showcasing forwarding isochronous data from CIS to BIS.
   * The :ref:`bluetooth_isochronous_time_synchronization` sample showcasing time-synchronized processing of isochronous data.
-  * Support for the :ref:`zephyr:nrf54h20dk_nrf54h20` board in the following samples:
+  * Support for the :zephyr:board:`nrf54h20dk` board in the following samples:
 
     * :ref:`central_bas` sample
     * :ref:`bluetooth_central_hr_coded` sample
@@ -601,7 +601,7 @@ Bluetooth samples
     * :ref:`peripheral_status` sample
     * :ref:`shell_bt_nus` sample
 
-  * Support for both the :ref:`zephyr:nrf54h20dk_nrf54h20` and the nRF54L15 PDK boards in the following samples:
+  * Support for both the :zephyr:board:`nrf54h20dk` and the nRF54L15 PDK boards in the following samples:
 
     * :ref:`peripheral_lbs` sample
     * :ref:`bluetooth_central_hids` sample
@@ -709,7 +709,7 @@ Cellular samples
 
 * :ref:`nrf_cloud_rest_cell_location` sample:
 
-  * Added the :ref:`CONFIG_REST_CELL_SEND_DEVICE_STATUS <CONFIG_REST_CELL_SEND_DEVICE_STATUS>` Kconfig option to control sending device status on initial connection.
+  * Added the ``CONFIG_REST_CELL_SEND_DEVICE_STATUS`` Kconfig option to control sending device status on initial connection.
 
   * Removed the button press interface for enabling the device location card on the nRF Cloud website.
     The card is now automatically displayed.
@@ -744,8 +744,8 @@ Cryptography samples
 
     * :ref:`crypto_spake2p` sample.
     * Support for the nRF54L15 PDK board for all crypto samples.
-    * Support for the :ref:`zephyr:nrf54h20dk_nrf54h20` board in all crypto samples, except :ref:`crypto_persistent_key` and :ref:`crypto_tls`.
-    * Support for the :ref:`zephyr:nrf9151dk_nrf9151` board for all crypto samples.
+    * Support for the :zephyr:board:`nrf54h20dk` board in all crypto samples, except :ref:`crypto_persistent_key` and :ref:`crypto_tls`.
+    * Support for the :zephyr:board:`nrf9151dk` board for all crypto samples.
     * Support for the :ref:`nRF9161 DK <ug_nrf9161>` board for the :ref:`crypto_test`.
 
 Common samples
@@ -771,12 +771,12 @@ Enhanced ShockBurst samples
 
 * :ref:`esb_prx` sample:
 
-  * Added support for the :ref:`zephyr:nrf54h20dk_nrf54h20` and nRF54L15 PDK boards.
+  * Added support for the :zephyr:board:`nrf54h20dk` and nRF54L15 PDK boards.
 
 Keys samples
 ------------
 
-* Added support for the :ref:`zephyr:nrf9151dk_nrf9151` and the :ref:`zephyr:nrf9161dk_nrf9161` boards for all keys samples.
+* Added support for the :zephyr:board:`nrf9151dk` and the :zephyr:board:`nrf9161dk` boards for all keys samples.
 
 Matter samples
 --------------
@@ -798,7 +798,7 @@ Matter samples
 
     DFU over Matter OTA and Bluetooth LE SMP are supported in all samples but require an external flash.
 
-  * Support for Matter over Thread on the :ref:`zephyr:nrf54h20dk_nrf54h20` with the ``nrf54h20dk/nrf54h20/cpuapp`` board target to the following Matter samples:
+  * Support for Matter over Thread on the :zephyr:board:`nrf54h20dk` with the ``nrf54h20dk/nrf54h20/cpuapp`` board target to the following Matter samples:
 
     * :ref:`matter_lock_sample` sample.
     * :ref:`matter_template_sample` sample.
@@ -811,7 +811,7 @@ Matter samples
 
 * Updated:
 
-  * Matter samples that used :zephyr:code-sample:`nrf_ieee802154_rpmsg` or :ref:`multiprotocol-rpmsg-sample` radio core firmware, now use the :ref:`ipc_radio`.
+  * Matter samples that used :zephyr:code-sample:`nrf_ieee802154_rpmsg` or ``nRF5340: Multiprotocol RPMsg`` radio core firmware, now use the :ref:`ipc_radio`.
   * Enabled the Bluetooth LE Extended Announcement feature for all samples, and increased advertising timeout from 15 minutes to 1 hour.
 
 * Removed:
@@ -845,7 +845,7 @@ Networking samples
 ------------------
 
 * Updated the networking samples to support import of certificates in valid PEM formats.
-* Removed QEMU x86 emulation support and added support for the :ref:`native simulator <zephyr:native_sim>` board.
+* Removed QEMU x86 emulation support and added support for the :zephyr:board:`native simulator <native_sim>` board.
 
 * :ref:`mqtt_sample` sample:
 
@@ -866,7 +866,7 @@ NFC samples
 * Added:
 
   * Support for the nRF54L15 PDK board in the :ref:`nrf-nfc-system-off-sample` sample.
-  * Support for the :ref:`zephyr:nrf54h20dk_nrf54h20` and nRF54L15 PDK boards in the following samples:
+  * Support for the :zephyr:board:`nrf54h20dk` and nRF54L15 PDK boards in the following samples:
 
     * :ref:`record_launch_app` sample
     * :ref:`record_text` sample
@@ -879,7 +879,7 @@ Peripheral samples
 
 * :ref:`radio_test` sample:
 
-  * Added support for the :ref:`zephyr:nrf54h20dk_nrf54h20` and nRF54L15 PDK boards.
+  * Added support for the :zephyr:board:`nrf54h20dk` and nRF54L15 PDK boards.
 
   * The CLI command ``fem tx_power_control <tx_power_control>`` replaces ``fem tx_gain <tx_gain>`` .
     This change applies to the sample built with the :ref:`CONFIG_RADIO_TEST_POWER_CONTROL_AUTOMATIC <CONFIG_RADIO_TEST_POWER_CONTROL_AUTOMATIC>` set to ``n``.
@@ -897,23 +897,23 @@ SUIT samples
 
 * Added experimental support using the Software Updates for Internet of Things (SUIT):
 
-   * :ref:`nrf54h_suit_sample` sample - For DFUs using SMP over Bluetooth LE and UART.
+   * ``nrf54h_suit_sample`` sample - For DFUs using SMP over Bluetooth LE and UART.
 
-   * :ref:`suit_flash_companion` sample - For enabling access to external flash memory in DFUs.
+   * ``suit_flash_companion`` sample - For enabling access to external flash memory in DFUs.
 
-   * :ref:`suit_recovery` sample - For recovering the device firmware if the original firmware is damaged.
+   * ``suit_recovery`` sample - For recovering the device firmware if the original firmware is damaged.
 
 Trusted Firmware-M (TF-M) samples
 ---------------------------------
 
-* Added support for the :ref:`zephyr:nrf9151dk_nrf9151` and the :ref:`zephyr:nrf9161dk_nrf9161` boards for all TF-M samples, except for the :ref:`provisioning_image_net_core` sample.
+* Added support for the :zephyr:board:`nrf9151dk` and the :zephyr:board:`nrf9161dk` boards for all TF-M samples, except for the :ref:`provisioning_image_net_core` sample.
 
 Thread samples
 --------------
 
 * Added new :ref:`feature set <thread_ug_feature_sets>` Kconfig option :kconfig:option:`CONFIG_OPENTHREAD_NORDIC_LIBRARY_RCP`.
 
-* Updated the Thread samples that used :zephyr:code-sample:`nrf_ieee802154_rpmsg` or :ref:`multiprotocol-rpmsg-sample` radio core firmware, so that they now use the :ref:`ipc_radio`.
+* Updated the Thread samples that used :zephyr:code-sample:`nrf_ieee802154_rpmsg` or ``nRF5340: Multiprotocol RPMsg`` radio core firmware, so that they now use the :ref:`ipc_radio`.
 
 * :ref:`ot_cli_sample` sample:
 
@@ -927,7 +927,7 @@ Thread samples
 Zigbee samples
 --------------
 
-* Updated the Zigbee samples that used :zephyr:code-sample:`nrf_ieee802154_rpmsg` or :ref:`multiprotocol-rpmsg-sample` radio core firmware, so that they now use the :ref:`ipc_radio`.
+* Updated the Zigbee samples that used :zephyr:code-sample:`nrf_ieee802154_rpmsg` or ``nRF5340: Multiprotocol RPMsg`` radio core firmware, so that they now use the :ref:`ipc_radio`.
 
 Wi-Fi samples
 -------------
@@ -964,13 +964,13 @@ Other samples
 
 * :ref:`bootloader` sample:
 
-  * Added support for the :ref:`zephyr:nrf9151dk_nrf9151` and the :ref:`zephyr:nrf9161dk_nrf9161` boards.
+  * Added support for the :zephyr:board:`nrf9151dk` and the :zephyr:board:`nrf9161dk` boards.
   * Updated the key revocation handling process to remove a security weakness found in the previous design.
     It is recommended to switch to the improved revocation handling in the newly manufactured devices.
 
 * :ref:`ipc_service_sample` sample:
 
-  * Removed support for the `OpenAMP`_ library backend on the :ref:`zephyr:nrf54h20dk_nrf54h20` board.
+  * Removed support for the `OpenAMP`_ library backend on the :zephyr:board:`nrf54h20dk` board.
 
 Drivers
 =======
@@ -1063,7 +1063,7 @@ Modem libraries
 
   * Fixed an issue with the CFUN hooks when the Modem library is initialized during ``SYS_INIT`` at kernel level and makes calls to the :ref:`nrf_modem_at` before the application level initialization is done.
 
-  * Deprecated the Kconfig option :kconfig:option:`CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_UART_ZEPHYR`.
+  * Deprecated the Kconfig option ``CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_UART_ZEPHYR``.
 
   * Removed the deprecated Kconfig options ``CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_UART_ASYNC`` and ``CONFIG_NRF_MODEM_LIB_TRACE_BACKEND_UART_SYNC``.
 
@@ -1107,7 +1107,7 @@ Libraries for networking
    * The :ref:`lib_softap_wifi_provision` library.
    * The :ref:`lib_wifi_ready` library.
 
-* :ref:`lib_wifi_credentials` library:
+* Wi-Fi credentials library:
 
   * Added:
 
@@ -1184,7 +1184,7 @@ Libraries for networking
 
   * Fixed a NULL pointer issue that could occur when there were some valid predictions in flash but not the one required at the current time.
 
-* :ref:`lib_download_client` library:
+* Download client library:
 
   * Removed the deprecated ``download_client_connect`` function.
 
@@ -1207,7 +1207,7 @@ SUIT DFU
 
 * Added:
 
-  * Experimental support for :ref:`SUIT DFU <ug_nrf54h20_suit_dfu>` for nRF54H20.
+  * Experimental support for ``SUIT DFU <ug_nrf54h20_suit_dfu>`` for nRF54H20.
     SUIT is now the only way to boot local domains of the nRF54H20 SoC.
   * Experimental support for DFU from external flash for nRF54H20.
   * Experimental support for recovery image for application and radio cores for nRF54H20.
@@ -1323,21 +1323,21 @@ Documentation
   * The :ref:`ug_coremark` page.
   * The :ref:`dult_readme` page.
   * The :ref:`ug_dult` guide.
-  * :ref:`Software Updates for Internet of Things (SUIT) documentation <ug_nrf54h20_suit_dfu>` in :ref:`ug_nrf54h`:
+  * ``Software Updates for Internet of Things (SUIT) documentation`` in :ref:`ug_nrf54h`:
 
     The following conceptual guides:
 
-      * :ref:`ug_nrf54h20_suit_intro` - An overview of the SUIT procedure.
-      * :ref:`ug_nrf54h20_suit_manifest_overview` - An overview of the role and importance of the SUIT manifest.
-      * :ref:`ug_nrf54h20_suit_components` - An explanation of SUIT components, found within the manifest(s).
-      * :ref:`ug_nrf54h20_suit_hierarchical_manifests` - An explanation of the SUIT manifest topology that Nordic Semiconductor has implemented for the nRF54H20 SoC.
-      * :ref:`ug_nrf54h20_suit_compare_other_dfu` - A comparison of SUIT with other bootloader and DFU procedures supported in the |NCS|.
+      * ``ug_nrf54h20_suit_intro`` - An overview of the SUIT procedure.
+      * ``ug_nrf54h20_suit_manifest_overview`` - An overview of the role and importance of the SUIT manifest.
+      * ``ug_nrf54h20_suit_components`` - An explanation of SUIT components, found within the manifests.
+      * ``ug_nrf54h20_suit_hierarchical_manifests`` - An explanation of the SUIT manifest topology that Nordic Semiconductor has implemented for the nRF54H20 SoC.
+      * ``ug_nrf54h20_suit_compare_other_dfu`` - A comparison of SUIT with other bootloader and DFU procedures supported in the |NCS|.
 
     The following user guides:
 
-      * :ref:`ug_nrf54h20_suit_customize_dfu` - Describing how to customize the SUIT DFU procedure (and a quick-start guide version :ref:`ug_nrf54h20_suit_customize_dfu_qsg`).
-      * :ref:`ug_nrf54h20_suit_fetch` - Describing how to reconfigure an application that uses the push model to a fetch model-based upgrade.
-      * :ref:`ug_nrf54h20_suit_external_memory` - Describing how to enable external flash memory when using SUIT.
+      * ``ug_nrf54h20_suit_customize_dfu`` - Describing how to customize the SUIT DFU procedure (and a quick-start guide version ``ug_nrf54h20_suit_customize_dfu_qsg``).
+      * ``ug_nrf54h20_suit_fetch`` - Describing how to reconfigure an application that uses the push model to a fetch model-based upgrade.
+      * ``ug_nrf54h20_suit_external_memory`` - Describing how to enable external flash memory when using SUIT.
 
   * :ref:`ug_wifi_mem_req_raw_mode` under :ref:`ug_wifi_advanced_mode`.
   * The :ref:`bt_mesh_models_common_blocking_api_rule` section to the :ref:`bt_mesh_models_overview` page.
@@ -1353,7 +1353,7 @@ Documentation
   * The :ref:`ug_wifi_overview` page by separating the information about Wi-Fi certification into its own :ref:`ug_wifi_certification` page under :ref:`ug_wifi`.
   * The :ref:`ug_bt_mesh_configuring` page with an example of possible entries in the Settings NVS name cache.
   * The :ref:`lib_security` page to include all security-related libraries.
-  * The trusted storage support table in the :ref:`trusted_storage_in_ncs` section by adding nRF52833 and replacing nRF9160 with nRF91 Series.
+  * The secure storage support table in the :ref:`secure_storage_in_ncs` page by adding nRF52833 and replacing nRF9160 with nRF91 Series.
   * The :ref:`ug_nrf52_developing` and :ref:`ug_nrf5340` by adding notes about how to perform FOTA updates with samples using random HCI identities, some specifically relevant when using the iOS app.
   * Improved the :ref:`ug_radio_fem` user guide to be up-to-date and more informative.
   * The :ref:`bt_fast_pair_readme` page to document support for the FMDN extension and aligned the page with the sysbuild migration.

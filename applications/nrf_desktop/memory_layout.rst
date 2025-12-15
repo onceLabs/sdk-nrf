@@ -29,8 +29,6 @@ By default, a Zephyr-based application defines the memory layout in the DTS.
 If enabled, the :ref:`partition_manager` defines a new memory layout that is used instead of the memory layout defined in the DTS.
 You can use the :kconfig:option:`CONFIG_PARTITION_MANAGER_ENABLED` Kconfig option value to check whether the Partition Manager is enabled in the current build.
 The option is automatically enabled when using Zephyr's :ref:`zephyr:sysbuild` (unless your board uses nRF54H SoC Series).
-Enabling the :ref:`nrf_desktop_bluetooth_guide_fast_pair` also results in using the Partition Manager.
-To store the Fast Pair Provisioning data, the Fast Pair integration in the |NCS| uses partition defined by the Partition Manager.
 
 Memory layout in DTS
 ********************
@@ -40,7 +38,7 @@ For example, the nRF52 Series devices use non-volatile flash memory represented 
 Make sure to also update the DTS chosen nodes, which represent the code partition (``zephyr,code-partition``) and flash (``zephyr,flash``), if needed.
 
 If you wish to change the default memory layout of the board without editing the board-specific files, edit the DTS overlay file.
-The nRF Desktop application automatically adds the :file:`dts.overlay` file if it is present in the project's board configuration directory.
+The nRF Desktop application automatically adds the :file:`app.overlay` file if it is present in the project's board configuration directory.
 For more details, see the :ref:`nrf_desktop_board_configuration` section.
 
 .. important::
@@ -83,9 +81,9 @@ The Partition Manager supports partitions in external flash.
 Enabling external flash can be useful especially for memory-limited devices.
 For example, the MCUboot can use it as a secondary image partition for the :ref:`background firmware upgrade <nrf_desktop_bootloader_background_dfu>`.
 The MCUboot moves the image data from the secondary image partition to the primary image partition before booting the new firmware.
-To use external flash for the secondary image partition, in addition to defining the proper static Partition Manager configuration, you must enable the ``SB_CONFIG_PM_EXTERNAL_FLASH_MCUBOOT_SECONDARY`` Kconfig option in the sysbuild configuration.
+To use external flash for the secondary image partition, in addition to defining the proper static Partition Manager configuration, you must enable the :kconfig:option:`SB_CONFIG_PM_EXTERNAL_FLASH_MCUBOOT_SECONDARY` Kconfig option in the sysbuild configuration.
 
-For an example of the nRF Desktop application configuration that uses an external flash, see the ``mcuboot_qspi`` configuration of the nRF52840 Development Kit (DK).
+For an example of the nRF Desktop application configuration that uses an external flash, see the ``mcuboot_qspi`` configuration of the nRF52840 DK.
 This configuration uses the ``MX25R64`` external flash that is part of the development kit.
 
 For detailed information, see the :ref:`partition_manager` documentation.

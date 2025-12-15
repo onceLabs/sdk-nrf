@@ -16,6 +16,7 @@ if BT_FAST_PAIR_FMDN
 config BT_FAST_PAIR_FMDN_TX_POWER
 	int "TX power set in Bluetooth LE controller [dBm]"
 	default 0
+	range 0 127
 	help
 	  Define the TX power configuration used for the extension advertising and
 	  connections in dBm. The value is passed to the Bluetooth LE controller
@@ -25,6 +26,10 @@ config BT_FAST_PAIR_FMDN_TX_POWER
 	  a warning notifying the user about the real TX power during the enabling
 	  procedure of this library. The actual TX power value will be as close to
 	  the desired configuration as possible.
+
+	  This Kconfig option must be set to zero at minimum. The Fast Pair specification
+	  requires that the conducted Bluetooth transmit power for FMDN advertisements
+	  must be set to at least 0 dBm.
 
 config BT_FAST_PAIR_FMDN_TX_POWER_CORRECTION_VAL
 	int "TX power correction value [dBm]"
@@ -235,7 +240,7 @@ config BT_FAST_PAIR_FMDN_CLOCK_NVM_UPDATE_RETRY_TIME
 endif # BT_FAST_PAIR_FMDN_CLOCK
 
 config BT_FAST_PAIR_FMDN_DULT
-	bool "Enable Detecting Unwanted Location Trackers (DULT) support in FMDN"
+	bool "Detecting Unwanted Location Trackers (DULT) support in FMDN"
 	default y
 	select DULT
 	help
@@ -329,7 +334,7 @@ config BT_FAST_PAIR_FMDN_DULT_FIRMWARE_VERSION_REVISION
 endmenu
 
 config BT_FAST_PAIR_FMDN_DULT_MOTION_DETECTOR
-	bool "Enable DULT Motion detector support in FMDN"
+	bool "DULT Motion detector support in FMDN"
 	select DULT_MOTION_DETECTOR
 	select BT_FAST_PAIR_FMDN_DULT_CAPABILITY_MOTION_DETECTOR_UT
 	help
@@ -385,7 +390,7 @@ config BT_FAST_PAIR_FMDN_RING_REQ_TIMEOUT_DULT_BT_GATT
 config BT_FAST_PAIR_FMDN_RING_REQ_TIMEOUT_DULT_MOTION_DETECTOR
 	int "Timeout in milliseconds in ringing request from DULT motion detector source"
 	default 1000
-	depends on BT_FAST_PAIR_FMDN_DULT
+	depends on BT_FAST_PAIR_FMDN_DULT_MOTION_DETECTOR
 	help
 	  The default timeout parameter in milliseconds is used in the start
 	  ringing request that originates from the motion detector DULT source.

@@ -11,6 +11,7 @@
 #include <zephyr/zbus/zbus.h>
 #include <../subsys/bluetooth/audio/bap_stream.h>
 #include <bluetooth/hci_vs_sdc.h>
+#include <audio_defines.h>
 
 #include "zbus_common.h"
 #include "audio_sync_timer.h"
@@ -187,8 +188,8 @@ static int iso_conn_handle_set(struct bt_bap_stream *bap_stream, uint16_t *iso_c
 	return 0;
 }
 
-int bt_le_audio_tx_send(struct le_audio_tx_info *tx, uint8_t num_tx,
-			struct le_audio_encoded_audio enc_audio)
+int bt_le_audio_tx_send(struct net_buf const *const audio_frame, struct le_audio_tx_info *tx,
+			uint8_t num_tx)
 {
 	int ret;
 	size_t data_size_pr_stream = 0;
@@ -201,7 +202,17 @@ int bt_le_audio_tx_send(struct le_audio_tx_info *tx, uint8_t num_tx,
 		return -EINVAL;
 	}
 
-	data_size_pr_stream = enc_audio.size / enc_audio.num_ch;
+	/* Get number of locations in the audio frame */
+	struct audio_metadata *meta = net_buf_user_data(audio_frame);
+	uint8_t num_loc = audio_metadata_num_loc_get(meta);
+
+	if (num_loc == 0 || (audio_frame->len % num_loc != 0)) {
+		LOG_ERR("Invalid number (%d) of locations in audio frame (%d)", num_loc,
+			audio_frame->len);
+		return -EINVAL;
+	}
+
+	data_size_pr_stream = audio_frame->len / num_loc;
 
 	/* When sending ISO data, we always send ts = 0 to the first active transmitting channel.
 	 * The controller will populate with a ts which is fetched using bt_iso_chan_get_tx_sync.
@@ -232,8 +243,8 @@ int bt_le_audio_tx_send(struct le_audio_tx_info *tx, uint8_t num_tx,
 			continue;
 		}
 
-		if (tx[i].audio_channel > enc_audio.num_ch) {
-			LOG_WRN("Unsupported audio_channel: %d", tx[i].audio_channel);
+		if (tx[i].audio_location > num_loc) {
+			LOG_WRN("Unsupported audio_location: %d", tx[i].audio_location);
 			continue;
 		}
 
@@ -246,7 +257,8 @@ int bt_le_audio_tx_send(struct le_audio_tx_info *tx, uint8_t num_tx,
 		}
 
 		if (data_size_pr_stream != LE_AUDIO_SDU_SIZE_OCTETS(bitrate)) {
-			LOG_ERR("The encoded data size does not match the SDU size");
+			LOG_ERR("The encoded data size (%zu) does not match the SDU size (%d)",
+				data_size_pr_stream, LE_AUDIO_SDU_SIZE_OCTETS(bitrate));
 			return -EINVAL;
 		}
 
@@ -257,15 +269,15 @@ int bt_le_audio_tx_send(struct le_audio_tx_info *tx, uint8_t num_tx,
 		}
 		common_interval = tx[i].cap_stream->bap_stream.qos->interval;
 
-		/* Check if same audio is sent to all channels */
-		if (enc_audio.num_ch == 1) {
-			ret = iso_stream_send(enc_audio.data, data_size_pr_stream, tx[i].cap_stream,
-					      tx_info, common_tx_sync_ts_us);
+		/* Check if same audio is sent to all locations */
+		if (num_loc == 1) {
+			ret = iso_stream_send(audio_frame->data, data_size_pr_stream,
+					      tx[i].cap_stream, tx_info, common_tx_sync_ts_us);
 		} else {
-			ret = iso_stream_send(
-				&enc_audio.data[(data_size_pr_stream * tx[i].audio_channel)],
-				data_size_pr_stream, tx[i].cap_stream, tx_info,
-				common_tx_sync_ts_us);
+			ret = iso_stream_send(audio_frame->data +
+						      (tx[i].audio_location * data_size_pr_stream),
+					      data_size_pr_stream, tx[i].cap_stream, tx_info,
+					      common_tx_sync_ts_us);
 		}
 
 		if (ret) {
@@ -281,7 +293,7 @@ int bt_le_audio_tx_send(struct le_audio_tx_info *tx, uint8_t num_tx,
 		}
 
 		/* Strictly, it is only required to call get_tx_sync_sdc on the first streaming
-		 * channel to get the timestamp which is sent to all other channels.
+		 * location to get the timestamp which is sent to all other locations.
 		 * However, to be able to detect errors, this is called on each TX.
 		 */
 		ret = get_tx_sync_sdc(tx_info->iso_conn_handle, &tx_info->iso_tx_readback);

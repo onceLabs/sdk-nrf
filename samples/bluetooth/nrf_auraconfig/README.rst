@@ -513,7 +513,7 @@ Example:
 
    nac adv_name "Lecture hall" 0
 
-This command sets the advertising name for the BIG 0 to "Lecture hall".
+This command sets the advertising name for the BIG 0 to ``Lecture hall``.
 
 .. note::
     The name must be enclosed in quotation marks if it contains spaces.
@@ -537,7 +537,7 @@ Example:
 
    nac program_info "Mathematics 101" 0 0
 
-This command sets the program info for the subgroup 0 in the BIG 0 to "Mathematics 101".
+This command sets the program info for the subgroup 0 in the BIG 0 to ``Mathematics 101``.
 
 ----
 
@@ -765,7 +765,7 @@ SD card setup
 *************
 
 This sample can support pre-encoded LC3 data stored as LC3 files on an SD card.
-You can use the `nRF Auracast configuration files`_ provided by Nordic Semiconductor for populating the SD-card.
+You can use the `nRF Auracast configuration files`_ provided by Nordic Semiconductor for populating the SD card.
 
 If you are not using an SD card, the system defaults to sending dummy data.
 The purpose of the dummy data is to test that the broadcast source has been correctly configured.
@@ -780,6 +780,11 @@ Building and running
 .. |sample path| replace:: :file:`samples/bluetooth/nrf_auraconfig`
 
 .. include:: /includes/build_and_run.txt
+
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
 
 The nRF5340 Audio DK comes pre-programmed with basic firmware that indicates if the kit is functional.
 See :ref:`nrf53_audio_app_dk_testing_out_of_the_box` for more information.

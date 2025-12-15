@@ -16,12 +16,12 @@ choice WIFI_NRF70_OPER_MODES
 	  Select the operating mode of the nRF700x driver
 
 config WIFI_NRF70_SYSTEM_MODE
-	bool "Enable nRF70 system mode"
+	bool "nRF70 system mode"
 	help
 	  Select this option to enable system mode of the nRF700x driver
 
 config WIFI_NRF70_SCAN_ONLY
-	bool "Enable nRF70 scan only mode"
+	bool "nRF70 scan only mode"
 	help
 	  Select this option to enable scan only mode of the nRF700x driver
 
@@ -31,12 +31,15 @@ config WIFI_NRF70_OFFLOADED_RAW_TX
 config WIFI_NRF70_RADIO_TEST
 	bool "Radio test mode of the nRF700x driver"
 
-config WIFI_NRF70_SYSTEM_WITH_RAW_MODES
-	bool "Enable nRF70 system mode with raw modes"
-	help
-	  Select this option to enable system mode of the nRF700x driver with raw modes
-
 endchoice
+
+if WIFI_NRF70_SYSTEM_MODE
+
+config WIFI_NRF70_SYSTEM_WITH_RAW_MODES
+	bool "nRF70 system with raw modes"
+	help
+	  Select this option to enable nRF700x driver with raw modes
+endif
 
 choice WIFI_PATCHES_EXT_FLASH_SUPPORT
 	bool "nRF700x FW patch location"
@@ -57,9 +60,7 @@ config WIFI_PATCHES_EXT_FLASH_XIP
 
 config WIFI_PATCHES_EXT_FLASH_STORE
 	bool "Relocate to external memory but execute from RAM"
-	# nRF7002 supports SPI based external memory access but missing tools support
-	# TODO: Enable when tools support is available (NRFJPROG-157)
-	depends on !BOARD_NRF7002DK_NRF5340_CPUAPP && !BOARD_NRF7002DK_NRF5340_CPUAPP_NS
+	depends on PARTITION_MANAGER
 
 endchoice
 

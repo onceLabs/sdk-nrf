@@ -8,11 +8,12 @@
 #include <zephyr/types.h>
 #include <stdbool.h>
 #include <zephyr/ztest.h>
-#include <download_client.h>
+#include <downloader.h>
 #include <fw_info.h>
 #include <pm_config.h>
 #include <fota_download.h>
 #include "test_fota_download_common.h"
+#include <fota_download_util.h>
 
 /* fota_download_start may modify the resource locator passed to it, so we cannot directly pass
  * test constants. Instead, we copy them to a modifiable buffer first.
@@ -24,7 +25,7 @@ static char buf[1024];
 #define ARBITRARY_IMAGE_OFFSET 512
 
 /* Stubs and mocks */
-static const char *download_client_start_file;
+static const char *downloader_get_file;
 static bool spm_s0_active_retval;
 
 K_SEM_DEFINE(download_with_offset_sem, 0, 1);
@@ -32,8 +33,9 @@ static bool start_with_offset;
 static bool fail_on_offset_get;
 static bool fail_on_connect;
 static bool fail_on_start;
+static bool fail_on_proto;
 static bool download_with_offset_success;
-static download_client_callback_t download_client_event_handler;
+static downloader_callback_t downloader_event_handler;
 K_SEM_DEFINE(stop_sem, 0, 1);
 
 int dfu_target_init(int img_type, int img_num, size_t file_size, dfu_target_callback_t cb)
@@ -81,16 +83,14 @@ int dfu_target_schedule_update(int img_num)
 	return 0;
 }
 
-int download_client_file_size_get(struct download_client *client, size_t *size)
+int downloader_file_size_get(struct downloader *client, size_t *size)
 {
 	return 0;
 }
 
-int download_client_init(struct download_client *client,
-			 download_client_callback_t callback)
+int downloader_init(struct downloader *client, struct downloader_cfg *dl_cfg)
 {
-	download_client_event_handler = callback;
-	client->fd = -1;
+	downloader_event_handler = dl_cfg->callback;
 	return 0;
 }
 
@@ -99,16 +99,18 @@ enum dfu_target_image_type dfu_target_smp_img_type_check(const void *const buf, 
 	return DFU_TARGET_IMAGE_TYPE_SMP;
 }
 
-int download_client_get(struct download_client *client, const char *host,
-			const struct download_client_cfg *config, const char *file, size_t from)
+int downloader_get_with_host_and_file(struct downloader *dl,
+				      const struct downloader_host_cfg *dl_host_cfg,
+				      const char *host, const char *file, size_t from)
 {
+	if (fail_on_proto == true) {
+		return -EPROTONOSUPPORT;
+	}
 	if (fail_on_connect == true) {
 		return -1;
 	}
-	/* Mark connection */
-	client->fd = 1;
 
-	download_client_start_file = file;
+	downloader_get_file = file;
 
 	if (fail_on_start == true) {
 		return -1;
@@ -122,16 +124,13 @@ int download_client_get(struct download_client *client, const char *host,
 	return 0;
 }
 
-int download_client_disconnect(struct download_client *client)
+int downloader_cancel(struct downloader *client)
 {
-	const struct download_client_evt evt = {
-		.id = DOWNLOAD_CLIENT_EVT_CLOSED,
+	const struct downloader_evt evt = {
+		.id = DOWNLOADER_EVT_STOPPED,
 	};
-	if (client->fd == -1) {
-		return -EINVAL;
-	}
-	client->fd = -1;
-	download_client_event_handler(&evt);
+
+	downloader_event_handler(&evt);
 	return 0;
 }
 
@@ -215,8 +214,14 @@ void set_s0_active(bool s0_active)
 
 void client_callback(const struct fota_download_evt *evt)
 {
+	printk("Event: %d\n", evt->id);
 	switch (evt->id) {
 	case FOTA_DOWNLOAD_EVT_ERROR:
+		if (fail_on_proto) {
+			zassert_equal(evt->cause, FOTA_DOWNLOAD_ERROR_CAUSE_PROTO_NOT_SUPPORTED);
+			fail_on_proto = false;
+			k_sem_give(&download_with_offset_sem);
+		}
 		if (fail_on_offset_get == true) {
 			zassert_equal(evt->cause, FOTA_DOWNLOAD_ERROR_CAUSE_INTERNAL, NULL);
 			fail_on_offset_get = false;
@@ -259,10 +264,12 @@ static void init(void)
 	fail_on_offset_get = false;
 	fail_on_connect = false;
 	fail_on_start = false;
-	download_client_start_file = NULL;
+	fail_on_proto = false;
+	downloader_get_file = NULL;
 	spm_s0_active_retval = false;
 
 	k_sem_reset(&stop_sem);
+	k_sem_reset(&download_with_offset_sem);
 
 	err = fota_download_init(client_callback);
 	zassert_equal(err, 0, NULL);
@@ -293,7 +300,7 @@ static void test_fota_download_any_generic(const char * const resource_locator,
 	zassert_equal(err, 0, NULL);
 
 	/* Verify that the correct resource was selected */
-	zassert_true(strcmp(download_client_start_file, expected_selection) == 0, NULL);
+	zassert_true(strcmp(downloader_get_file, expected_selection) == 0, NULL);
 
 	/* Verify that the download can be canceled with no isse */
 	err = fota_download_cancel();
@@ -340,8 +347,8 @@ ZTEST(fota_download_tests, test_download_with_offset)
 
 	uint8_t fragment_buf[1] = {0};
 	size_t  fragment_len = 1;
-	const struct download_client_evt evt = {
-		.id = DOWNLOAD_CLIENT_EVT_FRAGMENT,
+	const struct downloader_evt evt = {
+		.id = DOWNLOADER_EVT_FRAGMENT,
 		.fragment = {
 			.buf = fragment_buf,
 			.len = fragment_len,
@@ -354,7 +361,7 @@ ZTEST(fota_download_tests, test_download_with_offset)
 	err = fota_download_any(BASE_DOMAIN, buf, NO_TLS, 0, 0, 0);
 	zassert_ok(err, NULL);
 
-	err = download_client_event_handler(&evt);
+	err = downloader_event_handler(&evt);
 	zassert_equal(err, -1, NULL);
 
 	fail_on_offset_get = true;
@@ -373,7 +380,7 @@ ZTEST(fota_download_tests, test_download_with_offset)
 	err = fota_download_any(BASE_DOMAIN, buf, NO_TLS, 0, 0, 0);
 	zassert_ok(err, NULL);
 
-	err = download_client_event_handler(&evt);
+	err = downloader_event_handler(&evt);
 	zassert_equal(err, -1, NULL);
 
 	fail_on_connect = true;
@@ -391,7 +398,7 @@ ZTEST(fota_download_tests, test_download_with_offset)
 	err = fota_download_any(BASE_DOMAIN, buf, NO_TLS, 0, 0, 0);
 	zassert_ok(err, NULL);
 
-	err = download_client_event_handler(&evt);
+	err = downloader_event_handler(&evt);
 	zassert_equal(err, -1, NULL);
 
 	fail_on_start = true;
@@ -407,7 +414,7 @@ ZTEST(fota_download_tests, test_download_with_offset)
 	err = fota_download_any(BASE_DOMAIN, buf, NO_TLS, 0, 0, 0);
 	zassert_ok(err, NULL);
 
-	err = download_client_event_handler(&evt);
+	err = downloader_event_handler(&evt);
 	zassert_equal(err, -1, NULL);
 
 	download_with_offset_success = false;
@@ -420,4 +427,64 @@ ZTEST(fota_download_tests, test_download_with_offset)
 	/* Try cancelling again and expect error. */
 	err = fota_download_cancel();
 	zassert_equal(err, -EAGAIN);
+}
+
+
+ZTEST(fota_download_tests, test_download_invalid_protocol)
+{
+	init();
+
+	fail_on_proto = true;
+	int err = fota_download_any("ftp://" BASE_DOMAIN, buf, NO_TLS, 0, 0, 0);
+
+	zassert_equal(err, -EPROTONOSUPPORT, "%d", err);
+	fota_download_cancel();
+
+}
+
+ZTEST_SUITE(fota_download_util, NULL, NULL, NULL, NULL, NULL);
+
+ZTEST(fota_download_util, test_download_util_invalid_protocol)
+{
+	init();
+
+	fail_on_proto = true;
+	int err = fota_download_util_download_start("ftp://host.com/file.bin",
+				      DFU_TARGET_IMAGE_TYPE_ANY, 0,
+				      client_callback);
+
+	zassert_ok(err, NULL);
+	k_sem_take(&download_with_offset_sem, K_SECONDS(2));
+	k_sem_take(&stop_sem, K_FOREVER);
+}
+
+ZTEST(fota_download_util, test_download_util_start)
+{
+	init();
+
+	uint8_t fragment_buf[1] = {0};
+	size_t  fragment_len = 1;
+	struct downloader_evt evt = {
+		.id = DOWNLOADER_EVT_FRAGMENT,
+		.fragment = {
+			.buf = fragment_buf,
+			.len = fragment_len,
+		}
+	};
+
+	start_with_offset = true;
+	int err = fota_download_util_download_start("http://host.com/file.bin",
+				      DFU_TARGET_IMAGE_TYPE_ANY, 0,
+				      client_callback);
+
+	zassert_ok(err);
+
+	err = downloader_event_handler(&evt);
+	zassert_ok(err);
+
+	evt.id = DOWNLOADER_EVT_DONE;
+	err = downloader_event_handler(&evt);
+	zassert_ok(err);
+
+	k_sem_take(&stop_sem, K_FOREVER);
 }

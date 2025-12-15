@@ -4,13 +4,8 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-# Usually BOARD_DIR is an absolute path and sourced through '<ZEPHYR_ROOT>/boards/Kconfig'.
-# But for compliance and doc generation it's a glob and this line ensures that
-# boards in sdk-nrf are sourced properly in those occasions.
-orsource "./$(BOARD_DIR)/Kconfig.board"
-orsource "./$(BOARD_DIR)/Kconfig"
+orsource "./cmake/toolchain/$(ZEPHYR_TOOLCHAIN_VARIANT)/Kconfig.defconfig"
 
-rsource "boards/shields/*/Kconfig.shield"
 rsource "subsys/net/openthread/Kconfig.defconfig"
 
 if !TFM_PROFILE_TYPE_MINIMAL
@@ -27,12 +22,6 @@ rsource "modules/trusted-firmware-m/Kconfig.psa.defconfig"
 endif # BUILD_WITH_TFM
 
 menu "Nordic nRF Connect"
-
-# Hides child parent configuration options
-config HIDE_CHILD_PARENT_CONFIG
-	bool
-	default y if "$(HIDE_CHILD_PARENT_CONFIG)" = "True"
-	default n
 
 # Override configuration from zephyr which sets this to 0x200 if MCUboot is
 # enabled (CONFIG_BOOTLOADER_MCUBOOT), since NCS use partition_manager to
@@ -65,10 +54,15 @@ config NET_SOCKETS_OFFLOAD_TLS
 #  - For running tests.
 #  - For CC3XX RNG
 #  - For Cracen RNG
+#  - For bt_enable() when using the SoftDevice Controller
 config MAIN_STACK_SIZE
+	default 4096 if PSA_NEED_CRACEN_CTR_DRBG_DRIVER && !BUILD_WITH_TFM && TRUSTED_STORAGE
+	default 3584 if PSA_NEED_CRACEN_CTR_DRBG_DRIVER && !BUILD_WITH_TFM
+	default 3584 if (SOC_NRF54H20_CPUAPP || SOC_NRF54H20_CPURAD)
+	default 2048 if PSA_NEED_OBERON_CTR_DRBG_DRIVER && !BUILD_WITH_TFM
 	default 2048 if ZTEST
 	default 2048 if ENTROPY_CC3XX && !BUILD_WITH_TFM
-	default 2048 if PSA_NEED_CRACEN_CTR_DRBG_DRIVER && !BUILD_WITH_TFM
+	default 1128 if BT_LL_SOFTDEVICE
 
 config ZTEST_STACK_SIZE
 	default 2048 if ZTEST
@@ -81,10 +75,6 @@ config PRIVILEGED_STACK_SIZE
 config MCUMGR_TRANSPORT_NETBUF_SIZE
 	default 2475 if MCUMGR_TRANSPORT_BT_REASSEMBLY
 	default 1024 if UPDATEABLE_IMAGE_NUMBER > 1
-
-# When using HCI on the nRF5340 we need a larger command buffer.
-config BT_BUF_CMD_TX_COUNT
-	default 10 if SOC_COMPATIBLE_NRF5340_CPUAPP || SOC_COMPATIBLE_NRF5340_CPUNET
 
 config INIT_ARCH_HW_AT_BOOT
 	default y
@@ -106,19 +96,36 @@ config NORDIC_QSPI_NOR_FLASH_LAYOUT_PAGE_SIZE
 	  chosen Zephyr flash devicetree node to ensure that swapping can be
 	  performed.
 
-config GETOPT
-	default n
-
-# Temporary hack to be able to build samples and tests on the nRF51L15 FLPR core
-if SOC_NRF54L15_CPUFLPR && PARTITION_MANAGER_ENABLED
+# Temporary hack to be able to build samples and tests on the nRF51L15/nRF54L09 Eng A/nRF54LM20A Eng A/nRF7120 FLPR core
 config FLASH_BASE_ADDRESS
 	hex
-	default 0x0
+	depends on PARTITION_MANAGER_ENABLED
+	depends on SOC_NRF54L15_CPUFLPR || SOC_NRF54LM20A_ENGA_CPUFLPR || SOC_NRF54LV10A_ENGA_CPUFLPR|| SOC_NRF7120_ENGA_CPUFLPR
+	default 0x0 if SOC_NRF54L15_CPUFLPR || SOC_NRF54LM20A_ENGA_CPUFLPR || SOC_NRF54LV10A_ENGA_CPUFLPR
+	default 0x2C0000 if SOC_NRF7120_ENGA_CPUFLPR
+
 config FLASH_SIZE
 	int
-	default 1524
-endif
+	depends on PARTITION_MANAGER_ENABLED
+	depends on SOC_NRF54L15_CPUFLPR || SOC_NRF54LM20A_ENGA_CPUFLPR || SOC_NRF54LV10A_ENGA_CPUFLPR || SOC_NRF7120_ENGA_CPUFLPR
+	default 1012 if SOC_NRF54LV10A_ENGA_CPUFLPR
+	default 1524 if SOC_NRF54L15_CPUFLPR
+	default 2036 if SOC_NRF54LM20A_ENGA_CPUFLPR
+	default 128 if SOC_NRF7120_ENGA_CPUFLPR
 
+config NRF_SECURITY_ENABLER
+	def_bool y
+	imply NRF_SECURITY if BT_CRYPTO || BT_HOST_CRYPTO || BT_MESH_USES_MBEDTLS_PSA || BT_FAST_PAIR_CRYPTO_PSA
+	imply ENTROPY_GENERATOR if BOARD_NATIVE_SIM || BT_HOST_CRYPTO_PRNG || BT_ECC || BT_GATT_CACHING
+	imply PSA_WANT_GENERATE_RANDOM if BT_HOST_CRYPTO_PRNG || BT_ECC || BT_GATT_CACHING
+	imply MBEDTLS_ENABLE_HEAP if BT_HOST_CRYPTO_PRNG || BT_ECC || BT_GATT_CACHING || BT_CRYPTO
+	depends on !SOC_NRF5340_CPUNET
+
+if SOC_SERIES_BSIM_NRFXX && ENTROPY_GENERATOR
+config MBEDTLS_HEAP_SIZE
+	int
+	default 2048
+endif
 
 rsource "samples/Kconfig"
 rsource "subsys/Kconfig"

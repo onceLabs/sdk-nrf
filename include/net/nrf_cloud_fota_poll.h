@@ -51,6 +51,7 @@ struct nrf_cloud_fota_poll_ctx {
 	/* Internal variables */
 	struct nrf_cloud_rest_context *rest_ctx;
 	struct k_work_delayable timeout_work;
+	struct k_work_delayable cancel_work;
 	bool is_nonblocking;
 	bool full_modem_fota_supported;
 	const char *device_id;
@@ -133,12 +134,25 @@ int nrf_cloud_fota_poll_process_pending(struct nrf_cloud_fota_poll_ctx *ctx);
  * @retval -EFAULT          A FOTA job was not successful.
  * @retval -ENOENT          A FOTA job has finished and its status has been reported to the cloud.
  * @retval -EAGAIN          No FOTA job exists.
+ * @retval -ETIMEDOUT       The FOTA job check timed out. Retry later.
+ * @retval -ENETDOWN        The network is down.
  */
 int nrf_cloud_fota_poll_process(struct nrf_cloud_fota_poll_ctx *ctx);
+
+/**
+ * @brief Apply downloaded image. For full modem FOTA this must be called after the network has
+ *	  been disconnected. Only applicable in non-blocking mode.
+ *
+ * @param[in] ctx Pointer to context used for FOTA polling operations.
+ *
+ * @return 0 on success, negative value on failure.
+ */
+int nrf_cloud_fota_poll_update_apply(struct nrf_cloud_fota_poll_ctx *ctx);
 
 /** @} */
 
 #ifdef __cplusplus
+}
 #endif
 
 #endif /* NRF_CLOUD_FOTA_POLL_H_ */

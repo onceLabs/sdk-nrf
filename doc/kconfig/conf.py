@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2024 Nordic Semiconductor
+# Copyright (c) 2025 Nordic Semiconductor
 #
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
@@ -7,9 +7,8 @@
 # Kconfig documentation build configuration file
 
 import os
-from pathlib import Path
 import sys
-
+from pathlib import Path
 
 # Paths ------------------------------------------------------------------------
 
@@ -66,7 +65,15 @@ os.environ["NCS_MEMFAULT_FIRMWARE_SDK_KCONFIG"] = str(
     / "memfault-firmware-sdk"
     / "Kconfig"
 )
-
+os.environ["ZEPHYR_NRF_KCONFIG"] = str(
+    NRF_BASE
+    / "Kconfig.nrf"
+)
+os.environ["SYSBUILD_NRF_KCONFIG"] = str(
+    NRF_BASE
+    / "sysbuild"
+    / "Kconfig.sysbuild"
+)
 
 def setup(app):
     app.add_css_file("css/kconfig.css")

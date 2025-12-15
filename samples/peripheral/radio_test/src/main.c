@@ -7,12 +7,23 @@
 #include <zephyr/sys/printk.h>
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/clock_control/nrf_clock_control.h>
+#include <zephyr/pm/device_runtime.h>
 #if defined(NRF54L15_XXAA)
 #include <hal/nrf_clock.h>
 #endif /* defined(NRF54L15_XXAA) */
 #if defined(CONFIG_CLOCK_CONTROL_NRF2)
 #include <hal/nrf_lrcconf.h>
 #endif
+#include <nrfx.h>
+#if NRF54L_ERRATA_20_PRESENT
+#include <hal/nrf_power.h>
+#endif /* NRF54L_ERRATA_20_PRESENT */
+#if defined(NRF54LM20A_ENGA_XXAA)
+#include <hal/nrf_clock.h>
+#endif /* defined(NRF54LM20A_ENGA_XXAA) */
+
+/* Empty trim value */
+#define TRIM_VALUE_EMPTY 0xFFFFFFFF
 
 #if defined(CONFIG_CLOCK_CONTROL_NRF)
 static void clock_init(void)
@@ -44,10 +55,16 @@ static void clock_init(void)
 		}
 	} while (err);
 
-#if defined(NRF54L15_XXAA)
-	/* MLTPAN-20 */
+#if NRF54L_ERRATA_20_PRESENT
+	if (nrf54l_errata_20()) {
+		nrf_power_task_trigger(NRF_POWER, NRF_POWER_TASK_CONSTLAT);
+	}
+#endif /* NRF54L_ERRATA_20_PRESENT */
+
+#if defined(NRF54LM20A_ENGA_XXAA)
+	/* MLTPAN-39 */
 	nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_PLLSTART);
-#endif /* defined(NRF54L15_XXAA) */
+#endif /* defined(NRF54LM20A_ENGA_XXAA) */
 
 	printk("Clock has started\n");
 }
@@ -77,13 +94,69 @@ static void clock_init(void)
 		}
 	} while (err == -EAGAIN);
 
-#if defined(NRF54L15_XXAA)
-	/* MLTPAN-20 */
-	nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_PLLSTART);
-#endif /* defined(NRF54L15_XXAA) */
-
 	printk("Clock has started\n");
 }
+
+#if defined(CONFIG_SOC_SERIES_NRF54HX)
+static void nrf54hx_radio_trim(void)
+{
+	/* Apply HMPAN-102 workaround for nRF54H series */
+	*(volatile uint32_t *)0x5302C7E4 =
+				(((*((volatile uint32_t *)0x5302C7E4)) & 0xFF000FFF) | 0x0012C000);
+
+	/* Apply HMPAN-18 workaround for nRF54H series - load trim values*/
+	if (*(volatile uint32_t *) 0x0FFFE458 != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C734 = *(volatile uint32_t *) 0x0FFFE458;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE45C != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C738 = *(volatile uint32_t *) 0x0FFFE45C;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE460 != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C73C = *(volatile uint32_t *) 0x0FFFE460;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE464 != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C740 = *(volatile uint32_t *) 0x0FFFE464;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE468 != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C74C = *(volatile uint32_t *) 0x0FFFE468;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE46C != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C7D8 = *(volatile uint32_t *) 0x0FFFE46C;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE470 != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C840 = *(volatile uint32_t *) 0x0FFFE470;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE474 != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C844 = *(volatile uint32_t *) 0x0FFFE474;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE478 != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C848 = *(volatile uint32_t *) 0x0FFFE478;
+	}
+
+	if (*(volatile uint32_t *) 0x0FFFE47C != TRIM_VALUE_EMPTY) {
+		*(volatile uint32_t *) 0x5302C84C = *(volatile uint32_t *) 0x0FFFE47C;
+	}
+
+	/* Apply HMPAN-103 workaround for nRF54H series*/
+	if ((*(volatile uint32_t *) 0x5302C8A0 == 0x80000000) ||
+		(*(volatile uint32_t *) 0x5302C8A0 == 0x0058120E)) {
+		*(volatile uint32_t *) 0x5302C8A0 = 0x0058090E;
+	}
+
+	*(volatile uint32_t *) 0x5302C8A4 = 0x00F8AA5F;
+	*(volatile uint32_t *) 0x5302C7AC = 0x8672827A;
+	*(volatile uint32_t *) 0x5302C7B0 = 0x7E768672;
+	*(volatile uint32_t *) 0x5302C7B4 = 0x0406007E;
+}
+#endif /* defined(CONFIG_SOC_SERIES_NRF54HX) */
 
 #else
 BUILD_ASSERT(false, "No Clock Control driver");
@@ -91,14 +164,33 @@ BUILD_ASSERT(false, "No Clock Control driver");
 
 int main(void)
 {
-	printk("Starting Radio Test example\n");
+	printk("Starting Radio Test sample\n");
+
+#if defined(CONFIG_SOC_SERIES_NRF54HX)
+	const struct device *console_uart = DEVICE_DT_GET_OR_NULL(DT_CHOSEN(zephyr_console));
+	const struct device *shell_uart = DEVICE_DT_GET_OR_NULL(DT_CHOSEN(zephyr_shell_uart));
+
+	if (console_uart != NULL) {
+		int ret = pm_device_runtime_get(console_uart);
+
+		if (ret < 0) {
+			printk("Failed to get console UART runtime PM: %d\n", ret);
+		}
+	}
+
+	if (shell_uart != NULL && shell_uart != console_uart) {
+		int ret = pm_device_runtime_get(shell_uart);
+
+		if (ret < 0) {
+			printk("Failed to get shell UART runtime PM: %d\n", ret);
+		}
+	}
+#endif /* defined(CONFIG_SOC_SERIES_NRF54HX) */
 
 	clock_init();
 
 #if defined(CONFIG_SOC_SERIES_NRF54HX)
-	/* Apply HMPAN-102 workaround for nRF54H series */
-	*(volatile uint32_t *)0x5302C7E4 =
-				(((*((volatile uint32_t *)0x5302C7E4)) & 0xFF000FFF) | 0x0012C000);
+	nrf54hx_radio_trim();
 #endif
 
 	return 0;

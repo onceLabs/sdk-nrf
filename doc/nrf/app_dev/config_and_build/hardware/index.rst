@@ -3,7 +3,7 @@
 Configuring devicetree
 ######################
 
-The |nRFVSC| is the recommended tool for editing :ref:`configure_application_hw`.
+|nRFVSC| is the recommended tool for editing :ref:`configure_application_hw`.
 The extension offers several layers of `Devicetree integration <Devicetree support overview_>`_, ranging from summarizing devicetree settings in a menu and providing devicetree language support in the editor, to the Devicetree Visual Editor, a GUI tool for editing devicetree files.
 Follow the steps in `How to create devicetree files`_ and use one of the following options to edit the :file:`.dts`, :file:`.dtsi`, and :file:`.overlay` files:
 
@@ -28,5 +28,6 @@ In particular, :ref:`zephyr:set-devicetree-overlays` explains how the base devic
    :caption: Subpages:
 
    add_new_driver
+   add_new_led_example
    pin_control
    use_gpio_pin_directly

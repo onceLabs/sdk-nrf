@@ -30,7 +30,7 @@
 #define image_scratch mcuboot_scratch
 
 #if (CONFIG_SETTINGS_FCB || CONFIG_SETTINGS_NVS || defined(PM_SETTINGS_STORAGE_ID) ||\
-	CONFIG_SETTINGS_ZMS)
+	CONFIG_SETTINGS_ZMS || CONFIG_SETTINGS_ZMS_LEGACY)
 #define storage settings_storage
 #define storage_partition settings_storage
 #elif CONFIG_FILE_SYSTEM_LITTLEFS
@@ -68,7 +68,28 @@
 		    (DEVICE_DT_GET_OR_NULL(DT_NODELABEL(FIXED_PARTITION_DATA_FIELD(label, _DEV)))))
 #define FLASH_AREA_DEVICE(label) FIXED_PARTITION_DEVICE(label)
 
+#define FIXED_PARTITION_MTD(label) \
+	COND_CODE_1(DT_NODE_EXISTS(FIXED_PARTITION_DATA_FIELD(label, _DEV)), \
+		    (FIXED_PARTITION_DATA_FIELD(label, _DEV)), \
+		    (DT_NODELABEL(FIXED_PARTITION_DATA_FIELD(label, _DEV))))
+#define FIXED_PARTITION_NODE_MTD(node) \
+	COND_CODE_1( \
+		DT_FIXED_SUBPARTITION_EXISTS(node), \
+			(DT_MTD_FROM_FIXED_SUBPARTITION(node)), \
+			(DT_MTD_FROM_FIXED_PARTITION(node)))
+
 #define FIXED_PARTITION_EXISTS(label) IS_ENABLED(PM_IS_ENABLED(label))
 #define FLASH_AREA_LABEL_EXISTS(label) FIXED_PARTITION_EXISTS(label)
+
+#define FIXED_PARTITION(label)							\
+	((const struct flash_area *)&UTIL_CAT(global_pm_partition_, label))
+
+#define DECLARE_PARTITION(label)						\
+	extern const struct flash_area UTIL_CAT(global_pm_partition_, label)
+
+/* For each partition found in PM config generate the extern declaration */
+#define MAKE_LABEL(id, _) UTIL_CAT(PM_, UTIL_CAT(PM_##id##_LABEL))
+FOR_EACH(DECLARE_PARTITION, (;), LISTIFY(PM_NUM, MAKE_LABEL, (,)));
+#undef MAKE_LABEL
 
 #endif /* FLASH_MAP_PM_H_*/

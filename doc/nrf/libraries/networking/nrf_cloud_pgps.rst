@@ -38,7 +38,7 @@ With A-GNSS, new ephemerides are needed on average every two hours, or if the fi
 Configuration
 *************
 
-Configure the :kconfig:option:`CONFIG_NRF_CLOUD_PGPS` Kconfig option to enable or disable the use of this library.
+To enable this library, set the :kconfig:option:`CONFIG_NRF_CLOUD` and :kconfig:option:`CONFIG_NRF_CLOUD_PGPS` Kconfig options.
 
 Configure one of the following options to control the network transport for P-GPS requests and responses:
 
@@ -113,7 +113,7 @@ There are three ways to define this storage location:
 
   Use this option if the flash memory for your application is too full to use a dedicated partition, and the application uses MCUboot for FOTA updates but not for MCUboot itself.
 
-  Do not use this option if you are using MCUboot as a second-stage upgradable bootloader and also have FOTA updates enabled for MCUboot itself, not just the application (using :kconfig:option:`CONFIG_SECURE_BOOT` and :kconfig:option:`CONFIG_BUILD_S1_VARIANT`).
+  Do not use this option if you are using MCUboot as a second-stage upgradable bootloader and also have FOTA updates enabled for MCUboot itself, not just the application (using the :kconfig:option:`SB_CONFIG_SECURE_BOOT_APPCORE` Kconfig option).
   Otherwise, the P-GPS library prevents the full completion of MCUboot update, and the first-stage immutable bootloader reverts MCUboot to its previous image.
 
 * To use an application-specific storage, enable the :kconfig:option:`CONFIG_NRF_CLOUD_PGPS_STORAGE_CUSTOM` option.
@@ -233,8 +233,7 @@ The library offers two different ways to control the timing of P-GPS cloud reque
    * Call :c:func:`nrf_cloud_pgps_preemptive_updates`.
    * Call :c:func:`nrf_cloud_pgps_notify_prediction`.
 
-The indirect methods are used in the :ref:`asset_tracker_v2` and the :ref:`serial_lte_modem` applications.
-They are simpler to use than the direct methods.
+The indirect methods are simpler to use than the direct methods.
 The direct method is used in the :ref:`gnss_sample` sample.
 
 When nRF Cloud responds with the requested P-GPS data, the library sends the :c:enum:`CLOUD_EVT_DATA_RECEIVED` event.
@@ -249,7 +248,7 @@ A P-GPS prediction for the current date and time can be retrieved using one of t
 * Directly, by calling the function :c:func:`nrf_cloud_pgps_find_prediction`
 * Indirectly, by calling the function :c:func:`nrf_cloud_pgps_notify_prediction`
 
-The indirect method is used in the :ref:`gnss_sample` sample and in the :ref:`asset_tracker_v2` and :ref:`serial_lte_modem` applications.
+The indirect method is used in the :ref:`gnss_sample` sample.
 
 The application can inject the data contained in the prediction to the GNSS module in the modem by calling the :c:func:`nrf_cloud_pgps_inject` function.
 This must be done when event :c:enumerator:`NRF_MODEM_GNSS_EVT_AGNSS_REQ` is received from the GNSS interface.
@@ -292,13 +291,13 @@ Dependencies
 This library uses the following |NCS| libraries:
 
 * :ref:`lib_date_time`
-* :ref:`lib_download_client`
+* :ref:`lib_downloader`
 * :ref:`modem_info_readme`
 * :ref:`lib_nrf_cloud`
 
 It uses the following `sdk-nrfxlib`_ library:
 
-* :ref:`nrfxlib:gnss_interface`
+* :ref:`GNSS interface <nrfxlib:gnss_interface>`
 
 It uses the following Zephyr subsystem:
 

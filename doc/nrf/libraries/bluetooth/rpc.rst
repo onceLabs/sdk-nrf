@@ -96,7 +96,7 @@ For more details, see the :ref:`zephyr:snippets` documentation.
 Configuration
 *************
 
-To enable the Bluetooth Low Energy RPC library, use the sysbuild configuration ``SB_CONFIG_NETCORE_IPC_RADIO`` along with the ``SB_CONFIG_NETCORE_IPC_RADIO_BT_RPC`` option.
+To enable the Bluetooth Low Energy RPC library, use the sysbuild configuration :kconfig:option:`SB_CONFIG_NETCORE_IPC_RADIO` along with the :kconfig:option:`SB_CONFIG_NETCORE_IPC_RADIO_BT_RPC` option.
 Set the :makevar:`SNIPPET` to ``nordic-bt-rpc`` to apply the necessary configuration for the Bluetooth Low Energy RPC library on both cores.
 If you use a custom board, you need to create a custom snippet with a similar configuration to the ``nordic-bt-rpc`` snippet.
 
@@ -124,7 +124,7 @@ The following |NCS| samples can optionally use this library:
 * :ref:`peripheral_uart`
 
 The :ref:`ipc_radio` sample, is a configurable application, that exposes the Bluetooth LE stack functionality running on an MCU with radio (for example, the nRF5340 network core) to another CPU through the :ref:`nrfxlib:nrf_rpc`.
-When using the :ref:`ipc_radio` as Bluetooth Low Energy over RPC, reconfigure it by setting the ``SB_CONFIG_NETCORE_IPC_RADIO_BT_RPC`` sysbuild Kconfig option to ``y`` to run the whole Bluetooth LE stack on the network core.
+When using the :ref:`ipc_radio` as Bluetooth Low Energy over RPC, reconfigure it by setting the :kconfig:option:`SB_CONFIG_NETCORE_IPC_RADIO_BT_RPC` sysbuild Kconfig option to ``y`` to run the whole Bluetooth LE stack on the network core.
 For more details, see the :ref:`Configuration <ipc_radio_config>` section of the IPC radio firmware application guide.
 
 The :ref:`ble_rpc_host` application is an alternative to the :ref:`ipc_radio` sample.
@@ -145,7 +145,7 @@ The behavior of the Bluetooth implementation is almost the same as Zephyr's with
     The Bluetooth LE API is not strictly real-time by design, so the additional latency introduced by the IPC communication should be acceptable in most applications.
     To reduce the latency, consider using a different transport backend for nRF RPC.
     See :ref:`nrf_rpc_architecture` for details.
-  * Using advanced Bluetooth LE configurations, such as multiple simultaneous connections or advanced security features can be a limitation, because the child image (:ref:`ble_rpc_host` or :ref:`ipc_radio`) might require significantly more memory than the MCU it runs on has available.
+  * Using advanced Bluetooth LE configurations, such as multiple simultaneous connections or advanced security features can be a limitation, because the image (:ref:`ble_rpc_host` or :ref:`ipc_radio`) might require significantly more memory than the MCU it runs on has available.
     Typically, network or radio cores are more memory-constrained than the application MCU.
   * The :c:func:`bt_gatt_cancel` function is not implemented.
   * The ``flags`` field of  the :c:struct:`bt_gatt_subscribe_params` structure is atomic, so it cannot be correctly handled by the nRF RPC.

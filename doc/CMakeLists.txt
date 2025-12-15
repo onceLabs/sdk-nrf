@@ -22,7 +22,8 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE} COMPONENTS doc)
 
 set(SPHINXOPTS "-j auto -W --keep-going -T" CACHE STRING "Default Sphinx Options")
 set(SPHINXOPTS_EXTRA "" CACHE STRING "Extra Sphinx Options")
-set(NO_DTS_BINDINGS OFF CACHE BOOL "Do not generate dts bindings documentation")
+set(DTS_BINDINGS OFF CACHE BOOL "Generate dts bindings documentation")
+set(HW_FEATURES OFF CACHE BOOL "Generate hardware features")
 
 separate_arguments(SPHINXOPTS)
 separate_arguments(SPHINXOPTS_EXTRA)
@@ -32,7 +33,7 @@ separate_arguments(SPHINXOPTS_EXTRA)
 
 find_package(Python 3.8)
 set(DOXYGEN_SKIP_DOT True)
-find_package(Doxygen 1.8.18 REQUIRED)
+find_package(Doxygen 1.12.0 REQUIRED)
 
 find_program(SPHINXBUILD sphinx-build)
 if(NOT SPHINXBUILD)
@@ -74,13 +75,13 @@ file(MAKE_DIRECTORY ${KCONFIG_BINARY_DIR})
 #
 function(add_doxygen_docset name sources version)
   cmake_parse_arguments(DOXYGEN "STANDALONE" "" "" ${ARGN})
-  set(DOCSET_BUILD_DIR ${CMAKE_BINARY_DIR}/html)
+  set(DOCSET_BUILD_DIR ${CMAKE_BINARY_DIR}/html/${name})
   set(DOCSET_SOURCE_BASE ${sources})
   set(DOCSET_VERSION ${version})
 
   if(NOT DOXYGEN_STANDALONE)
     set(SUFFIX "-doxygen")
-    set(DOCSET_BUILD_DIR ${DOCSET_BUILD_DIR}/${name}/doxygen)
+    set(DOCSET_BUILD_DIR ${DOCSET_BUILD_DIR}/doxygen)
   endif()
 
   configure_file(${CMAKE_CURRENT_LIST_DIR}/${name}/${name}.doxyfile.in ${CMAKE_BINARY_DIR}/${name}.doxyfile)
@@ -107,6 +108,7 @@ endfunction()
 # - DODGY: Enable/disable "dodgy" mode. If enabled "-W" (warnings as errors)
 #   option will be disabled. It can be useful for external docsets that are
 #   likely to generate build warnings.
+# - SPHINXOPTS: Docset specific Sphinx options
 #
 # This function configures multiple targets which can be used to build a docset.
 # The docset configuration (conf.py) is expected to be at the ${name} folder
@@ -126,7 +128,7 @@ endfunction()
 # - ${name}-clean: Clean build artifacts.
 #
 function(add_docset name version)
-  cmake_parse_arguments(DOCSET "DODGY" "" "" ${ARGN})
+  cmake_parse_arguments(DOCSET "DODGY" "" "SPHINXOPTS" ${ARGN})
 
   set(DOCSET_CFG_DIR ${CMAKE_CURRENT_LIST_DIR}/${name})
   set(DOCSET_BUILD_DIR ${CMAKE_BINARY_DIR}/${name})
@@ -153,6 +155,7 @@ function(add_docset name version)
       -w ${DOCSET_BUILD_DIR}/inventory.log
       ${SPHINXOPTS}
       ${SPHINXOPTS_EXTRA}
+      ${DOCSET_SPHINXOPTS}
       ${DOCSET_SRC_DIR}
       ${DOCSET_HTML_DIR}
     USES_TERMINAL
@@ -170,6 +173,7 @@ function(add_docset name version)
       -w ${DOCSET_BUILD_DIR}/html.log
       ${SPHINXOPTS}
       ${SPHINXOPTS_EXTRA}
+      ${DOCSET_SPHINXOPTS}
       ${EXTRA_ARGS}
       ${DOCSET_SRC_DIR}
       ${DOCSET_HTML_DIR}
@@ -191,6 +195,7 @@ function(add_docset name version)
         -w ${DOCSET_BUILD_DIR}/html-live.log
         ${SPHINXOPTS}
         ${SPHINXOPTS_EXTRA}
+        ${DOCSET_SPHINXOPTS}
         ${EXTRA_ARGS}
         ${DOCSET_SRC_DIR}
         ${DOCSET_HTML_DIR}
@@ -210,6 +215,7 @@ function(add_docset name version)
       -w ${DOCSET_BUILD_DIR}/linkcheck.log
       ${SPHINXOPTS}
       ${SPHINXOPTS_EXTRA}
+      ${DOCSET_SPHINXOPTS}
       ${EXTRA_ARGS}
       ${DOCSET_SRC_DIR}
       ${DOCSET_LINKCHECK_DIR}
@@ -276,7 +282,7 @@ file(MAKE_DIRECTORY ${HTML_DIR})
 
 set(DTS_ARGS)
 
-if(NO_DTS_BINDINGS)
+if(NOT DTS_BINDINGS)
   list(APPEND DTS_ARGS --turbo-mode)
 endif()
 
@@ -296,7 +302,11 @@ add_custom_target(
   COMMENT "Generating Devicetree bindings documentation..."
 )
 
-add_docset(zephyr ${Zephyr_VERSION})
+if(NOT HW_FEATURES)
+  set(ZEPHYR_SPHINXOPTS -t hw_features_turbo)
+endif()
+
+add_docset(zephyr ${Zephyr_VERSION} SPHINXOPTS ${ZEPHYR_SPHINXOPTS})
 add_doxygen_docset(zephyr ${ZEPHYR_BASE} ${Zephyr_VERSION})
 add_dependencies(zephyr zephyr-devicetree)
 add_dependencies(zephyr-all zephyr-devicetree)
@@ -313,7 +323,7 @@ add_doxygen_docset(nrf ${NRF_BASE} ${NRF_VERSION})
 #-------------------------------------------------------------------------------
 # docset: mcuboot
 
-add_docset(mcuboot "2.1.99")
+add_docset(mcuboot "2.2.0-rc2")
 
 #-------------------------------------------------------------------------------
 # docset: nrfx
@@ -323,12 +333,12 @@ add_doxygen_docset(nrfx ${ZEPHYR_HAL_NORDIC_MODULE_DIR} "" STANDALONE)
 #-------------------------------------------------------------------------------
 # docset: tfm
 
-add_docset(tfm "2.1.0")
+add_docset(tfm "2.2.0")
 
 #-------------------------------------------------------------------------------
 # docset: matter
 
-add_docset(matter "1.3.0")
+add_docset(matter "1.5.0")
 
 #-------------------------------------------------------------------------------
 # docset: nrfxlib
@@ -339,12 +349,12 @@ add_doxygen_docset(nrfxlib ${ZEPHYR_NRFXLIB_MODULE_DIR} ${NRF_VERSION})
 #-------------------------------------------------------------------------------
 # docset: wifi
 
-add_doxygen_docset(wifi ${ZEPHYR_HAL_NORDIC_MODULE_DIR} "" STANDALONE)
+add_doxygen_docset(wifi ${ZEPHYR_NRF_WIFI_MODULE_DIR} "" STANDALONE)
 
 #-------------------------------------------------------------------------------
 # docset: internal
 
-if (EXISTS "${ZEPHYR_DOC_INTERNAL_MODULE_DIR}" )
+if(EXISTS "${ZEPHYR_DOC_INTERNAL_MODULE_DIR}" )
   message(STATUS "Internal documentation included")
   add_docset(internal "")
 endif()
@@ -381,7 +391,7 @@ add_dependencies(merge-search-indexes
     tfm-all
     kconfig-all
 )
-if (EXISTS "${ZEPHYR_DOC_INTERNAL_MODULE_DIR}" )
+if(EXISTS "${ZEPHYR_DOC_INTERNAL_MODULE_DIR}" )
   add_dependencies(merge-search-indexes internal-all)
 endif()
 
@@ -396,7 +406,7 @@ endfunction()
 add_dependencies(nrfxlib-inventory-all kconfig-all zephyr-all)
 add_doc_dependencies(zephyr kconfig-all)
 add_doc_dependencies(mcuboot kconfig-all)
-add_doc_dependencies(nrf zephyr-all nrfxlib-inventory-all mcuboot-all matter-all tfm-all kconfig-all)
+add_doc_dependencies(nrf zephyr-all nrfxlib-inventory-all mcuboot-all matter-all tfm-all kconfig-all wifi)
 add_doc_dependencies(nrfxlib nrf-all)
 
 add_custom_target(build-all ALL)
@@ -413,7 +423,7 @@ add_dependencies(build-all
     kconfig-all
     wifi
 )
-if (EXISTS "${ZEPHYR_DOC_INTERNAL_MODULE_DIR}" )
+if(EXISTS "${ZEPHYR_DOC_INTERNAL_MODULE_DIR}" )
   add_dependencies(build-all internal-all)
 endif()
 

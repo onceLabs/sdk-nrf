@@ -12,6 +12,7 @@
 #include <memfault/ports/zephyr/http.h>
 #include <memfault/core/data_packetizer.h>
 #include <memfault/core/trace_event.h>
+#include <memfault/panics/coredump.h>
 #include <dk_buttons_and_leds.h>
 
 #include <zephyr/logging/log.h>
@@ -92,6 +93,12 @@ static void on_connect(void)
 	LOG_INF("Time to connect: %d ms", time_to_lte_connection);
 #endif /* IS_ENABLED(MEMFAULT_NCS_LTE_METRICS) */
 
+	if (IS_ENABLED(CONFIG_MEMFAULT_NCS_POST_COREDUMP_ON_NETWORK_CONNECTED) &&
+	    memfault_coredump_has_valid_coredump(NULL)) {
+		/* Coredump sending handled internally */
+		return;
+	}
+
 	LOG_INF("Sending already captured data to Memfault");
 
 	/* Trigger collection of heartbeat data. */
@@ -112,7 +119,7 @@ static void on_connect(void)
 	memfault_zephyr_port_post_data();
 }
 
-static void l4_event_handler(struct net_mgmt_event_callback *cb, uint32_t event,
+static void l4_event_handler(struct net_mgmt_event_callback *cb, uint64_t event,
 			     struct net_if *iface)
 {
 	switch (event) {
@@ -124,12 +131,12 @@ static void l4_event_handler(struct net_mgmt_event_callback *cb, uint32_t event,
 		LOG_INF("Network connectivity lost");
 		break;
 	default:
-		LOG_DBG("Unknown event: 0x%08X", event);
+		LOG_DBG("Unknown event: 0x%08llX", event);
 		return;
 	}
 }
 
-static void connectivity_event_handler(struct net_mgmt_event_callback *cb, uint32_t event,
+static void connectivity_event_handler(struct net_mgmt_event_callback *cb, uint64_t event,
 				       struct net_if *iface)
 {
 	if (event == NET_EVENT_CONN_IF_FATAL_ERROR) {

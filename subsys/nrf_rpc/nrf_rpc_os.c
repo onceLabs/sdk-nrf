@@ -83,6 +83,7 @@ int nrf_rpc_os_init(nrf_rpc_os_work_t callback)
 			thread_pool_entry,
 			NULL, NULL, NULL,
 			CONFIG_NRF_RPC_THREAD_PRIORITY, 0, K_NO_WAIT);
+		k_thread_name_set(&pool_threads[i], "rpc");
 	}
 
 	return 0;
@@ -100,21 +101,26 @@ void nrf_rpc_os_thread_pool_send(const uint8_t *data, size_t len)
 void nrf_rpc_os_msg_set(struct nrf_rpc_os_msg *msg, const uint8_t *data,
 			size_t len)
 {
-	k_sched_lock();
 	msg->data = data;
 	msg->len = len;
-	k_sem_give(&msg->sem);
-	k_sched_unlock();
+	(void)k_condvar_signal(&msg->event);
 }
 
-void nrf_rpc_os_msg_get(struct nrf_rpc_os_msg *msg, const uint8_t **data,
-			size_t *len)
+void nrf_rpc_os_msg_get(struct nrf_rpc_os_msg *msg, struct nrf_rpc_os_mutex *mutex,
+			const uint8_t **data, size_t *len)
 {
-	k_sem_take(&msg->sem, K_FOREVER);
-	k_sched_lock();
-	*data = msg->data;
-	*len = msg->len;
-	k_sched_unlock();
+	int rc = k_condvar_wait(&msg->event, &mutex->mutex,
+				CONFIG_NRF_RPC_RESPONSE_TIMEOUT == -1
+					? K_FOREVER
+					: K_MSEC(CONFIG_NRF_RPC_RESPONSE_TIMEOUT));
+
+	if (rc == 0) {
+		*data = msg->data;
+		*len = msg->len;
+	} else {
+		*data = NULL;
+		*len = 0;
+	}
 }
 
 uint32_t nrf_rpc_os_ctx_pool_reserve(void)

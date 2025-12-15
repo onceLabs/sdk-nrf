@@ -103,6 +103,14 @@ Examples
      link search --read
      link search --start
 
+* Perform environment evaluation for PLMNs 24405, 24412 and 24491:
+
+  .. code-block:: console
+
+     link funmode --flightmode
+     link funmode --rxonly
+     link enveval --eval_type dynamic --plmns 24405,24412,24491
+
 ----
 
 AT commands
@@ -121,6 +129,10 @@ in a separate plain AT command mode where also pipelining of AT commands is supp
 .. note::
    When using ``at`` command, any quotation marks (``"``), apostrophes (``'``) and backslashes (``\``) within the AT command syntax must be escaped with a backslash (``\``).
    The percentage sign (``%``) is often needed and can be written as is.
+
+.. note::
+   In order to support provisioning certificates using the ``AT%CMNG=0`` command, occurences of escaped newlines ``\\n`` are replaced by ``\r\n`` internally.
+   To use this feature, remove existing occurences of ``\r`` and replace ``\n`` with ``\\n`` in the AT command string.
 
 Examples
 --------
@@ -168,6 +180,7 @@ Examples
      at at_cmd_mode start
      MoSh AT command mode started, press ctrl-x ctrl-q to escape
      MoSh specific AT commands:
+       Echo off/on: ATE0 and ATE1
        ICMP Ping: AT+NPING=<addr>[,<payload_length>,<timeout_msecs>,<count>[,<interval_msecs>[,<cid>]]]
      Other custom functionalities:
        AT command pipelining, for example:
@@ -446,19 +459,19 @@ Examples
 
      location get
 
-* Retrieve location with Wi-Fi positioning.
+* Retrieve location with Wi-Fi® positioning.
   You need to have a Wi-Fi-enabled device and build the sample with Wi-Fi support.
   If the location is not found, use cellular positioning:
 
   .. code-block:: console
 
-     location get --method wifi --wifi_timeout 60000 --method cellular --cellular_service nrf
+     location get --method wifi --wifi_timeout 60 --method cellular
 
 * Retrieve location periodically every hour with GNSS and if not found, use cellular positioning:
 
   .. code-block:: console
 
-     location get --interval 3600 --method gnss --gnss_timeout 300000 --method cellular
+     location get --interval 3600 --method gnss --gnss_timeout 300 --method cellular
 
 * Cancel ongoing location request or periodic location request:
 
@@ -689,6 +702,39 @@ Examples
 
 ----
 
+NTN
+===
+
+MoSh command: ``ntn``
+
+You can use the command for NTN helper functionality provided by the :ref:`lib_ntn` library.
+The command provides support for setting and invalidating the location to the modem, and enabling and disabling modem location updates from an external GNSS.
+
+Internal GNSS is not supported when NTN NB-IoT is enabled in the system mode.
+To use internal GNSS to get the location, GNSS must be enabled and NTN NB-IoT disabled in the system mode.
+You can use the ``location`` or ``gnss`` commands to get the location using internal GNSS.
+After GNSS has been stopped, you can enable NTN NB-IoT in the system mode.
+
+To enable location updates from an external GNSS, you need to build the sample with external GNSS support and connect UART pins to the development kit.
+With external GNSS support, location is automatically updated to the modem periodically.
+The update interval is calculated based on the requested accuracy.
+See :ref:`modem_shell_ext_gnss_support` for information about building the sample with external GNSS support.
+
+Examples
+--------
+
+* Set location to the modem:
+
+  .. code-block:: console
+
+     ntn location set 60.171000 24.941000 30.0 3600
+
+* Invalidate location:
+
+  .. code-block:: console
+
+     ntn location invalidate
+
 Remote control using nRF Cloud
 ==============================
 
@@ -811,11 +857,6 @@ Configuration options
 =====================
 
 Check and configure the following configuration options for the sample:
-
-.. _CONFIG_MOSH_LINK:
-
-CONFIG_MOSH_LINK
-   Enable LTE link control feature in modem shell.
 
 .. _CONFIG_MOSH_PING:
 
@@ -951,7 +992,7 @@ Power measurements
 ==================
 
 You can perform power measurements using the `Power Profiler Kit II (PPK2)`_.
-See the documentation for instructions on how to setup the DK for power measurements.
+See the documentation for instructions on how to set up the DK for power measurements.
 The documentation shows, for example, how to connect the wires for both source meter and ampere meter modes.
 The same instructions are valid also when using a different meter.
 
@@ -997,7 +1038,7 @@ Getting nRF91 Series DK out-of-the-box and to nRF Cloud
 To program the certificates and connect to nRF Cloud, complete the following steps:
 
 1. `Download nRF Connect for Desktop`_.
-#. Update the modem firmware on the on-board modem of the nRF91 Series DK to the latest version as instructed in :ref:`nrf9160_updating_fw_modem`.
+#. Update the modem firmware on the on-board modem of the nRF91 Series DK to the latest version as instructed in `Programming nRF91 Series DK firmware`_.
 #. Build and program the MoSh to the nRF91 Series DK using the default MoSh configuration (with REST as the transport):
 
 .. parsed-literal::
@@ -1284,19 +1325,46 @@ BT shell support
 To build the MoSh sample with Zephyr BT shell command support, use the :file:`-DDTC_OVERLAY_FILE=bt.overlay` and :file:`-DEXTRA_CONF_FILE=overlay-bt.conf` options.
 When running this configuration, you can perform BT scanning and advertising using the ``bt`` command.
 
-Compile as follows:
+You must program the *board controller* with the :ref:`bluetooth-hci-lpuart-sample` sample first, before programming the main controller with the :ref:`modem_shell_application` sample.
+Program the board controller as follows:
 
-.. code-block:: console
+1. Set the **SW10** switch, marked as *debug/prog*, in the **NRF52** position.
+   On nRF9160 DK board version 0.9.0 and earlier versions, the switch was called **SW5**.
+#. Build the :ref:`bluetooth-hci-lpuart-sample` sample for the ``nrf9160dk/nrf52840`` board target and program the board controller with it.
 
-   west build -p -b nrf9160dk/nrf9160/ns -- -DDTC_OVERLAY_FILE="bt.overlay" -DEXTRA_CONF_FILE="overlay-bt.conf"
+   .. note::
+      To build the sample successfully, you must specify the board version along with the board target.
+      The board version is printed on the label of your DK, just below the PCA number.
+      For example, for board version 1.1.0, build the sample as follows:
 
-Additionally, you need to program the nRF52840 side of the nRF9160 DK as instructed in :ref:`lte_sensor_gateway`.
+      .. parsed-literal::
+         :class: highlight
 
-Compile the :ref:`bluetooth-hci-lpuart-sample` sample as follows:
+         west build --board nrf9160dk@1.1.0/nrf52840
 
-.. code-block:: console
+#. Verify that the programming was successful.
+   Use a terminal emulator, like the `Serial Terminal app`_, to connect to the second serial port and check the output.
+   See :ref:`test_and_optimize` for the required settings and steps.
 
-   west build -p -b nrf9160dk/nrf52840
+After programming the board controller, you must program the main controller with the :ref:`modem_shell_application` sample.
+Program the main controller as follows:
+
+1. Set the **SW10** switch, marked as *debug/prog*, in the **NRF91** position.
+   On nRF9160 DK board version 0.9.0 and earlier versions, the switch was called **SW5**.
+#. Build the sample for the ``nrf9160dk/nrf9160/ns`` board target and program the main controller with it.
+
+   .. note::
+      To build the sample successfully, you must specify the board version along with the board target.
+      For example, for board version 1.1.0, build the sample as follows:
+
+      .. parsed-literal::
+         :class: highlight
+
+         west build -p -b nrf9160dk@1.1.0/nrf9160/ns -- -DDTC_OVERLAY_FILE="bt.overlay" -DEXTRA_CONF_FILE="overlay-bt.conf"
+
+#. Verify that the programming was successful.
+   Use a terminal emulator, like the `Serial Terminal app`_, to connect to the first serial port and check the output.
+   See :ref:`test_and_optimize` for the required settings and steps.
 
 The following example demonstrates how to use MoSh with two development kits, where one acts as a broadcaster and the other one as an observer.
 
@@ -1423,6 +1491,39 @@ For example:
    west build -p -b *board_target* -- -Dmodem_shell_SNIPPET="nrf91-modem-trace-ext-flash"
 
 |board_target|
+
+.. _modem_shell_ext_gnss_support:
+
+nRF9151 DK with external GNSS support
+=====================================
+
+To build the MoSh sample for an nRF9151 DK with external GNSS support, use the ``-DEXTRA_DTC_OVERLAY_FILE=ext_gnss_uart.overlay`` and ``-DCONFIG_GNSS=y`` options.
+For example:
+
+.. parsed-literal::
+   :class: highlight
+
+   west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_DTC_OVERLAY_FILE=ext_gnss_uart.overlay -DCONFIG_GNSS=y
+
+The external GNSS support requires an external GNSS module with UART interface and NMEA output.
+For example, you can use an nRF91 Series DK with the :ref:`gnss_sample` sample in NMEA only mode.
+
+After programming the development kit, connect the UART TX and GND pins from the external GNSS module to the UART RX and GND pins of the nRF9151 DK.
+The RX pin for UART2 is set to P0.30 in the :file:`ext_gnss_uart.overlay` file.
+The speed is set to 115200 bps by default, but you can change it by modifying the overlay file.
+
+MoSh automatically provides periodic location updates when requested by the modem.
+
+Example output with NTN library debug logging enabled:
+
+.. code-block:: console
+
+   NTN location request event: requested: true, accuracy: 200 m
+   NTN location updates from external GNSS enabled
+   [00:00:01.788,696] <inf> ntn: Location updates requested immediately, accuracy: 200 m
+   [00:00:02.565,734] <dbg> ntn: ntn_location_set: lat: 61.493776, lon: 23.775918, alt: 146.5 m, validity: 12 s
+   [00:00:08.553,009] <dbg> ntn: ntn_location_set: lat: 61.493777, lon: 23.775916, alt: 147.2 m, validity: 12 s
+   [00:00:13.555,145] <dbg> ntn: ntn_location_set: lat: 61.493779, lon: 23.775901, alt: 147.3 m, validity: 12 s
 
 References
 **********

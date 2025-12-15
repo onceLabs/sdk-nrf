@@ -279,7 +279,10 @@ static void bt_conn_info_dec(struct nrf_rpc_cbor_ctx *ctx, struct bt_conn *conn,
 	info->id = nrf_rpc_decode_uint(ctx);
 
 	if (info->type == BT_CONN_TYPE_LE) {
-		info->le.interval = nrf_rpc_decode_uint(ctx);
+		info->le.interval_us = nrf_rpc_decode_uint(ctx);
+#if !defined(CONFIG_BT_SHORTER_CONNECTION_INTERVALS)
+		info->le._interval = nrf_rpc_decode_uint(ctx);
+#endif
 		info->le.latency = nrf_rpc_decode_uint(ctx);
 		info->le.timeout = nrf_rpc_decode_uint(ctx);
 		LOCK_CONN_INFO();
@@ -392,7 +395,7 @@ static void bt_conn_get_remote_info_rpc_rsp(const struct nrf_rpc_group *group,
 	bt_conn_remote_info_dec(ctx, res->conn, res->remote_info);
 }
 
-int bt_conn_get_remote_info(struct bt_conn *conn,
+int bt_conn_get_remote_info(const struct bt_conn *conn,
 			    struct bt_conn_remote_info *remote_info)
 {
 	struct nrf_rpc_cbor_ctx ctx;
@@ -403,7 +406,7 @@ int bt_conn_get_remote_info(struct bt_conn *conn,
 
 	bt_rpc_encode_bt_conn(&ctx, conn);
 
-	result.conn = conn;
+	result.conn = (struct bt_conn *)conn;
 	result.remote_info = remote_info;
 
 	nrf_rpc_cbor_cmd_no_err(&bt_rpc_grp, BT_CONN_GET_REMOTE_INFO_RPC_CMD,
@@ -610,32 +613,6 @@ int bt_conn_create_auto_stop(void)
 }
 #endif /* defined(CONFIG_BT_FILTER_ACCEPT_LIST) */
 
-#if !defined(CONFIG_BT_FILTER_ACCEPT_LIST)
-int bt_le_set_auto_conn(const bt_addr_le_t *addr,
-			const struct bt_le_conn_param *param)
-{
-	struct nrf_rpc_cbor_ctx ctx;
-	int result;
-	size_t buffer_size_max = 3;
-
-	buffer_size_max += addr ? sizeof(bt_addr_le_t) : 0;
-	buffer_size_max += (param == NULL) ? 1 : 12;
-
-	NRF_RPC_CBOR_ALLOC(&bt_rpc_grp, ctx, buffer_size_max);
-
-	nrf_rpc_encode_buffer(&ctx, addr, sizeof(bt_addr_le_t));
-	if (param == NULL) {
-		nrf_rpc_encode_null(&ctx);
-	} else {
-		bt_le_conn_param_enc(&ctx, param);
-	}
-
-	nrf_rpc_cbor_cmd_no_err(&bt_rpc_grp, BT_LE_SET_AUTO_CONN_RPC_CMD,
-				&ctx, nrf_rpc_rsp_decode_i32, &result);
-
-	return result;
-}
-#endif  /* !defined(CONFIG_BT_FILTER_ACCEPT_LIST) */
 #endif  /* defined(CONFIG_BT_CENTRAL) */
 
 #if defined(CONFIG_BT_SMP)

@@ -10,7 +10,6 @@
 #include <zephyr/kernel.h>
 #include <dtm.h>
 
-#include "dtm_uart_wait.h"
 #include "dtm_transport.h"
 
 LOG_MODULE_REGISTER(dtm_tw_tr, CONFIG_DTM_TRANSPORT_LOG_LEVEL);
@@ -69,6 +68,22 @@ LOG_MODULE_REGISTER(dtm_tw_tr, CONFIG_DTM_TRANSPORT_LOG_LEVEL);
 
 /* The DTM maximum wait time in milliseconds for the UART command second byte. */
 #define DTM_UART_SECOND_BYTE_MAX_DELAY 5
+
+#define DTM_UART DT_CHOSEN(ncs_dtm_uart)
+
+#if DT_NODE_HAS_PROP(DTM_UART, current_speed)
+/* UART Baudrate used to communicate with the DTM library. */
+#define DTM_UART_BAUDRATE DT_PROP(DTM_UART, current_speed)
+
+/* The UART poll cycle in micro seconds.
+ * A baud rate of e.g. 19200 bits / second, and 8 data bits, 1 start/stop bit,
+ * no flow control, give the time to transmit a byte:
+ * 10 bits * 1/19200 = approx: 520 us.
+ */
+#define DTM_UART_POLL_CYCLE_US ((uint32_t) (10 * 1e6 / DTM_UART_BAUDRATE))
+#else
+#error "DTM UART node not found"
+#endif /* DT_NODE_HAS_PROP(DTM_UART, currrent_speed) */
 
 static const struct device *dtm_uart = DEVICE_DT_GET(DTM_UART);
 
@@ -335,6 +350,9 @@ enum dtm_evt {
 /** Upper bits of packet length */
 static uint8_t upper_len;
 
+/** Currently configured PHY */
+static enum dtm_phy dtm_phy = DTM_PHY_1M;
+
 static int reset_dtm(uint8_t parameter)
 {
 	if (parameter > LE_RESET_MAX_RANGE) {
@@ -342,6 +360,7 @@ static int reset_dtm(uint8_t parameter)
 	}
 
 	upper_len = 0;
+	dtm_phy = DTM_PHY_1M;
 	return dtm_setup_reset();
 }
 
@@ -357,18 +376,32 @@ static int upper_set(uint8_t parameter)
 
 static int phy_set(uint8_t parameter)
 {
+	int err;
 	switch (parameter) {
 	case LE_PHY_1M_MIN_RANGE ... LE_PHY_1M_MAX_RANGE:
-		return dtm_setup_set_phy(DTM_PHY_1M);
-
+		err = dtm_setup_set_phy(DTM_PHY_1M);
+		if (err == 0) {
+			dtm_phy = DTM_PHY_1M;
+		}
+		return err;
 	case LE_PHY_2M_MIN_RANGE ... LE_PHY_2M_MAX_RANGE:
-		return dtm_setup_set_phy(DTM_PHY_2M);
-
+		err = dtm_setup_set_phy(DTM_PHY_2M);
+		if (err == 0) {
+			dtm_phy = DTM_PHY_2M;
+		}
+		return err;
 	case LE_PHY_LE_CODED_S8_MIN_RANGE ... LE_PHY_LE_CODED_S8_MAX_RANGE:
-		return dtm_setup_set_phy(DTM_PHY_CODED_S8);
-
+		err = dtm_setup_set_phy(DTM_PHY_CODED_S8);
+		if (err == 0) {
+			dtm_phy = DTM_PHY_CODED_S8;
+		}
+		return err;
 	case LE_PHY_LE_CODED_S2_MIN_RANGE ... LE_PHY_LE_CODED_S2_MAX_RANGE:
-		return dtm_setup_set_phy(DTM_PHY_CODED_S2);
+		err = dtm_setup_set_phy(DTM_PHY_CODED_S2);
+		if (err == 0) {
+			dtm_phy = DTM_PHY_CODED_S2;
+		}
+		return err;
 
 	default:
 		return -EINVAL;
@@ -448,7 +481,7 @@ static int read_max(uint8_t parameter, uint16_t *ret)
 
 static int cte_set(uint8_t parameter)
 {
-	enum dtm_cte_type_code type = (parameter & LE_CTE_TYPE_MASK) >> LE_CTE_TYPE_POS;
+	enum dtm_cte_type_code type = (parameter >> LE_CTE_TYPE_POS) & LE_CTE_TYPE_MASK;
 	uint8_t time = parameter & LE_CTE_CTETIME_MASK;
 
 	if (!parameter) {
@@ -472,7 +505,7 @@ static int cte_set(uint8_t parameter)
 
 static int cte_slot_set(uint8_t parameter)
 {
-	enum dtm_cte_type_code type = (parameter & LE_CTE_TYPE_MASK) >> LE_CTE_TYPE_POS;
+	enum dtm_cte_type_code type = (parameter >> LE_CTE_TYPE_POS) & LE_CTE_TYPE_MASK;
 
 	switch (type) {
 	case LE_CTE_SLOT_1US:
@@ -668,7 +701,10 @@ static uint16_t on_test_tx_cmd(uint8_t chan, uint8_t length, enum dtm_pkt_type t
 		return LE_TEST_STATUS_EVENT_ERROR;
 	}
 
-	length = (length & ~LE_UPPER_BITS_MASK) | upper_len;
+	/* Add upper bits to length only if packet is not vendor specific */
+	if (pkt != DTM_PACKET_FF_OR_VENDOR || (dtm_phy != DTM_PHY_1M && dtm_phy != DTM_PHY_2M)) {
+		length = (length & ~LE_UPPER_BITS_MASK) | upper_len;
+	}
 
 	err = dtm_test_transmit(chan, length, pkt);
 
@@ -723,14 +759,17 @@ int dtm_tr_init(void)
 		return -EIO;
 	}
 
+#if defined(CONFIG_DTM_USB) && defined(CONFIG_SOC_NRF54H20_CPURAD)
+	/* Enable RX path for the USB CDC ACM.
+	 * uart_irq_rx_enable() -> cdc_acm_irq_rx_enable() -> cdc_acm_work_submit(rx_fifo_work)
+	 * It is not needed for non CDC ACM UARTs.
+	 */
+	uart_irq_rx_enable(dtm_uart);
+#endif /* defined(CONFIG_DTM_USB) && defined(CONFIG_SOC_NRF54H20_CPURAD) */
+
 	err = dtm_init(NULL);
 	if (err) {
 		LOG_ERR("Error during DTM initialization: %d", err);
-		return err;
-	}
-
-	err = dtm_uart_wait_init();
-	if (err) {
 		return err;
 	}
 
@@ -747,7 +786,7 @@ union dtm_tr_packet dtm_tr_get(void)
 	int err;
 
 	for (;;) {
-		dtm_uart_wait();
+		k_sleep(K_USEC(DTM_UART_POLL_CYCLE_US));
 
 		err = uart_poll_in(dtm_uart, &rx_byte);
 		if (err) {

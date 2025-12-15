@@ -8,6 +8,7 @@
 
 #include "app/fabric_table_delegate.h"
 #include "app/group_data_provider.h"
+#include "clusters/cluster_init.h"
 #include "migration/migration_manager.h"
 
 #ifdef CONFIG_NCS_SAMPLE_MATTER_SETTINGS_SHELL
@@ -46,11 +47,21 @@
 #include <ram_pwrdn.h>
 #endif
 
+#ifdef CONFIG_CHIP_STORE_KEYS_IN_KMU
+#include <platform/nrfconnect/KMUKeyAllocator.h>
+#endif
+
+#ifdef CONFIG_OPENTHREAD
+#include <openthread.h>
+#include <platform/OpenThread/GenericNetworkCommissioningThreadDriver.h>
+#endif
+
 #include <app/InteractionModelEngine.h>
 #include <app/clusters/network-commissioning/network-commissioning.h>
-#include <app/server/OnboardingCodesUtil.h>
 #include <credentials/examples/DeviceAttestationCredsExample.h>
+#include <data-model-providers/codegen/Instance.h>
 #include <platform/nrfconnect/ExternalFlashManager.h>
+#include <setup_payload/OnboardingCodesUtil.h>
 
 LOG_MODULE_DECLARE(app, CONFIG_CHIP_APP_LOG_LEVEL);
 
@@ -68,13 +79,24 @@ Clusters::NetworkCommissioning::Instance Nrf::Matter::InitData::sWiFiCommissioni
 };
 #endif
 
+#ifdef CONFIG_OPENTHREAD
+app::Clusters::NetworkCommissioning::InstanceAndDriver<NetworkCommissioning::GenericThreadDriver>
+	sThreadNetworkDriver(0 /*endpointId*/);
+#endif
+
 #ifdef CONFIG_CHIP_CRYPTO_PSA
 chip::Crypto::PSAOperationalKeystore Nrf::Matter::InitData::sOperationalKeystoreDefault{};
+#endif
+
+#ifdef CONFIG_CHIP_STORE_KEYS_IN_KMU
+chip::DeviceLayer::KMUSessionKeystore Nrf::Matter::InitData::sKMUSessionKeystoreDefault{};
 #endif
 
 #ifdef CONFIG_CHIP_FACTORY_DATA
 FactoryDataProvider<InternalFlashFactoryData> Nrf::Matter::InitData::sFactoryDataProviderDefault{};
 #endif
+
+chip::DeviceLayer::DeviceInfoProviderImpl Nrf::Matter::InitData::sDeviceInfoProviderDefault{};
 
 namespace
 {
@@ -87,6 +109,9 @@ Nrf::Matter::InitData sLocalInitData{ .mNetworkingInstance = nullptr,
 #endif
 #ifdef CONFIG_CHIP_CRYPTO_PSA
 				      .mOperationalKeyStore = nullptr,
+#endif
+#ifdef CONFIG_CHIP_STORE_KEYS_IN_KMU
+				      .mSessionKeystore = nullptr,
 #endif
 				      .mPreServerInitClbk = nullptr,
 				      .mPostServerInitClbk = nullptr };
@@ -139,7 +164,7 @@ void FeedFromMatter(Nrf::Watchdog::WatchdogSource *watchdogSource)
 #endif
 
 /* Matter stack design implies different initialization procedure for Thread and Wi-Fi backend. */
-#if defined(CONFIG_NET_L2_OPENTHREAD)
+#if defined(CONFIG_OPENTHREAD)
 CHIP_ERROR ConfigureThreadRole()
 {
 	using ThreadRole = ConnectivityManager::ThreadDeviceType;
@@ -168,8 +193,22 @@ CHIP_ERROR InitNetworkingStack()
 	error = ConfigureThreadRole();
 	VerifyOrReturnLogError(error == CHIP_NO_ERROR, error);
 
+	sThreadNetworkDriver.Init();
+
 	return error;
 }
+
+#if CHIP_SYSTEM_CONFIG_USE_OPENTHREAD_ENDPOINT
+void LockOpenThreadTask(void)
+{
+	chip::DeviceLayer::ThreadStackMgr().LockThreadStack();
+}
+
+void UnlockOpenThreadTask(void)
+{
+	chip::DeviceLayer::ThreadStackMgr().UnlockThreadStack();
+}
+#endif /* CHIP_SYSTEM_CONFIG_USE_OPENTHREAD_ENDPOINT */
 
 #elif defined(CONFIG_CHIP_WIFI)
 
@@ -182,8 +221,8 @@ CHIP_ERROR InitNetworkingStack()
 	return CHIP_NO_ERROR;
 }
 #else
-#error "No valid L2 network backend selected");
-#endif /* CONFIG_NET_L2_OPENTHREAD */
+#error "No valid networking backend selected");
+#endif /* CONFIG_OPENTHREAD */
 
 #define VerifyInitResultOrReturn(ec, msg)                                                                              \
 	VerifyOrReturn(ec == CHIP_NO_ERROR, LOG_ERR(msg " [Error: %d]", sInitResult.Format()))
@@ -200,7 +239,7 @@ void DoInitChipServer(intptr_t /* unused */)
 		/* Remove diagnostic logs on the first boot, as retention RAM is not cleared during erase/factory reset.
 		 */
 		if (count == 1) {
-			Nrf::Matter::DiagnosticLogProvider::GetInstance().ClearLogs();
+			Nrf::Matter::DiagnosticLogProvider::GetInstance().ClearAllLogs();
 		}
 
 		Nrf::Matter::DiagnosticLogProvider::GetInstance().Init();
@@ -215,7 +254,7 @@ void DoInitChipServer(intptr_t /* unused */)
 		VerifyInitResultOrReturn(sInitResult, "Custom pre server initialization failed");
 	}
 
-	/* Initialize L2 networking backend. */
+	/* Initialize networking backend. */
 	sInitResult = InitNetworkingStack();
 	VerifyInitResultOrReturn(sInitResult, "Cannot initialize IPv6 networking stack");
 
@@ -268,6 +307,15 @@ void DoInitChipServer(intptr_t /* unused */)
 	/* The default CommissionableDataProvider is set internally in the GenericConfigurationManagerImpl::Init(). */
 #endif
 
+#if CHIP_SYSTEM_CONFIG_USE_OPENTHREAD_ENDPOINT
+	// Set up OpenThread configuration when OpenThread is included
+	chip::Inet::EndPointStateOpenThread::OpenThreadEndpointInitParam nativeParams;
+	nativeParams.lockCb = LockOpenThreadTask;
+	nativeParams.unlockCb = UnlockOpenThreadTask;
+	nativeParams.openThreadInstancePtr = chip::DeviceLayer::ThreadStackMgrImpl().OTInstance();
+	sLocalInitData.mServerInitParams->endpointNativeParams = static_cast<void *>(&nativeParams);
+#endif /* CHIP_SYSTEM_CONFIG_USE_OPENTHREAD_ENDPOINT */
+
 #ifdef CONFIG_NCS_SAMPLE_MATTER_SETTINGS_SHELL
 	VerifyOrReturn(Nrf::PersistentStorageShell::Init(),
 		       LOG_ERR("Matter settings shell has been enabled, but it cannot be initialized."));
@@ -275,6 +323,13 @@ void DoInitChipServer(intptr_t /* unused */)
 
 #ifdef CONFIG_CHIP_CRYPTO_PSA
 	sLocalInitData.mServerInitParams->operationalKeystore = sLocalInitData.mOperationalKeyStore;
+#endif
+
+/* Set KMUKeyAllocator for devices that supports KMU */
+#ifdef CONFIG_CHIP_STORE_KEYS_IN_KMU
+	static KMUKeyAllocator kmuAllocator;
+	Crypto::SetPSAKeyAllocator(&kmuAllocator);
+	sLocalInitData.mServerInitParams->sessionKeystore = sLocalInitData.mSessionKeystore;
 #endif
 
 	VerifyOrReturn(sLocalInitData.mServerInitParams, LOG_ERR("No valid server initialization parameters"));
@@ -294,6 +349,9 @@ void DoInitChipServer(intptr_t /* unused */)
 	VerifyInitResultOrReturn(sInitResult, "Cannot register CHIP event handler");
 
 	SetDeviceInfoProvider(sLocalInitData.mDeviceInfoProvider);
+
+	sLocalInitData.mServerInitParams->dataModelProvider =
+		app::CodegenDataModelProviderInstance(sLocalInitData.mServerInitParams->persistentStorageDelegate);
 
 	sInitResult = Server::GetInstance().Init(*sLocalInitData.mServerInitParams);
 	VerifyInitResultOrReturn(sInitResult, "Server::Init() failed");
@@ -372,7 +430,16 @@ CHIP_ERROR StartServer()
 	CHIP_ERROR err = PlatformMgr().StartEventLoopTask();
 	VerifyInitResultOrReturnError(err, "PlatformMgr().StartEventLoopTask() failed");
 
-	return WaitForReadiness();
+	/* Wait for the CHIP server to be initialized. */
+	err = WaitForReadiness();
+	VerifyInitResultOrReturnError(err, "CHIP server initialization failed");
+
+	/* Run all code-driven registered cluster initialization callbacks. */
+	if (!nrf_matter_cluster_init_run_all()) {
+		return CHIP_ERROR_INTERNAL;
+	}
+
+	return CHIP_NO_ERROR;
 }
 
 #ifdef CONFIG_CHIP_FACTORY_DATA
@@ -381,5 +448,10 @@ FactoryDataProviderBase *GetFactoryDataProvider()
 	return sLocalInitData.mFactoryDataProvider;
 }
 #endif
+
+PersistentStorageDelegate *GetPersistentStorageDelegate()
+{
+	return sLocalInitData.mServerInitParams->persistentStorageDelegate;
+}
 
 } /* namespace Nrf::Matter */

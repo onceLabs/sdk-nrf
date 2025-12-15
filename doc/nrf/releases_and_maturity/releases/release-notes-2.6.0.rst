@@ -44,7 +44,7 @@ Added the following features as supported:
 
 * Power Management (nPM1300):
 
-  * New :ref:`npm1300_one_button` sample that demonstrates how to support wake-up, shutdown, and user interactions through a single button connected to the nPM1300.
+  * New :ref:`nPM1300: One button <npm13xx_one_button>` sample that demonstrates how to support wake-up, shutdown, and user interactions through a single button connected to the nPM1300.
   * LDO and load-switches soft start configuration to limit voltage fluctuations, and PFM mode configuration for added user flexibility.
 
 * Amazon Sidewalk:
@@ -55,7 +55,7 @@ Added the following features as supported:
 * Cellular IoT:
 
   * Support for nRF9151 DK on the majority of :ref:`cellular IoT samples <cellular_samples>`.
-  * The :ref:`serial_lte_modem` application can now be used to turn an nRF91 Series SiP into a standalone modem that can be used through Zephyr's cellular modem driver.
+  * The Serial LTE modem application can now be used to turn an nRF91 Series SiP into a standalone modem that can be used through Zephyr's cellular modem driver.
 
 * Security:
 
@@ -94,7 +94,7 @@ Added the following features as experimental:
     * Communication using either MQTT or CoAP over Wi-Fi.
     * Better out-of-box experience by using the new nRF Cloud Security Services :ref:`auto-onboarding feature <nrf_cloud_multi_service_provisioning_service>`.
       This makes it easier to connect a new device to nRF Cloud, including installation of security credentials.
-  * The :ref:`nrf_cloud_rest_device_message` sample also includes experimental support for the new nRF Cloud Security Services :ref:`auto-onboarding <remote_prov_auto_onboard>` feature.
+  * The :ref:`nrf_cloud_rest_device_message` sample also includes experimental support for the new nRF Cloud Security Services auto-onboarding feature.
 
 * Other:
 
@@ -142,7 +142,7 @@ Supported modem firmware
 See `Modem firmware compatibility matrix`_ for an overview of which modem firmware versions have been tested with this version of the |NCS|.
 
 Use the latest version of the nRF Programmer app of `nRF Connect for Desktop`_ to update the modem firmware.
-See :ref:`nrf9160_gs_updating_fw_modem` for instructions.
+See the `Programming nRF91 Series DK firmware` page for instructions.
 
 Modem-related libraries and versions
 ====================================
@@ -194,7 +194,7 @@ Working with nRF91 Series
 * Updated:
 
   * The :ref:`ug_nrf9160_gs` and :ref:`ug_thingy91_gsg` pages so that instructions in the :ref:`nrf9160_gs_connecting_dk_to_cloud` and :ref:`thingy91_connect_to_cloud` sections, respectively, match the updated nRF Cloud workflow.
-  * The :ref:`ug_nrf9160_gs` by replacing the Updating the DK firmware section with a new :ref:`nrf9160_gs_installing_software` section.
+  * The :ref:`ug_nrf9160_gs` by replacing the Updating the DK firmware section with a new Getting started using the Quick Start app section.
     This new section includes steps for using the `Quick Start app`_, a new application in `nRF Connect for Desktop`_ that streamlines the getting started process with the nRF91 Series DKs.
   * :ref:`ug_nrf9160` user guide by separating the information about snippets into its own page, :ref:`ug_nrf91_snippet`.
 
@@ -386,10 +386,10 @@ Zigbee
 
 * Updated:
 
-  * :ref:`nrfxlib:zboss` to v3.11.3.0 and platform v5.1.4 (``v3.11.3.0+5.1.4``).
+  * ZBOSS Zigbee stack to v3.11.3.0 and platform v5.1.4 (``v3.11.3.0+5.1.4``).
     They contain fixes for security vulnerabilities and other bugs.
-    For details, see :ref:`zboss_changelog`.
-  * :ref:`ZBOSS Network Co-processor Host <ug_zigbee_tools_ncp_host>` package to the new version v2.2.2.
+    For details, see the ZBOSS changelog.
+  * ZBOSS Network Co-processor Host package to the new version v2.2.2.
 
 * Removed the precompiled development variant of ZBOSS libraries.
 * Fixed a bus fault issue at reset when using :kconfig:option:`CONFIG_RAM_POWER_DOWN_LIBRARY` in some samples configuration (KRKNWK-18572).
@@ -442,7 +442,7 @@ Asset Tracker v2
 * Added:
 
   * Support for the nRF9151 development kit.
-  * The :ref:`CONFIG_DATA_SAMPLE_WIFI_DEFAULT <CONFIG_DATA_SAMPLE_WIFI_DEFAULT>` Kconfig option to configure whether Wi-Fi APs are included in sample requests by default.
+  * The ``CONFIG_DATA_SAMPLE_WIFI_DEFAULT`` Kconfig option to configure whether Wi-Fi APs are included in sample requests by default.
   * The :kconfig:option:`CONFIG_NRF_CLOUD_SEND_SERVICE_INFO_FOTA` and :kconfig:option:`CONFIG_NRF_CLOUD_SEND_SERVICE_INFO_UI` Kconfig options.
     The application no longer sends a device shadow update; this is now handled by the :ref:`lib_nrf_cloud` library.
   * Support for ADXL367 accelerometer.
@@ -478,19 +478,19 @@ Serial LTE modem
     It can be used in conjunction with CMUX to use a single UART for both AT data and PPP.
     The ``#XPPP`` AT command is added to manage the PPP link.
   * ``#XMQTTCFG`` AT command to configure the MQTT client before connecting to the broker.
-  * The :ref:`CONFIG_SLM_AUTO_CONNECT <CONFIG_SLM_AUTO_CONNECT>` Kconfig option to support automatic LTE connection at start-up or reset.
-  * The :ref:`CONFIG_SLM_CUSTOMER_VERSION <CONFIG_SLM_CUSTOMER_VERSION>` Kconfig option for customers to define their own version string after customization.
+  * The ``CONFIG_SLM_AUTO_CONNECT`` Kconfig option to support automatic LTE connection at start-up or reset.
+  * The ``CONFIG_SLM_CUSTOMER_VERSION`` Kconfig option for customers to define their own version string after customization.
   * The optional ``path`` parameter to the ``#XCARRIEREVT`` AT notification.
   * ``#XCARRIERCFG`` AT command to configure the LwM2M carrier library using the LwM2M carrier settings (see the :kconfig:option:`CONFIG_LWM2M_CARRIER_SETTINGS` Kconfig option).
   * Support for Zephyr's cellular modem driver, which allows a Zephyr application running on an external MCU to seamlessly use Zephyr's IP stack instead of AT commands for connectivity.
-    See :ref:`slm_as_zephyr_modem` for more information.
+    See nRF91 Series as a Zephyr-compatible modem for more information.
 
 * Updated:
 
-  * The ``CONFIG_SLM_WAKEUP_PIN`` Kconfig option has been renamed to :ref:`CONFIG_SLM_POWER_PIN <CONFIG_SLM_POWER_PIN>`.
+  * The ``CONFIG_SLM_WAKEUP_PIN`` Kconfig option has been renamed to ``CONFIG_SLM_POWER_PIN``.
     In addition to its already existing functionality, it can now be used to power off the SiP.
   * ``#XMQTTCON`` AT command to exclude MQTT client ID from the parameter list.
-  * ``#XSLMVER`` AT command to report :ref:`CONFIG_SLM_CUSTOMER_VERSION <CONFIG_SLM_CUSTOMER_VERSION>` if it is defined.
+  * ``#XSLMVER`` AT command to report ``CONFIG_SLM_CUSTOMER_VERSION`` if it is defined.
   * The ``#XTCPCLI``, ``#XUDPCLI``, and ``#XHTTPCCON`` AT commands with options for the following purposes:
 
     * Set the ``PEER_VERIFY`` socket option.
@@ -641,42 +641,42 @@ Bluetooth Mesh samples
 
 * :ref:`ble_mesh_dfu_target` sample:
 
-  * Added support for the :ref:`zephyr:nrf52840dongle_nrf52840`.
+  * Added support for the :zephyr:board:`nrf52840dongle`.
 
 * :ref:`bluetooth_mesh_light_dim` sample:
 
-  * Added support for the :ref:`zephyr:nrf52840dongle_nrf52840`.
-  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :ref:`zephyr:nrf5340dk_nrf5340` and :ref:`zephyr:thingy53_nrf5340` boards.
+  * Added support for the :zephyr:board:`nrf52840dongle`.
+  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :zephyr:board:`nrf5340dk` and :zephyr:board:`thingy53` boards.
 
 * :ref:`bluetooth_mesh_light_lc` sample:
 
-  * Added support for the :ref:`zephyr:nrf52840dongle_nrf52840`.
-  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :ref:`zephyr:nrf5340dk_nrf5340` and :ref:`zephyr:thingy53_nrf5340` boards.
+  * Added support for the :zephyr:board:`nrf52840dongle`.
+  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :zephyr:board:`nrf5340dk` and :zephyr:board:`thingy53` boards.
 
 * :ref:`bluetooth_mesh_light` sample:
 
-  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :ref:`zephyr:nrf5340dk_nrf5340` and :ref:`zephyr:thingy53_nrf5340` boards.
+  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :zephyr:board:`nrf5340dk` and :zephyr:board:`thingy53` boards.
 
 * :ref:`bluetooth_mesh_light_switch` sample:
 
-  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :ref:`zephyr:nrf5340dk_nrf5340` and :ref:`zephyr:thingy53_nrf5340` boards.
+  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :zephyr:board:`nrf5340dk` and :zephyr:board:`thingy53` boards.
 
 * :ref:`bluetooth_mesh_sensor_server` sample:
 
-  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :ref:`zephyr:nrf5340dk_nrf5340` and :ref:`zephyr:thingy53_nrf5340` boards.
+  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :zephyr:board:`nrf5340dk` and :zephyr:board:`thingy53` boards.
 
 * :ref:`bluetooth_mesh_silvair_enocean` sample:
 
-  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :ref:`zephyr:nrf5340dk_nrf5340` board.
+  * Fixed an issue where Bluetooth could not be initialized due to a misconfiguration between the Bluetooth host and the Bluetooth LE Controller when building with :ref:`zephyr:sysbuild` for the :zephyr:board:`nrf5340dk` board.
 
 Cellular samples
 ----------------
 
 * Added support for the nRF9151 DK in all cellular samples except for the following samples:
 
-  * :ref:`lte_sensor_gateway`
+  * LTE Sensor Gateway
   * :ref:`smp_svr`
-  * :ref:`slm_shell_sample`
+  * SLM Shell
 
 * :ref:`ciphersuites` sample:
 
@@ -926,9 +926,9 @@ Peripheral samples
 PMIC samples
 ------------
 
-* Added :ref:`npm1300_one_button` sample that demonstrates how to support wake-up, shutdown, and user interactions through a single button connected to the nPM1300.
+* Added the :ref:`nPM1300: One button <npm13xx_one_button>` sample that demonstrates how to support wake-up, shutdown, and user interactions through a single button connected to the nPM1300.
 
-* :ref:`npm1300_fuel_gauge` sample:
+* :ref:`nPM1300: Fuel gauge <npm13xx_fuel_gauge>` sample:
 
   * Updated to accommodate API changes in the :ref:`nrfxlib:nrf_fuel_gauge`.
 
@@ -1153,7 +1153,7 @@ Modem libraries
     * The deprecated Kconfig option ``CONFIG_NRF_MODEM_LIB_IPC_IRQ_PRIO_OVERRIDE``.
     * The ``NRF_MODEM_LIB_NET_IF_DOWN`` flag support in the ``lte_net_if`` network interface driver.
 
-* :ref:`lib_modem_slm`:
+* Modem SLM:
 
     * Updated the library by making the used GPIO to be configurable using devicetree.
 
@@ -1199,7 +1199,7 @@ Libraries for networking
     It now contains more details on how to use the Azure CLI to set up an IoT Hub.
     The documentation on credential provisioning has also been updated, both for nRF91 Series devices and nRF70 Series devices.
 
-* :ref:`lib_download_client` library:
+* Download client library:
 
   * Added the ``family`` parameter to the :c:struct:`download_client_cfg` structure.
     This is used to optimize the download sequence when the device only supports IPv4 or IPv6.
@@ -1325,7 +1325,7 @@ Libraries for networking
 
   * Updated the :c:struct:`nrf_cloud_rest_location_request` structure to accept a pointer to a :c:struct:`nrf_cloud_location_config` structure in place of the single ``disable_response`` flag.
 
-* :ref:`lib_wifi_credentials` library:
+* Wi-Fi credentials library:
 
   * Updated the PSA backend to use the PSA Internal Trusted Storage (ITS) for storing Wi-Fi credentials instead of the Protected Storage.
     This has been changed because the PSA ITS is a better fit for storing assets like credentials.

@@ -4,23 +4,35 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <stdint.h>
-
 #include <zephyr/kernel.h>
 
-#include "../hw/ba414/regs_addr.h"
-#include <silexpk/core.h>
-#include "../hw/ba414/pkhardware_ba414e.h"
-#include <cracen/interrupts.h>
-#include <cracen/statuscodes.h>
+#include <stdint.h>
+
 #include "../hw/ba414/ba414_status.h"
+#include "../hw/ba414/pkhardware_ba414e.h"
+#include "../hw/ba414/regs_addr.h"
 #include "../hw/ik/ikhardware.h"
 #include "../hw/ik/regs_addr.h"
+#include <silexpk/core.h>
+#include <silexpk/iomem.h>
+#include <cracen/interrupts.h>
+#include <cracen/statuscodes.h>
 #include "internal.h"
 
 #include <hal/nrf_cracen.h>
 #include <security/cracen.h>
 #include <nrf_security_mutexes.h>
+
+#if defined(CONFIG_CRACEN_HW_VERSION_LITE) &&                                                      \
+	!defined(CONFIG_PSA_NEED_CRACEN_IKG_INTERRUPT_WORKAROUND)
+#error Check to see if the current board needs the IKG-PKE interrupt workaround or not, \
+then update this error
+#endif
+
+#if defined(CONFIG_PSA_NEED_CRACEN_RNG_NO_ENTROPY_WORKAROUND)
+#warning "CONFIG_PSA_NEED_CRACEN_RNG_NO_ENTROPY_WORKAROUND is enabled, any use of CRACEN IKG \
+module with entropy will fail"
+#endif
 
 #ifndef ADDR_BA414EP_REGS_BASE
 #define ADDR_BA414EP_REGS_BASE CRACEN_ADDR_BA414EP_REGS_BASE
@@ -29,20 +41,18 @@
 #define ADDR_BA414EP_CRYPTORAM_BASE CRACEN_ADDR_BA414EP_CRYPTORAM_BASE
 #endif
 
-#ifndef SX_PK_MICROCODE_ADDRESS
-#define SX_PK_MICROCODE_ADDRESS CRACEN_SX_PK_MICROCODE_ADDRESS
-#endif
-
 #ifndef NULL
 #define NULL (void *)0
 #endif
 
-#define ADDR_BA414EP_REGS(instance) ((char *)(ADDR_BA414EP_REGS_BASE) + 0x10000 * (instance))
+#define ADDR_BA414EP_REGS(instance) ((uint8_t *)(ADDR_BA414EP_REGS_BASE) + 0x10000 * (instance))
 #define ADDR_BA414EP_CRYPTORAM(instance)                                                           \
-	((char *)ADDR_BA414EP_CRYPTORAM_BASE + 0x10000 * (instance))
+	((uint8_t *)ADDR_BA414EP_CRYPTORAM_BASE + 0x10000 * (instance))
 
 #define PK_BUSY_MASK_BA414EP 0x00010000
 #define PK_BUSY_MASK_IK	     0x00050000
+
+#define IK_ENTROPY_ERROR     0xc6
 
 struct sx_pk_cnx {
 	struct sx_pk_req instance;
@@ -50,7 +60,7 @@ struct sx_pk_cnx {
 	struct sx_pk_blinder *b;
 };
 
-struct sx_pk_cnx silex_pk_engine;
+static struct sx_pk_cnx silex_pk_engine;
 
 NRF_SECURITY_MUTEX_DEFINE(cracen_mutex_asymmetric);
 
@@ -66,26 +76,33 @@ bool ik_is_busy(sx_pk_req *req)
 
 bool is_busy(sx_pk_req *req)
 {
+#if defined(CONFIG_CRACEN_IKG)
 	if (sx_pk_is_ik_cmd(req)) {
 		return ik_is_busy(req);
-	} else {
-		return ba414ep_is_busy(req);
 	}
+#endif
+
+	return ba414ep_is_busy(req);
 }
 
 void sx_clear_interrupt(sx_pk_req *req)
 {
 	sx_pk_wrreg(&req->regs, PK_REG_CONTROL, PK_RB_CONTROL_CLEAR_IRQ);
+
+#if defined(CONFIG_CRACEN_IKG)
 	if (sx_pk_is_ik_cmd(req)) {
 		sx_pk_wrreg(&req->regs, IK_REG_PK_CONTROL, IK_PK_CONTROL_CLEAR_IRQ);
 	}
+#endif
 }
 
 int read_status(sx_pk_req *req)
 {
+#if defined(CONFIG_CRACEN_IKG)
 	if (sx_pk_is_ik_cmd(req)) {
 		return sx_ik_read_status(req);
 	}
+#endif
 
 	uint32_t status = sx_pk_rdreg(&req->regs, PK_REG_STATUS);
 
@@ -95,38 +112,77 @@ int read_status(sx_pk_req *req)
 int sx_pk_wait(sx_pk_req *req)
 {
 	do {
-		if (!sx_pk_is_ik_cmd(req)) {
-			cracen_wait_for_pke_interrupt();
+		if (!IS_ENABLED(CONFIG_PSA_NEED_CRACEN_IKG_INTERRUPT_WORKAROUND) &&
+		    IS_ENABLED(CONFIG_CRACEN_USE_INTERRUPTS)) {
+			/* In CRACEN Lite the PKE-IKG interrupt is only active when in PK mode.
+			 * This is to work around a hardware issue where the interrupt is never
+			 * cleared. Therefore sx_pk_wait needs to use polling and not interrupts for
+			 * CRACEN Lite.
+			 */
+			if (IS_ENABLED(CONFIG_CRACEN_IKG)) {
+				if (!sx_pk_is_ik_cmd(req)) {
+					cracen_wait_for_pke_interrupt();
+				}
+			}
+		} else if (IS_ENABLED(CONFIG_CRACEN_HW_VERSION_LITE)) {
+			/* In CRACEN Lite the IKG sometimes fails due to an entropy error.
+			 * Error code is returned here so the entire operation can be rerun
+			 */
+			if (sx_pk_rdreg(&req->regs, IK_REG_STATUS) == IK_ENTROPY_ERROR) {
+				if (IS_ENABLED(CONFIG_PSA_NEED_CRACEN_RNG_NO_ENTROPY_WORKAROUND)) {
+					/* Do a soft reset of the IKG to ensure entropy error status
+					 * register is cleared for the next use
+					 */
+					sx_pk_wrreg(&req->regs, IK_REG_SOFT_RST, 1);
+					sx_pk_wrreg(&req->regs, IK_REG_SOFT_RST, 0);
+					return SX_OK;
+				} else {
+					return SX_ERR_RETRY;
+				}
+			}
+		} else {
+			/* For compliance */
 		}
+
 	} while (is_busy(req));
 
 	return read_status(req);
 }
 
-void sx_pk_wrreg(struct sx_regs *regs, uint32_t addr, uint32_t v)
+void sx_pk_wrreg(struct sx_regs *regs, uint32_t addr, uint32_t value)
 {
-	volatile uint32_t *p = (uint32_t *)(regs->base + addr);
+	volatile uint32_t *reg_ptr = (uint32_t *)(regs->base + addr);
 
-#ifdef INSTRUMENT_MMIO_WITH_PRINTFS
-	printk("sx_pk_wrreg(addr=0x%x, sum=0x%x, val=0x%x);\r\n", addr, (uint32_t)p, v);
+#ifdef SX_INSTRUMENT_MMIO_WITH_PRINTFS
+	printk("sx_pk_wrreg(addr=0x%x, reg_ptr=%p, val=0x%x)\r\n", addr, reg_ptr, value);
 #endif
+	if ((uintptr_t)reg_ptr % 4) {
+		SX_WARN_UNALIGNED_ADDR(reg_ptr);
+	}
 
-	*p = v;
+	*reg_ptr = value;
 }
 
 uint32_t sx_pk_rdreg(struct sx_regs *regs, uint32_t addr)
 {
-	volatile uint32_t *p = (uint32_t *)(regs->base + addr);
-	uint32_t v;
+	volatile uint32_t *reg_ptr = (uint32_t *)(regs->base + addr);
+	uint32_t value;
 
-	v = *p;
 
-#ifdef INSTRUMENT_MMIO_WITH_PRINTFS
-	printk("sx_pk_rdreg(addr=0x%x, sum=0x%x);\r\n", addr, (uint32_t)p);
-	printk("result = 0x%x\r\n", v);
+#ifdef SX_INSTRUMENT_MMIO_WITH_PRINTFS
+	printk("sx_pk_rdreg(addr=0x%x, reg_ptr=%p)\r\n", addr, reg_ptr);
+#endif
+	if ((uintptr_t)reg_ptr % 4) {
+		SX_WARN_UNALIGNED_ADDR(reg_ptr);
+	}
+
+	value = *reg_ptr;
+
+#ifdef SX_INSTRUMENT_MMIO_WITH_PRINTFS
+	printk("result = 0x%x\r\n", value);
 #endif
 
-	return v;
+	return value;
 }
 
 struct sx_pk_blinder **sx_pk_get_blinder(struct sx_pk_cnx *cnx)
@@ -189,11 +245,22 @@ struct sx_pk_acq_req sx_pk_acquire_req(const struct sx_pk_cmd_def *cmd)
 	req.req->cnx = &silex_pk_engine;
 
 	cracen_acquire();
-	nrf_cracen_int_enable(NRF_CRACEN, NRF_CRACEN_INT_PKE_IKG_MASK);
+	if (!IS_ENABLED(CONFIG_PSA_NEED_CRACEN_IKG_INTERRUPT_WORKAROUND) &&
+	    IS_ENABLED(CONFIG_CRACEN_USE_INTERRUPTS)) {
+		/* In CRACEN Lite the PKE-IKG interrupt is only active when in PK mode.
+		 * This is to work around a hardware issue where the interrupt is never cleared.
+		 * Therefore it is not enabled here for Cracen Lite.
+		 */
+		nrf_cracen_int_enable(NRF_CRACEN, NRF_CRACEN_INT_PKE_IKG_MASK);
+	}
 
 	/* Wait until initialized. */
 	while (ba414ep_is_busy(req.req) || ik_is_busy(req.req)) {
-		cracen_wait_for_pke_interrupt();
+		if (!IS_ENABLED(CONFIG_PSA_NEED_CRACEN_IKG_INTERRUPT_WORKAROUND) &&
+		    IS_ENABLED(CONFIG_CRACEN_USE_INTERRUPTS)) {
+
+			cracen_wait_for_pke_interrupt();
+		}
 	}
 
 	return req;

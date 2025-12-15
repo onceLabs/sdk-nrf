@@ -11,7 +11,8 @@
 
 #include "broadcast_sink.h"
 #include "zbus_common.h"
-#include "nrf5340_audio_dk.h"
+#include "peripherals.h"
+#include "led_assignments.h"
 #include "led.h"
 #include "button_assignments.h"
 #include "macros_common.h"
@@ -24,6 +25,8 @@
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(main, CONFIG_MAIN_LOG_LEVEL);
+
+BUILD_ASSERT(CONFIG_BT_AUDIO_CONCURRENT_RX_STREAMS_MAX <= CONFIG_AUDIO_DECODE_CHANNELS_MAX);
 
 struct ble_iso_data {
 	uint8_t data[CONFIG_BT_ISO_RX_MTU];
@@ -128,11 +131,7 @@ static void button_msg_sub_thread(void)
 			break;
 
 		case BUTTON_4:
-			ret = broadcast_sink_change_active_audio_stream();
-			if (ret) {
-				LOG_WRN("Failed to change active audio stream: %d", ret);
-			}
-
+			/* Unused button */
 			break;
 
 		case BUTTON_5:
@@ -208,7 +207,7 @@ static void le_audio_msg_sub_thread(void)
 
 			audio_system_start();
 			stream_state_set(STATE_STREAMING);
-			ret = led_blink(LED_APP_1_BLUE);
+			ret = led_blink(LED_AUDIO_CONN_STATUS);
 			ERR_CHK(ret);
 
 			break;
@@ -223,7 +222,7 @@ static void le_audio_msg_sub_thread(void)
 
 			stream_state_set(STATE_PAUSED);
 			audio_system_stop();
-			ret = led_on(LED_APP_1_BLUE);
+			ret = led_on(LED_AUDIO_CONN_STATUS);
 			ERR_CHK(ret);
 
 			break;
@@ -265,7 +264,7 @@ static void le_audio_msg_sub_thread(void)
 			if (strm_state == STATE_STREAMING) {
 				stream_state_set(STATE_PAUSED);
 				audio_system_stop();
-				ret = led_on(LED_APP_1_BLUE);
+				ret = led_on(LED_AUDIO_CONN_STATUS);
 				ERR_CHK(ret);
 			}
 
@@ -417,7 +416,7 @@ static int zbus_subscribers_create(void)
 		&button_msg_sub_thread_data, button_msg_sub_thread_stack,
 		CONFIG_BUTTON_MSG_SUB_STACK_SIZE, (k_thread_entry_t)button_msg_sub_thread, NULL,
 		NULL, NULL, K_PRIO_PREEMPT(CONFIG_BUTTON_MSG_SUB_THREAD_PRIO), 0, K_NO_WAIT);
-	ret = k_thread_name_set(button_msg_sub_thread_id, "BUTTON_MSG_SUB");
+	ret = k_thread_name_set(button_msg_sub_thread_id, "Msg_sub_btn");
 	if (ret) {
 		LOG_ERR("Failed to create button_msg thread");
 		return ret;
@@ -427,7 +426,7 @@ static int zbus_subscribers_create(void)
 		&le_audio_msg_sub_thread_data, le_audio_msg_sub_thread_stack,
 		CONFIG_LE_AUDIO_MSG_SUB_STACK_SIZE, (k_thread_entry_t)le_audio_msg_sub_thread, NULL,
 		NULL, NULL, K_PRIO_PREEMPT(CONFIG_LE_AUDIO_MSG_SUB_THREAD_PRIO), 0, K_NO_WAIT);
-	ret = k_thread_name_set(le_audio_msg_sub_thread_id, "LE_AUDIO_MSG_SUB");
+	ret = k_thread_name_set(le_audio_msg_sub_thread_id, "Msg_sub_LE_Audio");
 	if (ret) {
 		LOG_ERR("Failed to create le_audio_msg thread");
 		return ret;
@@ -437,9 +436,9 @@ static int zbus_subscribers_create(void)
 		&bt_mgmt_msg_sub_thread_data, bt_mgmt_msg_sub_thread_stack,
 		CONFIG_BT_MGMT_MSG_SUB_STACK_SIZE, (k_thread_entry_t)bt_mgmt_msg_sub_thread, NULL,
 		NULL, NULL, K_PRIO_PREEMPT(CONFIG_BT_MGMT_MSG_SUB_THREAD_PRIO), 0, K_NO_WAIT);
-	ret = k_thread_name_set(bt_mgmt_msg_sub_thread_id, "BT_MGMT_MSG_SUB");
+	ret = k_thread_name_set(bt_mgmt_msg_sub_thread_id, "Msg_sub_BT_mgmt");
 	if (ret) {
-		LOG_ERR("Failed to create le_audio_msg thread");
+		LOG_ERR("Failed to create msg BT management thread");
 		return ret;
 	}
 
@@ -471,10 +470,12 @@ static int zbus_link_producers_observers(void)
 		return ret;
 	}
 
-	ret = zbus_chan_add_obs(&volume_chan, &volume_evt_sub, ZBUS_ADD_OBS_TIMEOUT_MS);
-	if (ret) {
-		LOG_ERR("Failed to add add volume sub");
-		return ret;
+	if (IS_ENABLED(CONFIG_BOARD_NRF5340_AUDIO_DK_NRF5340_CPUAPP)) {
+		ret = zbus_chan_add_obs(&volume_chan, &volume_evt_sub, ZBUS_ADD_OBS_TIMEOUT_MS);
+		if (ret) {
+			LOG_ERR("Failed to add add volume sub");
+			return ret;
+		}
 	}
 
 	ret = zbus_chan_add_obs(&bt_mgmt_chan, &bt_mgmt_evt_sub, ZBUS_ADD_OBS_TIMEOUT_MS);
@@ -525,6 +526,11 @@ static int ext_adv_populate(struct bt_data *ext_adv_buf, size_t ext_adv_buf_size
 		return ret;
 	}
 
+	ext_adv_buf[ext_adv_buf_cnt].type = BT_DATA_NAME_COMPLETE;
+	ext_adv_buf[ext_adv_buf_cnt].data = CONFIG_BT_DEVICE_NAME;
+	ext_adv_buf[ext_adv_buf_cnt].data_len = sizeof(CONFIG_BT_DEVICE_NAME) - 1;
+	ext_adv_buf_cnt++;
+
 	ret = broadcast_sink_adv_populate(&ext_adv_buf[ext_adv_buf_cnt],
 					  ext_adv_buf_size - ext_adv_buf_cnt);
 
@@ -551,11 +557,9 @@ uint8_t stream_state_get(void)
 	return strm_state;
 }
 
-void streamctrl_send(void const *const data, size_t size, uint8_t num_ch)
+void streamctrl_send(struct net_buf const *const audio_frame)
 {
-	ARG_UNUSED(data);
-	ARG_UNUSED(size);
-	ARG_UNUSED(num_ch);
+	ARG_UNUSED(audio_frame);
 
 	LOG_WRN("Sending is not possible for broadcast sink");
 }
@@ -566,7 +570,7 @@ int main(void)
 
 	LOG_DBG("Main started");
 
-	ret = nrf5340_audio_dk_init();
+	ret = peripherals_init();
 	ERR_CHK(ret);
 
 	ret = fw_info_app_print();

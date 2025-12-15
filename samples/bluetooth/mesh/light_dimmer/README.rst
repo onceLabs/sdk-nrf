@@ -1,13 +1,13 @@
 .. _bluetooth_mesh_light_dim:
 
-Bluetooth Mesh: Light dimmer and scene selector
-###############################################
+Bluetooth Mesh NLC: Dimming Control/Scene Selector
+##################################################
 
 .. contents::
    :local:
    :depth: 2
 
-The Bluetooth® Mesh light dimmer and scene selector sample demonstrates how to set up a light dimmer and scene selector application, and control dimmable LEDs with Bluetooth Mesh using the :ref:`bt_mesh_lvl_readme`, the :ref:`bt_mesh_onoff_readme`, and the :ref:`bt_mesh_scene_readme`.
+The Bluetooth® Mesh NLC Dimming Control/Scene Selector sample demonstrates how to set up a light dimmer and scene selector application, and control dimmable LEDs with Bluetooth Mesh using the :ref:`bt_mesh_lvl_readme`, the :ref:`bt_mesh_onoff_readme`, and the :ref:`bt_mesh_scene_readme`.
 The sample provides the following functionality:
 
   * On/off and dim up/down using one button
@@ -59,7 +59,7 @@ This mobile application is also used to configure key bindings, and publication 
       After provisioning and configuring the mesh models supported by the sample in the `nRF Mesh mobile app`_, **Button 1** on the Mesh Light Dimmer device can be used to control the configured network nodes' LEDs, while **Button 2** can be used to store and restore scenes on the network nodes.
 
       .. note::
-        When running this sample on the :ref:`zephyr:nrf52840dongle_nrf52840`, the scene selection functionality will not be available as the device only has one button.
+        When running this sample on the :zephyr:board:`nrf52840dongle`, the scene selection functionality will not be available as the device only has one button.
         The single button of the dongle will be used for dimming and the on/off functionality as described for **Button 1** in this documentation.
 
    .. group-tab:: nRF54 DKs
@@ -67,7 +67,7 @@ This mobile application is also used to configure key bindings, and publication 
       After provisioning and configuring the mesh models supported by the sample in the `nRF Mesh mobile app`_, **Button 0** on the Mesh Light Dimmer device can be used to control the configured network nodes' LEDs, while **Button 1** can be used to store and restore scenes on the network nodes.
 
       .. note::
-        When running this sample on the :ref:`zephyr:nrf52840dongle_nrf52840`, the scene selection functionality will not be available as the device only has one button.
+        When running this sample on the :zephyr:board:`nrf52840dongle`, the scene selection functionality will not be available as the device only has one button.
         The single button of the dongle will be used for dimming and the on/off functionality as described for **Button 0** in this documentation.
 
 Provisioning
@@ -130,12 +130,14 @@ User interface
 
       Button 2:
         On short press and release, **Button 2** will publish a Scene Restore message using the configured publication parameters of its model instance, and restore the LED state of all the targets to the values stored under the current scene number.
-        Each press of the button will recall the next scene, meaning, the first press will recall scene 2, the next press will recall scene 3, and so on, before wrapping around back to scene 1.
+        Each press of the button recalls the next scene.
+        The first press recalls scene 2, the next press recalls scene 3, and the sequence continues incrementally until it wraps around back to scene 1.
+
 
         On long press and release, **Button 2** will publish a Scene Store message using the configured publication parameters of its model instance, and store the current LED state of all the targets under the scene with the most recently recalled scene number.
 
         .. note::
-          On the :ref:`zephyr:nrf52840dongle_nrf52840`, the scene selection functionality will not be available as the device only has one button.
+          On the :zephyr:board:`nrf52840dongle`, the scene selection functionality will not be available as the device only has one button.
 
         .. tip::
           On Thingy:53, **Button 2** can be accessed by removing the top part of the casing.
@@ -144,7 +146,7 @@ User interface
         Show the OOB authentication value during provisioning if the "Push button" OOB method is used.
 
         .. note::
-          :ref:`zephyr:thingy53_nrf5340` supports only one RGB LED.
+          :zephyr:board:`thingy53` supports only one RGB LED.
           Each RGB LED channel is used as separate LED.
 
    .. group-tab:: nRF54 DKs
@@ -159,8 +161,9 @@ User interface
         On release, the button publishes another Generic Level move set message with the ``delta`` parameter set to 0 and stops the continuous level change from the previous message.
 
       Button 2:
-        On short press and release, **Button 1** will publish a Scene Restore message using the configured publication parameters of its model instance, and restore the LED state of all the targets to the values stored under the current scene number.
-        Each press of the button will recall the next scene, meaning, the first press will recall scene 2, the next press will recall scene 3, and so on, before wrapping around back to scene 1.
+        On short press and release, **Button 1** publishes a Scene Restore message using the configured publication parameters of its model instance, and restores the LED state of all targets to the values stored under the current scene number.
+        Each press of the button recalls the next scene.
+        The first press recalls scene 2, the next press recalls scene 3, and the sequence continues incrementally until it wraps around back to scene 1.
 
         On long press and release, **Button 1** will publish a Scene Store message using the configured publication parameters of its model instance, and store the current LED state of all the targets under the scene with the most recently recalled scene number.
 
@@ -193,6 +196,11 @@ Building and running
 .. |sample path| replace:: :file:`samples/bluetooth/mesh/light_dimmer`
 
 .. include:: /includes/build_and_run_ns.txt
+
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
 
 .. _bluetooth_mesh_light_dimmer_testing:
 
@@ -245,6 +253,11 @@ You should now be able to perform the following actions:
 .. note::
   When controlling a Mesh Light Fixture device using the Mesh Light Dimmer device, the Light LC Server control will be temporarily disabled for the Mesh Light Fixture device.
   The control will be re-enabled after a certain time which can be configured using the :kconfig:option:`CONFIG_BT_MESH_LIGHT_CTRL_SRV_TIME_MANUAL` option.
+
+External flash for settings partition
+=====================================
+
+.. include:: /includes/mesh_ext_flash_settings.txt
 
 Dependencies
 ************

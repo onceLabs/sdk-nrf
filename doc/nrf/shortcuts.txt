@@ -2,12 +2,15 @@
 
 .. ### Versions
 
-.. |release| replace:: v2.8.0
-.. |release_tt| replace:: ``v2.8.0``
-.. |release_number_tt| replace:: ``2.8.0``
+.. |release| replace:: v3.2.0
+.. |release_tt| replace:: ``v3.2.0``
+.. |release_number_tt| replace:: ``3.2.0``
 
-.. |jlink_ver| replace:: v7.94i
-.. |jlink_ver_vsc| replace:: v7.94i
+.. |jlink_ver| replace:: v8.76
+
+.. |54H_nrfutil_device_ver| replace:: 2.15.2
+.. |54H_nrfutil_trace_ver| replace:: 4.4.0
+.. |ironside_se_ver| replace:: v23.1.2+21
 
 .. ### Config shortcuts
 
@@ -20,10 +23,16 @@
 .. |test_application| replace:: After programming the application to your development kit, complete the following steps to test it:
 
 .. |connect_generic| replace:: Connect the device to the computer using a USB cable.
-   The device is assigned a COM port (Windows) or ttyACM device (Linux), which is visible in the Device Manager.
+   The device is assigned a serial port.
+   Serial ports are referred to as COM ports on Windows, /dev/ttyACM devices on Linux, and /dev/tty devices on macOS.
+   To list Nordic Semiconductor devices connected to your computer together with their serial ports, open a terminal and run the ``nrfutil device list`` command.
+   Alternatively, check your operating system's device manager or its equivalent.
 
 .. |connect_kit| replace:: Connect the kit to the computer using a USB cable.
-   The kit is assigned a COM port (Windows) or ttyACM device (Linux), which is visible in the Device Manager.
+   The kit is assigned a serial port.
+   Serial ports are referred to as COM ports on Windows, /dev/ttyACM devices on Linux, and /dev/tty devices on macOS.
+   To list Nordic Semiconductor devices connected to your computer together with their serial ports, open a terminal and run the ``nrfutil device list`` command.
+   Alternatively, check your operating system's device manager or its equivalent.
 
 .. |connect_terminal_generic| replace:: Connect to the device with a terminal emulator (for example, the `Serial Terminal app`_).
    See :ref:`test_and_optimize` for the required settings and steps.
@@ -46,6 +55,10 @@
 .. |connect_terminal_both_ANSI| replace:: Connect to both kits with a terminal emulator that supports VT100/ANSI escape characters (for example, the `Serial Terminal app`_).
    See :ref:`test_and_optimize` for the required settings and steps.
 
+.. |serial_port_number_list| replace:: Serial ports are referred to as COM ports on Windows, /dev/ttyACM devices on Linux, and /dev/tty devices on macOS.
+   To list Nordic Semiconductor devices connected to your computer together with their serial ports, open a terminal and run the ``nrfutil device list`` command.
+   Alternatively, check your operating system's device manager or its equivalent.
+
 .. |ANSI| replace:: that supports VT100/ANSI escape characters
 
 .. |open_terminal_window_with_environment| replace:: Start the :ref:`toolchain environment <using_toolchain_environment>` in a terminal window.
@@ -65,36 +78,37 @@
 .. |Thingy91| replace:: Thingy:91 (PCA20035) - see :ref:`ug_thingy91`
 .. |nRF21540DK| replace:: nRF21540 DK board (PCA10112)
 
-.. |thingy52_not_supported_note| replace:: Despite being supported in :ref:`Zephyr <zephyr:thingy52_nrf52832>`, the |NCS| does not support `Nordic Thingy:52`_.
+.. |thingy52_not_supported_note| replace:: Despite :zephyr:board:`thingy52` being supported in Zephyr, the |NCS| does not support `Nordic Thingy:52`_.
 
 .. ### FOTA shortcuts
 
 .. |fota_upgrades_def| replace:: You can update the firmware of the device over the air, thus without a wired connection.
    Such an update is called a FOTA (firmware over-the-air) update.
 
-.. |fota_upgrades_building| replace:: To create a binary file for an application update, build the application with the :kconfig:option:`CONFIG_BOOTLOADER_MCUBOOT` option enabled.
-
 .. ### VSC shortcuts
 
-.. |vsc_extension_description| replace:: The |nRFVSC| is a complete IDE for developing applications compatible with the |NCS|.
-   The extension includes an interface for managing SDK and toolchain installations, an interface to the compiler and linker, an RTOS-aware debugger, a seamless interface to the |NCS|, and a serial terminal.
+.. |vsc_extension_description| replace:: |nRFVSC| is a set of VSIX extensions that turns |VSC| into a complete IDE for developing applications compatible with the |NCS|.
+   The extensions that are part of |nRFVSC| provide an interface for managing SDK and toolchain installations, an interface to the compiler and linker, an RTOS-aware debugger, a seamless interface to the |NCS|, and a serial terminal.
 .. |VSC| replace:: Visual Studio Code
-.. |nRFVSC| replace:: nRF Connect for VS Code extension
+.. |nRFVSC| replace:: nRF Connect for VS Code
 
 .. ### Deprecation shortcuts
 
 .. |file_suffix_related_deprecation_note| replace:: This feature is deprecated and is being replaced by :ref:`suffix-based configurations <app_build_file_suffixes>`.
     You can continue to use it until the transition is complete in the |NCS| and the feature is removed in one of the upcoming |NCS| releases.
 
-.. |sysbuild_related_deprecation_note| replace:: This feature is deprecated and is being replaced by Zephyr's :ref:`zephyr:sysbuild`.
-   You can continue to use it until the transition is complete in the |NCS| and the feature is removed in one of the upcoming |NCS| releases.
-   For more information, see :ref:`zephyr:sysbuild`, :ref:`sysbuild_images`, :ref:`zephyr_samples_sysbuild`, and :ref:`sysbuild_forced_options`.
-
 .. |nrfjprog_deprecation_note| replace:: Starting with the |NCS| v2.8.0, nrfjprog is in the process of being archived.
    It will remain available for download, but `nRF Util (device command) <Device command overview_>`_ will gradually replace it.
 
-.. |nrf_CLT_deprecation_note| replace:: Starting with the |NCS| v2.8.0, the nRF Command Line Tools are in the process of being archived.
-   They will remain available for download, but `nRF Util`_ will gradually replace them.
+.. |nrf_CLT_deprecation_note| replace:: The `nRF Command Line Tools`_ have been archived and replaced by `nRF Util`_.
+   No further updates will be made to the nRF Command Line Tools.
+   Last supported operating systems are Windows 10, Linux Ubuntu 22.04, and macOS 13.
+   The nRF Command Line Tools will remain available for download, but do not install the SEGGER J-Link version they provide if you have a newer version installed.
+
+.. |legacy_crypto_deprecation_note| replace:: Legacy crypto toolbox APIs are marked as deprecated in the |NCS| version 2.8.0, and will be removed in a future version.
+   Do not use the legacy crypto toolbox APIs prefixed with ``mbedtls_`` and the related configurations in any new designs.
+   Instead, use the :ref:`equivalent functionality from PSA Crypto APIs <ug_crypto_supported_features>`.
+   For information about configuring PSA Crypto API support, see :ref:`psa_crypto_support`.
 
 .. ### Thread usage shortcuts
 
@@ -102,23 +116,6 @@
    See :ref:`ug_thread` for more information.
 .. |thread_hwfc_enabled| replace:: This sample has Hardware Flow Control mechanism enabled by default in serial communication.
    When enabled, it allows devices to manage transmission by informing each other about their current state, and ensures more reliable connection in high-speed communication scenarios.
-
-.. ### Zigbee & ZBOSS shortcuts
-
-.. |zigbee_version| replace:: Zigbee 3.0
-.. |zboss_version| replace:: 3.11.5.0
-.. |zigbee_ncp_package_version| replace:: 2.2.4
-.. |zigbee_description| replace:: Zigbee is a portable, low-power software networking protocol that provides connectivity over an 802.15.4-based mesh network.
-.. |enable_zigbee_before_testing| replace:: Make sure to configure the Zigbee stack before building and testing this sample.
-   See :ref:`ug_zigbee_configuring` for more information.
-.. |zigbee_library| replace:: This is a Zigbee library.
-   See :ref:`ug_zigbee_configuring_libraries` for information about how to configure it for you Zigbee application.
-.. |zigbee_ncp_package| replace:: It contains the full development-ready source code for host and evaluation-ready firmware for the nRF52840 DK, the nRF52833 DK, and the nRF52840 Dongle.
-   The package comes with prebuilt libraries compatible with 64-bit Ubuntu 18.04 Linux.
-.. |zigbee_ncp_package_more_info| replace:: For information about how to recompile the package libraries for a different host architecture or operating system, see the `NCP Host documentation`_.
-   For information about how to use NCP Host for Zigbee in the |NCS| or build the firmware using the NCP sample, see the :ref:`NCP sample <zigbee_ncp_sample>`.
-.. |zigbee_shell_config| replace:: You can add support for Zigbee shell commands to any of the available :ref:`Zigbee samples <zigbee_samples>`, except for the :ref:`NCP sample <zigbee_ncp_sample>`.
-   Some of the commands use an endpoint for sending packets, so no endpoint handler is allowed to be registered for this endpoint.
 
 .. ### nRF Desktop shortcuts
 
@@ -147,7 +144,7 @@
 .. |led_stream| replace:: LED stream module
 .. |net_state| replace:: network state module
 .. |nrf_desktop_module_event_note| replace:: See the :ref:`nrf_desktop_architecture` for more information about the event-based communication in the nRF Desktop application and about how to read this table.
-.. |nrf_desktop_command_note_with_dfu_lock| replace:: With the :ref:`CONFIG_DESKTOP_DFU_LOCK <config_desktop_app_options>` option enabled, the device only executes this command when it holds the DFU owner status.
+.. |nrf_desktop_command_note_with_dfu_lock| replace:: With the :option:`CONFIG_DESKTOP_DFU_LOCK` option enabled, the device only executes this command when it holds the DFU owner status.
 .. |nRF_Desktop_confirmation_effect| replace:: After the confirmation, Bluetooth advertising using a new local identity is started.
    When a new Bluetooth Central device successfully connects and bonds, the old bond is removed and the new bond is used instead.
    If the new peer does not connect in the predefined period of time, the advertising ends and the application switches back to the old peer.
@@ -181,11 +178,14 @@
 .. |matter_cd_definition| replace:: a cryptographic document created by the CSA for each device type, used to confirm that a given type of device was certified
 .. |matter_cd_info_note_for_samples| replace:: This data payload also includes test Device Attestation, with test Certification Declaration, Product ID, and Vendor ID.
    These are used for :ref:`ug_matter_device_attestation_commissioning_info`, and you can generate your own test Certification Declaration when you :ref:`work on Matter end product <ug_matter_device_attestation_testing_da>`.
+.. |matter_unique_discriminator_note| replace:: If you are working with multiple devices, set a unique discriminator for each one, or commission them one at a time.
+   See :ref:`ug_matter_configuring_device_identification` for more information.
 
 .. ### Other shortcuts
 
 .. |ncs_oot_sample_note| replace:: Some samples in the |NCS| are currently not designed to work out-of-tree.
-   You may need to manually configure your sample to work correctly in the |nRFVSC|.
+   You may need to manually configure your sample to work correctly in |nRFVSC|.
+
 .. |ncs_repo| replace:: https://github.com/nrfconnect/sdk-nrf
 
 .. |ncs_nrfxlib_repo| replace:: https://github.com/nrfconnect/sdk-nrfxlib
@@ -216,9 +216,14 @@
    The suggested approach is to test with Nordic Semiconductor devices on both sides first to verify basic functionalities and get familiar with the solution before using custom devices.
    Contact `Technical Support team <DevZone_>`_ if you need assistance.
 
-.. |usb_known_issues| replace:: Make sure to check the :ref:`nRF5340 Audio application known issues <known_issues_nrf5340audio>` related to serial connection with the USB.
+.. |usb_known_issues| replace:: Make sure to check the :ref:`nRF5340 Audio application known issue OCT-2154 <known_issues_nrf5340audio>` related to intermittent audio stream on the headset when using USB audio interface on macOS.
 
 .. |trusted_execution| replace:: nRF5340 and nRF9160
+
+.. |samples_tfm_info| replace:: Starting from the |NCS| v2.0.0, TF-M is the only way to use :ref:`security by separation <ug_tfm_security_by_separation>` with ARM TrustZone.
+   In addition, the TF-M implementation is enabled by default for all samples and applications in the |NCS| when you build for the ``*/ns`` :ref:`variant <app_boards_names>` of the boards.
+
+.. |encrypted_its_not_supported_on_nrf54lm20| replace:: The encrypted ITS service is not supported on nRF54LM20 as it :ref:`does not support the full set of AEAD algorithm features <ug_crypto_supported_features_aead_algorithms>`.
 
 .. |plusminus| unicode:: U+000B1 .. PLUS-MINUS SIGN
    :rtrim:
@@ -246,20 +251,35 @@
 
 .. |parameters_override_west_config| replace:: The parameters and options passed in the command line always take precedence over ``west config`` settings.
 
-.. |multi_image| replace:: These samples are built for the application core and, by default, include the network core application as child image in a multi-image build (see :ref:`ug_nrf5340_multi_image`).
-
 .. |migration_contact_devzone| replace:: While we strive to document all breaking changes, the migration guides might not include the detailed migration steps for your use case.
    If you need assistance, contact Nordic Semiconductor's technical support on `DevZone`_.
 
 .. |nrf54_buttons_leds_numbering| replace:: The nRF54 DKs use a different numbering pattern for LED and buttons.
    See the User interface section for full overview.
 
-.. |ATv2_maintenance_note| replace:: The Asset Tracker v2 application is in maintenance mode.
-   For new projects, it is recommended to use the :ref:`nrf_cloud_multi_service` sample instead.
-
 .. |toolchain_management_ncs_versions| replace:: The Toolchain Manager installation is recommended only when using the nRF54H20 DK with the |NCS| v2.7.0.
    When using any other DK, the Toolchain Manager installation is recommended for the |NCS| v1.9.x and earlier versions.
 
+.. |ATv2_maintenance_note| replace:: The Asset Tracker v2 application is in maintenance mode.
+   For new projects, it is recommended to use the :ref:`nrf_cloud_multi_service` sample instead.
+
 .. |filter_samples_by_board| replace:: If you want to list samples available for one or more specific boards, `use the nRF Connect for Visual Studio Code extension to filter them <Browse samples_>`_.
 
-.. |54H_engb_2_8| replace:: The nRF54H20 DK Engineering A and B (up to version 0.8.2) are no longer supported starting with |NCS| v2.9.0.
+.. |devicetree_bindings| replace:: The devicetree bindings provide the structure for the content of the devicetree nodes.
+   The :ref:`compatible <zephyr:dt-bindings-compatible>` property defines the compatibility of a devicetree node with a devicetree binding.
+   For more information, read the :ref:`documentation about devicetree bindings in Zephyr <zephyr:dt-binding-compat>`.
+
+.. |install_latest_version| replace:: When you first install the |NCS|, it is recommended to install the latest released versions of the SDK and the toolchain.
+
+.. |connection_options_limited| replace:: Spinel connections through SPI and USB are not currently available in the |NCS|.
+
+.. |original_mbedtls_def_note| replace:: Whenever this documentation mentions 'original' Mbed TLS, it refers to the open-source `Arm Mbed TLS project`_, not the customized version available in Zephyr.
+   There is an option to utilize a 'built-in' driver, which corresponds to the software-implemented cryptography from the 'original' Mbed TLS deliverables.
+   This is provided to ensure that the cryptographic toolbox supports all requested features.
+
+
+.. |matter_cluster_editor_preview| replace:: The Matter Cluster Editor app is currently in the preview stage.
+
+.. |ISE| replace:: IronSide SE
+
+.. |ESB| replace:: Enhanced ShockBurst

@@ -29,9 +29,6 @@ Building and running
 
 .. include:: /includes/build_and_run.txt
 
-.. note::
-   |54H_engb_2_8|
-
 Testing
 =======
 
@@ -71,7 +68,7 @@ Sample output
 The sample displays the data in the following format::
 
    *** Booting nRF Connect SDK v3.4.99-ncs1-4802-g41e34920abf4 ***
-   Starting Event Trigger Example.
+   Starting Event Trigger Sample.
    I: SoftDevice Controller build revision:
    I: ba cb 53 9c e2 c9 de b6 |..S.....
    I: 82 1d 9c b3 eb de c5 1f |........

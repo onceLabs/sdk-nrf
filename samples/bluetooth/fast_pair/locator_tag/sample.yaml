@@ -11,7 +11,11 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf5340dk/nrf5340/cpuapp/ns
+      - nrf54l15dk/nrf54l05/cpuapp
+      - nrf54l15dk/nrf54l10/cpuapp
       - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54lm20dk/nrf54lm20a/cpuapp
+      - nrf54h20dk/nrf54h20/cpuapp
       - thingy53/nrf5340/cpuapp
       - thingy53/nrf5340/cpuapp/ns
     platform_allow:
@@ -20,10 +24,17 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf5340dk/nrf5340/cpuapp/ns
+      - nrf54l15dk/nrf54l05/cpuapp
+      - nrf54l15dk/nrf54l10/cpuapp
       - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54lm20dk/nrf54lm20a/cpuapp
+      - nrf54h20dk/nrf54h20/cpuapp
       - thingy53/nrf5340/cpuapp
       - thingy53/nrf5340/cpuapp/ns
-    tags: bluetooth ci_build sysbuild
+    tags:
+      - bluetooth
+      - ci_build
+      - sysbuild
   sample.bluetooth.fast_pair.locator_tag.release:
     sysbuild: true
     build_only: true
@@ -33,7 +44,11 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf5340dk/nrf5340/cpuapp/ns
+      - nrf54l15dk/nrf54l05/cpuapp
+      - nrf54l15dk/nrf54l10/cpuapp
       - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54lm20dk/nrf54lm20a/cpuapp
+      - nrf54h20dk/nrf54h20/cpuapp
       - thingy53/nrf5340/cpuapp
       - thingy53/nrf5340/cpuapp/ns
     platform_allow:
@@ -42,8 +57,15 @@ tests:
       - nrf52840dk/nrf52840
       - nrf5340dk/nrf5340/cpuapp
       - nrf5340dk/nrf5340/cpuapp/ns
+      - nrf54l15dk/nrf54l05/cpuapp
+      - nrf54l15dk/nrf54l10/cpuapp
       - nrf54l15dk/nrf54l15/cpuapp
+      - nrf54lm20dk/nrf54lm20a/cpuapp
+      - nrf54h20dk/nrf54h20/cpuapp
       - thingy53/nrf5340/cpuapp
       - thingy53/nrf5340/cpuapp/ns
-    tags: bluetooth ci_build sysbuild
+    tags:
+      - bluetooth
+      - ci_build
+      - sysbuild
     extra_args: FILE_SUFFIX=release

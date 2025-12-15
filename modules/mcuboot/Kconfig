@@ -1,44 +1,10 @@
 menu "MCUboot"
 
-config BOOT_SIGNATURE_KEY_FILE
-	string "MCUBoot PEM key file"
-	depends on !MCUBOOT_BUILD_STRATEGY_FROM_SOURCE
-	help
-	  Absolute path to PEM key file containing the private key corresponding
-	  to the public key included in MCUBoot. This will be used to sign the
-	  image so that it can be verified by MCUBoot. Since MCUBoot is not
-	  built from source, it is not possible for the build system to deduce
-	  what key was used when compiling it. Hence, it is required that the
-	  key is passed to the build system through this option.
-
-config SIGN_IMAGES
-	bool "Sign images for MCUBoot"
-	default y
-	imply BUILD_OUTPUT_META
-	depends on MCUBOOT_BUILD_STRATEGY_FROM_SOURCE \
-		   || BOOT_SIGNATURE_KEY_FILE != ""
-	help
-	  Sign images for MCUBoot as integrated part of the build stages using
-	  the private key.
-
 if BOOTLOADER_MCUBOOT
-
-config BOOT_BUILD_DIRECT_XIP_VARIANT
-	bool "Build DIRECT_XIP variant"
-	default y if MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP
-	default y if MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP_WITH_REVERT
-	help
-	  Build a variant of the 'app' image which can be used for DIRECT_XIP.
-
-# The name of this configuration needs to match the requirements set by the
-# script `partition_manager.py`. See `pm.yml` in the application directory
-# of MCUBoot.
-module=MCUBOOT
-source "${ZEPHYR_BASE}/../nrf/subsys/partition_manager/Kconfig.template.build_strategy"
 
 menuconfig MCUBOOT_HARDWARE_DOWNGRADE_PREVENTION
 	bool "Downgrade prevention using hardware security counters"
-	depends on SOC_NRF5340_CPUAPP || SOC_SERIES_NRF91X
+	depends on SOC_NRF5340_CPUAPP || SOC_SERIES_NRF91X || SOC_SERIES_NRF54LX || SOC_SERIES_NRF54HX
 	help
 	  This option can be enabled by the application and will ensure
 	  that the MCUBOOT_HW_DOWNGRADE_PREVENTION Kconfig option is
@@ -49,7 +15,9 @@ if MCUBOOT_HARDWARE_DOWNGRADE_PREVENTION
 config MCUBOOT_HW_DOWNGRADE_PREVENTION_COUNTER_SLOTS
 	int "Number of available hardware counter slots"
 	default 240
+	range 2 288 if SOC_SERIES_NRF54LX
 	range 2 300
+	depends on !SOC_SERIES_NRF54HX
 	help
 	  When MCUBOOT_HW_DOWNGRADE_PREVENTION is enabled, MCUboot will use
 	  one hardware counter for each updatable image (UPDATEABLE_IMAGE_NUMBER).
@@ -62,7 +30,8 @@ config MCUBOOT_HW_DOWNGRADE_PREVENTION_COUNTER_SLOTS
 config MCUBOOT_HW_DOWNGRADE_PREVENTION_COUNTER_VALUE
 	int "Security counter value"
 	default 1
-	range 1 65535
+	range 1 65535 if !SOC_SERIES_NRF54HX
+	range 1 4294967295 if SOC_SERIES_NRF54HX
 	help
 	  The security counter value for this image.
 	  This is the value that will be passed to the --security-counter
@@ -98,58 +67,76 @@ config USE_NRF53_MULTI_IMAGE_WITHOUT_UPGRADE_ONLY
 	  different swapping methods. This will however give you the potential
 	  of bricking the network core upon reverts.
 
-config DFU_MULTI_IMAGE_PACKAGE_BUILD
-	bool "Build DFU Multi Image package"
-	depends on BOOTLOADER_MCUBOOT
-	help
-	  Build DFU Multi Image package that contains a manifest file followed by
-	  selected update images.
-
-if DFU_MULTI_IMAGE_PACKAGE_BUILD
-
-config DFU_MULTI_IMAGE_PACKAGE_APP
-	bool "Include Application Core image in DFU Multi Image package"
-	default y
-
-config DFU_MULTI_IMAGE_PACKAGE_NET
-	bool "Include Network Core image in DFU Multi Image package"
-	depends on NRF53_UPGRADE_NETWORK_CORE
-	default y
-
-config DFU_MULTI_IMAGE_PACKAGE_MCUBOOT
-	bool "Include MCUboot image in DFU Multi Image package"
-	depends on BUILD_S1_VARIANT
-	# Currently simultaneous application and MCUboot updates are unsupported
-	depends on !DFU_MULTI_IMAGE_PACKAGE_APP && !DFU_MULTI_IMAGE_PACKAGE_NET
-
-endif # DFU_MULTI_IMAGE_PACKAGE_BUILD
-
-config ADD_MCUBOOT_MEDIATE_SIM_FLASH_DTS
-	bool "DTS overlay of the sim-flash intermediary for upgrading NET core"
-	depends on BOOTLOADER_MCUBOOT
-	help
-	  Add DTS overlay which defines the flash simulator device which is emulating
-	  the network core primary slot. This slot is required either to allow
-	  multi image update of the network core or to allow serial recovery of
-	  the network core.
-
 config MCUBOOT_USE_ALL_AVAILABLE_RAM
-	bool "Allow MCUBoot to use all available RAM (security implications)"
+	bool "Allow MCUBoot to use all available RAM"
 	depends on ARM_TRUSTZONE_M
 	default y if BOARD_THINGY53_NRF5340_CPUAPP_NS || BOARD_THINGY53_NRF5340_CPUAPP
 	help
-	  By default MCUBoot uses only the secure RAM partition. Enabling this
-	  may allow secrets to be leaked to non-secure through the non-secure
-	  RAM partition.
+	  By default MCUBoot uses only the secure RAM partition.
 
 endmenu
 
-config XIP_SPLIT_IMAGE
-	bool "Split XIP image"
-	depends on SOC_NRF5340_CPUAPP
-	depends on !MCUBOOT
+DT_CHOSEN_BOOTLOADER_REQUEST := nrf,bootloader-request
+DT_CHOSEN_BOOTLOADER_REQUEST_BACKUP := nrf,bootloader-request-backup
+
+config NRF_MCUBOOT_BOOT_REQUEST
+	bool "MCUboot bootloader requests"
+	imply MCUMGR_GRP_IMG_NRF
+	depends on $(dt_chosen_enabled,$(DT_CHOSEN_BOOTLOADER_REQUEST))
 	help
-	  Allows for an image to be split into 2 parts where there is code executing from internal
-	  flash and code from QSPI via XIP. Requires specific project setup for projects to use
-	  this feature: project's cmake which supports code dispatching, linker script for describe QSPI
-	  linking area and dedicated partition manager configuration.
+	  Handle bootloader requests.
+
+if NRF_MCUBOOT_BOOT_REQUEST
+
+choice NRF_MCUBOOT_BOOT_REQUEST_IMPL
+	prompt "Shared memory backend"
+	default NRF_MCUBOOT_BOOT_REQUEST_IMPL_RETENTION if RETENTION
+
+config NRF_MCUBOOT_BOOT_REQUEST_IMPL_RETENTION
+	bool "Retention"
+	depends on RETENTION
+	depends on $(dt_chosen_has_compat,$(DT_CHOSEN_BOOTLOADER_REQUEST),$(DT_COMPAT_ZEPHYR_RETENTION))
+	help
+	  Use zephyr,bootloader-request chosen node compatible with the
+	  zephyr,retention driver as the memory area to store and read from the
+	  bootloader requests.
+	  The built-in prefix property should be used to indicate the request
+	  structure version to ensure compatibility between the bootloader and
+	  the application.
+
+config NRF_MCUBOOT_BOOT_REQUEST_IMPL_FLASH
+	bool "NVM partition"
+	depends on FLASH
+	depends on CRC
+	depends on !PARTITION_MANAGER_ENABLED # Partition manager uses an incompatible flash_map.h
+	help
+	  Use zephyr,bootloader-request chosen node compatible with the
+	  flash driver as the memory area to store and read from the bootloader
+	  requests.
+
+endchoice
+
+config NRF_MCUBOOT_BOOT_REQUEST_PREFERENCE_KEEP
+	bool "Keep boot preference value across reboots"
+	depends on $(dt_chosen_enabled,$(DT_CHOSEN_BOOTLOADER_REQUEST_BACKUP))
+	default y
+	help
+	  Use zephyr,bootloader-request-backup chosen node compatible with the
+	  zephyr,retention driver as the memory area to store a copy of
+	  bootloader requests.
+	  If this optional node is defined, the module will keep a copy of data
+	  inside a backup region, allowing to preserve the preferred slot
+	  selection across device resets.
+
+config NCS_MCUBOOT_BOOT_REQUEST_TEST_SETS_BOOT_PREFERENCE
+	bool "Set boot preference if a slot is marked for test"
+	help
+	  This option allows to verify boot preference requests through issuing
+	  the image test.
+	  Using this option is not recommended in production systems, because
+	  it will boot any newly transferred image, even if it has a lower
+	  version than the current one.
+	  The rollback protection (using security counters) will still be
+	  effective.
+
+endif # NRF_MCUBOOT_BOOT_REQUEST

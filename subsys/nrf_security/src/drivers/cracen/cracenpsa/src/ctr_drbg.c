@@ -15,20 +15,39 @@
 #include <sxsymcrypt/blkcipher.h>
 #include <cracen/statuscodes.h>
 #include <security/cracen.h>
-#include <sicrypto/sicrypto.h>
-#include <sicrypto/util.h>
 #include <sxsymcrypt/trng.h>
 #include <sxsymcrypt/aes.h>
 #include <sxsymcrypt/keyref.h>
-
 #include <zephyr/kernel.h>
 #include <nrf_security_mutexes.h>
+#include <string.h>
 
-#define MAX_BITS_PER_REQUEST (1 << 19)		 /* NIST.SP.800-90Ar1:Table 3 */
-#define RESEED_INTERVAL	     ((uint64_t)1 << 48) /* 2^48 as per NIST spec */
+#ifdef CONFIG_CRACEN_HW_VERSION_LITE
+#define MAX_BITS_PER_REQUEST (1 << 16) /* Cracen Lite only supports 2^16 ctr size */
+/* Cracen Lite only supports 2^16 ctr size so will need to reseed before it overflows */
+#define RESEED_INTERVAL ((uint64_t)1 << 16)
+#else
+#define MAX_BITS_PER_REQUEST (1 << 19) /* NIST.SP.800-90Ar1:Table 3 */
+#define RESEED_INTERVAL ((uint64_t)1 << 48) /* 2^48 as per NIST spec */
+#endif
 
 /** @brief Magic number to signal that PRNG context is initialized */
 #define CRACEN_PRNG_INITIALIZED (0xA5B4A5B4)
+
+/* IAR Doesn't support aligned stack variables */
+#define ALIGN_UP(value, alignment) \
+  (((value) + (alignment) - 1) & ~((alignment) - 1))
+
+#ifdef __IAR_SYSTEMS_ICC__
+#define ALIGN_ON_STACK(type, var, size, alignment)                    \
+  type var##base[(size) + ((alignment)/sizeof(type))]; \
+  type * var = (type *)ALIGN_UP((intptr_t)var##base, alignment)
+#else
+#define ALIGN_ON_STACK(type, var, size, alignment)                    \
+  type var[size] __attribute__((aligned(alignment)));
+#endif
+
+#define CRACEN_ENTROPY_AND_NONCE_SIZE (CRACEN_PRNG_ENTROPY_SIZE + CRACEN_PRNG_NONCE_SIZE)
 
 /*
  * This driver uses a global context and discards the context passed from the user. We do that
@@ -39,7 +58,8 @@
  */
 static cracen_prng_context_t prng;
 
-NRF_SECURITY_MUTEX_DEFINE(cracen_prng_context_mutex);
+/* This mutex protects access to the TRNG and to the PRNG context as well. */
+NRF_SECURITY_MUTEX_DEFINE(cracen_prng_trng_mutex);
 
 /*
  * @brief Internal function to enable TRNG and get entropy for initial seed and
@@ -47,31 +67,53 @@ NRF_SECURITY_MUTEX_DEFINE(cracen_prng_context_mutex);
  *
  * @return 0 on success, nonzero on failure.
  */
-static int trng_get_seed(char *dst, int num_trng_bytes)
+static int trng_get_entropy(uint8_t *dst, int num_trng_bytes)
 {
-	int sx_err = SX_ERR_RESET_NEEDED;
+	int sx_err;
 	struct sx_trng trng;
+	int trng_chunk_size;
+	bool loop_continue;
 
-	while (true) {
-		switch (sx_err) {
-		case SX_ERR_RESET_NEEDED:
-			sx_err = sx_trng_open(&trng, NULL);
-			if (sx_err != SX_OK) {
-				return sx_err;
+	while (num_trng_bytes) {
+		/* The sx_trng_get function suggests to return <= 32 bytes at a time */
+		trng_chunk_size = MIN(num_trng_bytes, 32);
+
+		sx_err = SX_ERR_RESET_NEEDED;
+		loop_continue = true;
+		while (loop_continue) {
+			switch (sx_err) {
+			case SX_ERR_RESET_NEEDED:
+				sx_err = sx_trng_open(&trng, NULL);
+				if (sx_err != SX_OK) {
+					return sx_err;
+				}
+			/* fallthrough */
+			case SX_ERR_HW_PROCESSING:
+				/* Generate random numbers */
+				sx_err = sx_trng_get(&trng, dst, trng_chunk_size);
+				if (sx_err == SX_ERR_RESET_NEEDED) {
+					(void)sx_trng_close(&trng);
+				}
+				break;
+			default:
+				/* Exit the loop, either there is SX_OK or an error that cannot get
+				 * hanlded here.
+				 */
+				loop_continue = false;
+				break;
 			}
-		/* fallthrough */
-		case SX_ERR_HW_PROCESSING:
-			/* Generate random numbers */
-			sx_err = sx_trng_get(&trng, dst, num_trng_bytes);
-			if (sx_err == SX_ERR_RESET_NEEDED) {
-				(void)sx_trng_close(&trng);
-			}
-			break;
-		default:
-			(void)sx_trng_close(&trng);
+		}
+
+		(void)sx_trng_close(&trng);
+		if (sx_err != SX_OK) {
 			return sx_err;
 		}
+
+		num_trng_bytes -= trng_chunk_size;
+		dst += trng_chunk_size;
 	}
+
+	return SX_OK;
 }
 
 /**
@@ -82,9 +124,10 @@ static psa_status_t ctr_drbg_update(uint8_t *data)
 {
 	psa_status_t status = SX_OK;
 
-	char temp[CRACEN_PRNG_ENTROPY_SIZE + CRACEN_PRNG_NONCE_SIZE] __aligned(
-		CONFIG_DCACHE_LINE_SIZE);
+	ALIGN_ON_STACK(uint8_t, temp, CRACEN_ENTROPY_AND_NONCE_SIZE, CONFIG_DCACHE_LINE_SIZE);
+
 	size_t temp_length = 0;
+	_Static_assert(CRACEN_ENTROPY_AND_NONCE_SIZE % SX_BLKCIPHER_AES_BLK_SZ == 0, "");
 
 	psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
 
@@ -92,9 +135,8 @@ static psa_status_t ctr_drbg_update(uint8_t *data)
 	psa_set_key_bits(&attr, PSA_BYTES_TO_BITS(sizeof(prng.key)));
 	psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT);
 
-	while (temp_length < sizeof(temp)) {
-		si_be_add(prng.V, SX_BLKCIPHER_AES_BLK_SZ, 1);
-		_Static_assert((sizeof(temp) % SX_BLKCIPHER_AES_BLK_SZ) == 0);
+	while (temp_length < CRACEN_ENTROPY_AND_NONCE_SIZE) {
+		cracen_be_add(prng.V, SX_BLKCIPHER_AES_BLK_SZ, 1);
 
 		status = sx_blkcipher_ecb_simple(prng.key, sizeof(prng.key), prng.V, sizeof(prng.V),
 						 temp + temp_length, SX_BLKCIPHER_AES_BLK_SZ);
@@ -103,10 +145,11 @@ static psa_status_t ctr_drbg_update(uint8_t *data)
 			return status;
 		}
 		temp_length += SX_BLKCIPHER_AES_BLK_SZ;
+		prng.reseed_counter++;
 	}
 
 	if (data) {
-		si_xorbytes(temp, data, sizeof(temp));
+		cracen_xorbytes(temp, data, CRACEN_ENTROPY_AND_NONCE_SIZE);
 	}
 
 	memcpy(prng.key, temp, sizeof(prng.key));
@@ -122,18 +165,18 @@ psa_status_t cracen_init_random(cracen_prng_context_t *context)
 
 	int sx_err = SX_ERR_CORRUPTION_DETECTED;
 
-	char entropy[CRACEN_PRNG_ENTROPY_SIZE +
+	uint8_t entropy[CRACEN_PRNG_ENTROPY_SIZE +
 		     CRACEN_PRNG_NONCE_SIZE]; /* DRBG entropy + nonce buffer. */
 
 	if (prng.initialized == CRACEN_PRNG_INITIALIZED) {
 		return PSA_SUCCESS;
 	}
 
-	nrf_security_mutex_lock(cracen_prng_context_mutex);
+	nrf_security_mutex_lock(cracen_prng_trng_mutex);
 	safe_memset(&prng, sizeof(prng), 0, sizeof(prng));
 
 	/* Get the entropy used to seed the DRBG */
-	sx_err = trng_get_seed(entropy, sizeof(entropy));
+	sx_err = trng_get_entropy(entropy, sizeof(entropy));
 
 	if (sx_err != SX_OK) {
 		goto exit;
@@ -153,9 +196,29 @@ psa_status_t cracen_init_random(cracen_prng_context_t *context)
 	prng.initialized = CRACEN_PRNG_INITIALIZED;
 
 exit:
-	nrf_security_mutex_unlock(cracen_prng_context_mutex);
+	nrf_security_mutex_unlock(cracen_prng_trng_mutex);
 
 	return silex_statuscodes_to_psa(sx_err);
+}
+
+static psa_status_t cracen_reseed(void)
+{
+	psa_status_t status;
+
+	/* DRBG entropy + nonce buffer. */
+	uint8_t entropy[CRACEN_PRNG_ENTROPY_SIZE + CRACEN_PRNG_NONCE_SIZE];
+	int sx_err = trng_get_entropy(entropy, sizeof(entropy));
+
+	if (sx_err) {
+		return PSA_ERROR_HARDWARE_FAILURE;
+	}
+	status = ctr_drbg_update(entropy);
+	if (status != PSA_SUCCESS) {
+		return status;
+	}
+	safe_memset(entropy, sizeof(entropy), 0, CRACEN_PRNG_ENTROPY_SIZE + CRACEN_PRNG_NONCE_SIZE);
+	prng.reseed_counter = 0;
+	return PSA_SUCCESS;
 }
 
 psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, size_t output_size)
@@ -164,6 +227,7 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 
 	psa_status_t status = PSA_SUCCESS;
 	size_t len_left = output_size;
+	size_t number_of_blocks = DIV_ROUND_UP(output_size, SX_BLKCIPHER_AES_BLK_SZ);
 
 	if (output_size > 0 && output == NULL) {
 		return PSA_ERROR_INVALID_ARGUMENT;
@@ -173,7 +237,7 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 		return PSA_ERROR_INVALID_ARGUMENT;
 	}
 
-	nrf_security_mutex_lock(cracen_prng_context_mutex);
+	nrf_security_mutex_lock(cracen_prng_trng_mutex);
 
 	if (prng.reseed_counter == 0) {
 		/* Zephyr mutexes allow the same thread to lock a
@@ -181,27 +245,18 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 		 * here even though we hold the mutex.
 		 */
 		status = cracen_init_random(context);
-
 		if (status != PSA_SUCCESS) {
-			goto exit;
+			nrf_security_mutex_unlock(cracen_prng_trng_mutex);
+			return status;
 		}
 	}
 
-	if (prng.reseed_counter >= RESEED_INTERVAL) {
-		char entropy[CRACEN_PRNG_ENTROPY_SIZE +
-			     CRACEN_PRNG_NONCE_SIZE]; /* DRBG entropy + nonce buffer. */
-		int sx_err = trng_get_seed(entropy, sizeof(entropy));
-
-		if (sx_err) {
-			status = PSA_ERROR_HARDWARE_FAILURE;
-			goto exit;
-		}
-		status = ctr_drbg_update(entropy);
+	if (prng.reseed_counter + number_of_blocks >= RESEED_INTERVAL) {
+		status = cracen_reseed();
 		if (status != PSA_SUCCESS) {
-			goto exit;
+			nrf_security_mutex_unlock(cracen_prng_trng_mutex);
+			return status;
 		}
-		safe_memset(entropy, sizeof(entropy), 0,
-			    CRACEN_PRNG_ENTROPY_SIZE + CRACEN_PRNG_NONCE_SIZE);
 	}
 
 	psa_key_attributes_t attr = PSA_KEY_ATTRIBUTES_INIT;
@@ -210,20 +265,17 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 	psa_set_key_bits(&attr, PSA_BYTES_TO_BITS(sizeof(prng.key)));
 	psa_set_key_usage_flags(&attr, PSA_KEY_USAGE_ENCRYPT);
 
-	if (status != PSA_SUCCESS) {
-		return status;
-	}
-
 	while (len_left > 0) {
 		size_t cur_len = MIN(len_left, SX_BLKCIPHER_AES_BLK_SZ);
-		char temp[SX_BLKCIPHER_AES_BLK_SZ] __aligned(CONFIG_DCACHE_LINE_SIZE);
+		ALIGN_ON_STACK(uint8_t, temp, SX_BLKCIPHER_AES_BLK_SZ, CONFIG_DCACHE_LINE_SIZE);
 
-		si_be_add(prng.V, SX_BLKCIPHER_AES_BLK_SZ, 1);
+		cracen_be_add(prng.V, SX_BLKCIPHER_AES_BLK_SZ, 1);
 		status = sx_blkcipher_ecb_simple(prng.key, sizeof(prng.key), prng.V, sizeof(prng.V),
-						 temp, sizeof(temp));
+						 temp, SX_BLKCIPHER_AES_BLK_SZ);
 
 		if (status != PSA_SUCCESS) {
-			goto exit;
+			nrf_security_mutex_unlock(cracen_prng_trng_mutex);
+			return status;
 		}
 
 		for (int i = 0; i < cur_len; i++) {
@@ -232,17 +284,11 @@ psa_status_t cracen_get_random(cracen_prng_context_t *context, uint8_t *output, 
 
 		len_left -= cur_len;
 		output += cur_len;
+		prng.reseed_counter++;
 	}
 
 	status = ctr_drbg_update(NULL);
-	if (status != PSA_SUCCESS) {
-		goto exit;
-	}
-
-	prng.reseed_counter += 1;
-
-exit:
-	nrf_security_mutex_unlock(cracen_prng_context_mutex);
+	nrf_security_mutex_unlock(cracen_prng_trng_mutex);
 	return status;
 }
 
@@ -250,4 +296,20 @@ psa_status_t cracen_free_random(cracen_prng_context_t *context)
 {
 	(void)context;
 	return PSA_SUCCESS;
+}
+
+
+psa_status_t cracen_get_trng(uint8_t *output, size_t output_size)
+{
+	int sx_err;
+
+	if (output == NULL || output_size == 0) {
+		return PSA_ERROR_INVALID_ARGUMENT;
+	}
+
+	nrf_security_mutex_lock(cracen_prng_trng_mutex);
+	sx_err = trng_get_entropy(output, output_size);
+	nrf_security_mutex_unlock(cracen_prng_trng_mutex);
+
+	return silex_statuscodes_to_psa(sx_err);
 }

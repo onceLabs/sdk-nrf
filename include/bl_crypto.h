@@ -13,7 +13,10 @@ extern "C" {
 
 #include <zephyr/types.h>
 #include <fw_info.h>
-
+#if defined(CONFIG_NRF_SECURITY)
+#include <psa/crypto.h>
+#include <psa/crypto_extra.h>
+#endif
 
 /** @defgroup bl_crypto Bootloader crypto functions
  * @{
@@ -24,20 +27,22 @@ extern "C" {
 #define EHASHINV 101
 #define ESIGINV  102
 
-
-#if CONFIG_SB_CRYPTO_OBERON_SHA256
-	#include <ocrypto_sha256.h>
-	#define SHA256_CTX_SIZE sizeof(ocrypto_sha256_ctx)
-	typedef ocrypto_sha256_ctx bl_sha256_ctx_t;
-#elif CONFIG_SB_CRYPTO_CC310_SHA256
-	#include <nrf_cc310_bl_hash_sha256.h>
-	#define SHA256_CTX_SIZE sizeof(nrf_cc310_bl_hash_context_sha256_t)
-	typedef nrf_cc310_bl_hash_context_sha256_t bl_sha256_ctx_t;
+#if defined(CONFIG_SB_CRYPTO_PSA_SHA512)
+typedef psa_hash_operation_t bl_sha512_ctx_t;
+#elif defined(CONFIG_SB_CRYPTO_OBERON_SHA256)
+#include <ocrypto_sha256.h>
+#define SHA256_CTX_SIZE sizeof(ocrypto_sha256_ctx)
+typedef ocrypto_sha256_ctx bl_sha256_ctx_t;
+#elif defined(CONFIG_SB_CRYPTO_CC310_SHA256)
+#include <nrf_cc310_bl_hash_sha256.h>
+#define SHA256_CTX_SIZE sizeof(nrf_cc310_bl_hash_context_sha256_t)
+typedef nrf_cc310_bl_hash_context_sha256_t bl_sha256_ctx_t;
 #else
-	#define SHA256_CTX_SIZE 256
-	// uint32_t to make sure it is aligned equally as the other contexts.
-	typedef uint32_t bl_sha256_ctx_t[SHA256_CTX_SIZE/4];
+#define SHA256_CTX_SIZE 256
+/* uint32_t to make sure it is aligned equally as the other contexts. */
+typedef uint32_t bl_sha256_ctx_t[SHA256_CTX_SIZE/4];
 #endif
+
 
 /**
  * @brief Initialize bootloader crypto module.
@@ -96,6 +101,15 @@ int bl_root_of_trust_verify_external(const uint8_t *public_key,
 				     const uint8_t *firmware,
 				     const uint32_t firmware_len);
 
+/**
+ * @brief Perform root of trust housekeeping operations.
+ *
+ * This function performs cleanup and security housekeeping tasks for the
+ * root of trust crypto subsystems. It ensures that cryptographic keys are
+ * properly secured and non-essential key material is removed from volatile
+ * memory after the bootloader no longer needs access to them.
+ */
+void bl_root_of_trust_housekeeping(void);
 
 /**
  * @brief Initialize a sha256 operation context variable.
@@ -169,14 +183,70 @@ int bl_sha256_verify(const uint8_t *data, uint32_t data_len, const uint8_t *expe
 typedef int (*bl_sha256_verify_t)(const uint8_t *data, uint32_t data_len,
 				const uint8_t *expected);
 
+#if defined(CONFIG_SB_CRYPTO_PSA_SHA512)
+/**
+ * @brief Initialize a sha512 operation context variable.
+ *
+ * @param[out]  ctx  Context to be initialized.
+ *
+ * @retval 0         On success.
+ * @retval -EINVAL   If @p ctx was NULL.
+ */
+int bl_sha512_init(bl_sha512_ctx_t *ctx);
+
+/**
+ * @brief Hash a portion of data.
+ *
+ * @note @p ctx must be initialized before being used in this function.
+ *       An uninitialized @p ctx might not be reported as an error. Also,
+ *       @p ctx must not be used if it has been finalized, though this might
+ *       also not be reported as an error.
+ *
+ * @param[in]  ctx       Context variable. Must have been initialized.
+ * @param[in]  data      Data to hash.
+ * @param[in]  data_len  Length of @p data.
+ *
+ * @retval 0         On success.
+ * @retval -EINVAL   If @p ctx was NULL, uninitialized, or corrupted.
+ * @retval -ENOSYS   If the context has already been finalized.
+ */
+int bl_sha512_update(bl_sha512_ctx_t *ctx, const uint8_t *data, uint32_t data_len);
+
+/**
+ * @brief Finalize a hash result.
+ *
+ * @param[in]  ctx       Context variable.
+ * @param[out] output    Where to put the resulting digest. Must be at least
+ *                       32 bytes long.
+ *
+ * @retval 0         On success.
+ * @retval -EINVAL   If @p ctx was NULL or corrupted, or @p output was NULL.
+ */
+int bl_sha512_finalize(bl_sha512_ctx_t *ctx, uint8_t *output);
+
+/**
+ * @brief Calculate a digest and verify it directly.
+ *
+ * @param[in]  data      The data to hash.
+ * @param[in]  data_len  The length of @p data.
+ * @param[in]  expected  The expected digest over @p data.
+ *
+ * @retval 0          If the procedure succeeded and the resulting digest is
+ *                    identical to @p expected.
+ * @retval -EHASHINV  If the procedure succeeded, but the digests don't match.
+ * @return Any error code from @ref bl_512_init, @ref bl_sha512_update, or
+ *         @ref bl_sha512_finalize if something else went wrong.
+ */
+int bl_sha512_verify(const uint8_t *data, uint32_t data_len, const uint8_t *expected);
+#endif
 
 /**
  * @brief Validate a secp256r1 signature.
  *
  * @param[in]  hash        The hash to validate against.
  * @param[in]  hash_len    The length of the hash.
- * @param[in]  signature   The signature to validate.
  * @param[in]  public_key  The public key to validate with.
+ * @param[in]  signature   The signature to validate.
  *
  * @retval 0         The operation succeeded and the signature is valid for the
  *                   hash.
@@ -185,16 +255,42 @@ typedef int (*bl_sha256_verify_t)(const uint8_t *data, uint32_t data_len,
  */
 int bl_secp256r1_validate(const uint8_t *hash,
 			  uint32_t hash_len,
-			  const uint8_t *signature,
-			  const uint8_t *public_key);
+			  const uint8_t *public_key,
+			  const uint8_t *signature);
 
 /* Typedef for use in EXT_API declaration */
 typedef int (*bl_secp256r1_validate_t)(
 			  const uint8_t *hash,
 			  uint32_t hash_len,
-			  const uint8_t *signature,
-			  const uint8_t *public_key);
+			  const uint8_t *public_key,
+			  const uint8_t *signature);
 
+/**
+ * @brief Validate an ed25519 signature.
+ *
+ * @param[in]  hash        The hash to validate against.
+ * @param[in]  hash_len    The length of the hash.
+ * @param[in]  signature   The signature to validate.
+ *
+ * @retval 0         The operation succeeded and the signature is valid for the
+ *                   hash.
+ * @retval -EINVAL   A parameter was NULL, or the @p hash_len was not 64 bytes.
+ * @retval -ESIGINV  The signature validation failed.
+ */
+int bl_ed25519_validate(const uint8_t *hash,
+			uint32_t hash_len,
+			const uint8_t *signature);
+
+/**
+ * @brief Perform ED25519 key storage housekeeping operations.
+ *
+ * This function performs crypto key storage housekeeping for ED25519 keys.
+ * It iterates through KMU (Key Management Unit) keys, applies security
+ * policies by locking them, and purges key material from volatile memory.
+ * This ensures keys are secured and memory is cleaned up after the bootloader
+ * completes its cryptographic operations.
+ */
+void bl_ed25519_keys_housekeeping(void);
 
 /**
  * @brief Structure describing the BL_ROT_VERIFY EXT_API.

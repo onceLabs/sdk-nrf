@@ -18,8 +18,9 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci.h>
 
+#if !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED)
 #include <nfc_t2t_lib.h>
-
+#endif /* !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED) */
 #include <nfc/ndef/msg.h>
 #include <nfc/ndef/record.h>
 #include <nfc/ndef/ch.h>
@@ -58,21 +59,23 @@
 
 #define NFC_BUFFER_SIZE 1024
 
+
 static struct bt_le_oob oob_local;
-static uint8_t tk_local[NFC_NDEF_LE_OOB_REC_TK_LEN];
+#if !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED)
 static uint8_t nfc_buffer[NFC_BUFFER_SIZE];
+static void adv_work_handler(struct k_work *work);
+static K_WORK_DEFINE(adv_work, adv_work_handler);
+#endif /* !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED) */
 
 static struct bt_le_ext_adv *adv_set;
 
 static void system_off_work_handler(struct k_work *work);
 static void key_generation_work_handler(struct k_work *work);
-static void adv_work_handler(struct k_work *work);
 static void notify_work_handler(struct k_work *work);
 static void notify_timeout_handler(struct k_work *work);
 
 static K_WORK_DELAYABLE_DEFINE(system_off_work, system_off_work_handler);
 static K_WORK_DEFINE(key_generate_work, key_generation_work_handler);
-static K_WORK_DEFINE(adv_work, adv_work_handler);
 static K_WORK_DELAYABLE_DEFINE(notify_work, notify_work_handler);
 static K_WORK_DELAYABLE_DEFINE(notify_timeout, notify_timeout_handler);
 
@@ -98,13 +101,13 @@ static const struct bt_data non_connectable_sd_data[] = {
 };
 
 static const struct bt_le_adv_param *connectable_ad_params =
-	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE,
+	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONN,
 			CONNECTABLE_ADV_INTERVAL_MIN,
 			CONNECTABLE_ADV_INTERVAL_MAX,
 			NULL);
 
 static const struct bt_le_adv_param *non_connectable_ad_params =
-	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_SCANNABLE,
+	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_NONE,
 			NON_CONNECTABLE_ADV_INTERVAL_MIN,
 			NON_CONNECTABLE_ADV_INTERVAL_MAX,
 			NULL);
@@ -149,6 +152,7 @@ static int set_led_off(uint8_t led_idx)
 	}
 }
 
+#if !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED)
 static void nfc_callback(void *context, nfc_t2t_event_t event, const uint8_t *data,
 			 size_t data_length)
 {
@@ -184,6 +188,7 @@ static void nfc_callback(void *context, nfc_t2t_event_t event, const uint8_t *da
 		break;
 	}
 }
+#endif /* !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED) */
 
 static void connected(struct bt_conn *conn, uint8_t conn_err)
 {
@@ -263,16 +268,6 @@ static void auth_cancel(struct bt_conn *conn)
 	printk("Pairing cancelled: %s\n", addr);
 }
 
-static void legacy_tk_value_set(struct bt_conn *conn)
-{
-	int err;
-
-	err = bt_le_oob_set_legacy_tk(conn, tk_local);
-	if (err) {
-		printk("Failed to set local TK (err %d)\n", err);
-	}
-}
-
 static void lesc_oob_data_set(struct bt_conn *conn, struct bt_conn_oob_info *info)
 {
 	int err;
@@ -308,11 +303,6 @@ static void oob_data_request(struct bt_conn *conn, struct bt_conn_oob_info *info
 	if (info->type == BT_CONN_OOB_LE_SC) {
 		printk("LESC OOB data requested\n");
 		lesc_oob_data_set(conn, info);
-	}
-
-	if (info->type == BT_CONN_OOB_LE_LEGACY) {
-		printk("Legacy TK value requested\n");
-		legacy_tk_value_set(conn);
 	}
 }
 
@@ -473,11 +463,6 @@ static int pairing_key_generate(void)
 		return err;
 	}
 
-	err = bt_rand(tk_local, sizeof(tk_local));
-	if (err) {
-		printk("Failed to generate random TK value (err %d)\n", err);
-	}
-
 	return err;
 }
 
@@ -486,6 +471,7 @@ static void key_generation_work_handler(struct k_work *work)
 	pairing_key_generate();
 }
 
+#if !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED)
 static void adv_work_handler(struct k_work *work)
 {
 	int err;
@@ -518,6 +504,7 @@ static void adv_work_handler(struct k_work *work)
 		printk("Connectable advertising started\n");
 	}
 }
+#endif /* !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED) */
 
 static void notify_work_handler(struct k_work *work)
 {
@@ -559,6 +546,7 @@ static void notify_timeout_handler(struct k_work *work)
 	}
 }
 
+#if !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED)
 static int nfc_oob_data_setup(size_t *size)
 {
 	static const uint8_t ndef_record_count = 2;
@@ -584,7 +572,6 @@ static int nfc_oob_data_setup(size_t *size)
 			NFC_NDEF_LE_OOB_REC_LE_ROLE(NFC_NDEF_LE_OOB_REC_LE_ROLE_PERIPH_ONLY);
 	oob_rec_payload.le_sc_data = &oob_local.le_sc_data;
 	oob_rec_payload.local_name = bt_get_name();
-	oob_rec_payload.tk_value = tk_local;
 
 	ch_msg_records.ac = &NFC_NDEF_CH_AC_RECORD_DESC(ac_rec);
 	ch_msg_records.carrier = &NFC_NDEF_LE_OOB_RECORD_DESC(oob_rec);
@@ -599,9 +586,11 @@ static int nfc_oob_data_setup(size_t *size)
 
 	return nfc_ndef_msg_encode(&NFC_NDEF_MSG(ndef_msg), nfc_buffer, size);
 }
+#endif /* !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED) */
 
 static int nfc_init(void)
 {
+#if !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED)
 	int err;
 	size_t nfc_buffer_size = sizeof(nfc_buffer);
 
@@ -629,6 +618,9 @@ static int nfc_init(void)
 	}
 
 	return err;
+#else
+	return 0;
+#endif /* !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED) */
 }
 
 static void reset_reason_print(void)
@@ -637,10 +629,12 @@ static void reset_reason_print(void)
 
 	reason = nrfx_reset_reason_get();
 
-	if (reason & NRFX_RESET_REASON_NFC_MASK) {
-		printk("Wake up by NFC field detected\n");
-	} else if (reason & NRFX_RESET_REASON_OFF_MASK) {
+	if (reason & NRFX_RESET_REASON_OFF_MASK) {
 		printk("Wake up by the advertising start buttons\n");
+#if !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED)
+	} else if (reason & NRFX_RESET_REASON_NFC_MASK) {
+		printk("Wake up by NFC field detected\n");
+#endif /* !IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED) */
 #if defined(NRF_RESETINFO)
 	} else if (reason & NRFX_RESET_REASON_LOCAL_SREQ_MASK) {
 		printk("Application soft reset detected\n");
@@ -711,7 +705,7 @@ int main(void)
 	uint32_t button_state = 0;
 	uint32_t has_changed = 0;
 
-	printk("Starting Bluetooth Power Profiling example\n");
+	printk("Starting Bluetooth Power Profiling sample\n");
 
 	err = dk_buttons_init(button_handler);
 	if (err) {
@@ -774,10 +768,12 @@ int main(void)
 		return 0;
 	}
 
-	err = nfc_init();
-	if (err) {
-		printk("Failed to initialize NFC (err %d)\n", err);
-		return 0;
+	if (!IS_ENABLED(CONFIG_BT_POWER_PROFILING_NFC_DISABLED)) {
+		err = nfc_init();
+		if (err) {
+			printk("Failed to initialize NFC (err %d)\n", err);
+			return 0;
+		}
 	}
 
 	button_handler(button_state, has_changed);
@@ -786,8 +782,12 @@ int main(void)
 		k_work_schedule(&system_off_work, K_SECONDS(SYSTEM_OFF_DELAY));
 	}
 
-	for (;;) {
-		set_led(RUN_STATUS_LED, (++blink_status) % 2);
-		k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL));
+	if (!IS_ENABLED(CONFIG_BT_POWER_PROFILING_LED_DISABLED)) {
+		for (;;) {
+			set_led(RUN_STATUS_LED, (++blink_status) % 2);
+			k_sleep(K_MSEC(RUN_LED_BLINK_INTERVAL));
+		}
+	} else {
+		return 0;
 	}
 }

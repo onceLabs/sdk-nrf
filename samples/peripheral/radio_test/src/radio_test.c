@@ -28,6 +28,10 @@
 #include "fem_al/fem_al.h"
 #endif /* CONFIG_FEM */
 
+#if NRF54H_ERRATA_216_PRESENT
+#include <zephyr/drivers/mbox.h>
+#endif /* NRF54H_ERRATA_216_PRESENT */
+
 /* IEEE 802.15.4 default frequency. */
 #define IEEE_DEFAULT_FREQ         (5)
 /* Length on air of the LENGTH field. */
@@ -51,26 +55,25 @@
 	#define RADIO_TEST_TIMER_IRQn              TIMER020_IRQn
 	#define RADIO_TEST_RADIO_IRQn              RADIO_0_IRQn
 	#define RADIO_TEST_SHORT_END_DISABLE_MASK  NRF_RADIO_SHORT_PHYEND_DISABLE_MASK
-	#define RADIO_TEST_SHORT_END_START_MASK    NRF_RADIO_SHORT_PHYEND_START_MASK
+	#define RADIO_TEST_INT_END_MASK            NRF_RADIO_INT_PHYEND_MASK
+	#define RADIO_TEST_EVENT_END               NRF_RADIO_EVENT_PHYEND
 #elif defined(CONFIG_SOC_SERIES_NRF54LX)
 	#define RADIO_TEST_EGU                     NRF_EGU10
 	#define RADIO_TEST_TIMER_INSTANCE          10
 	#define RADIO_TEST_TIMER_IRQn              TIMER10_IRQn
 	#define RADIO_TEST_RADIO_IRQn              RADIO_0_IRQn
 	#define RADIO_TEST_SHORT_END_DISABLE_MASK  NRF_RADIO_SHORT_PHYEND_DISABLE_MASK
-	#define RADIO_TEST_SHORT_END_START_MASK    NRF_RADIO_SHORT_PHYEND_START_MASK
+	#define RADIO_TEST_INT_END_MASK            NRF_RADIO_INT_PHYEND_MASK
+	#define RADIO_TEST_EVENT_END               NRF_RADIO_EVENT_PHYEND
 #else
 	#define RADIO_TEST_EGU                     NRF_EGU0
 	#define RADIO_TEST_TIMER_INSTANCE          0
 	#define RADIO_TEST_TIMER_IRQn              TIMER0_IRQn
 	#define RADIO_TEST_RADIO_IRQn              RADIO_IRQn
 	#define RADIO_TEST_SHORT_END_DISABLE_MASK  NRF_RADIO_SHORT_END_DISABLE_MASK
-	#define RADIO_TEST_SHORT_END_START_MASK    NRF_RADIO_SHORT_END_START_MASK
+	#define RADIO_TEST_INT_END_MASK            NRF_RADIO_INT_END_MASK
+	#define RADIO_TEST_EVENT_END               NRF_RADIO_EVENT_END
 #endif /* defined(CONFIG_SOC_SERIES_NRF54HX) */
-
-#define RADIO_TEST_TIMER_IRQ_HANDLER  NRFX_CONCAT_3(nrfx_timer_,	    \
-						 RADIO_TEST_TIMER_INSTANCE, \
-						 _irq_handler)
 
 #define ENDPOINT_EGU_RADIO_TX    BIT(1)
 #define ENDPOINT_EGU_RADIO_RX    BIT(2)
@@ -93,7 +96,8 @@ static uint32_t rx_packet_cnt;
 static uint8_t current_channel;
 
 /* Timer used for channel sweeps and tx with duty cycle. */
-static const nrfx_timer_t timer = NRFX_TIMER_INSTANCE(RADIO_TEST_TIMER_INSTANCE);
+static nrfx_timer_t timer =
+	NRFX_TIMER_INSTANCE(NRF_TIMER_INST_GET(RADIO_TEST_TIMER_INSTANCE));
 
 static bool sweep_processing;
 
@@ -101,7 +105,7 @@ static bool sweep_processing;
 static uint16_t total_payload_size;
 
 /* PPI channel for starting radio */
-static uint8_t ppi_radio_start;
+static nrfx_gppi_handle_t ppi_radio_start;
 
 /* PPI endpoint status.*/
 static atomic_t endpoint_state;
@@ -112,6 +116,95 @@ K_WORK_DELAYABLE_DEFINE(rx_timeout_work, rx_timeout_work_handler);
 
 /* Pointer to rx timeout callback function. */
 static void (**rx_timeout_cb)(void);
+
+static volatile bool cancel_request;
+static volatile bool test_is_running;
+
+#if NRF54H_ERRATA_216_PRESENT
+static const struct mbox_dt_spec on_channel =
+	MBOX_DT_SPEC_GET(DT_NODELABEL(cpurad_cpusys_errata216_mboxes), on_req);
+static const struct mbox_dt_spec off_channel =
+	MBOX_DT_SPEC_GET(DT_NODELABEL(cpurad_cpusys_errata216_mboxes), off_req);
+#endif /* NRF54H_ERRATA_216_PRESENT */
+
+/* Delay time from triggering the task "ON" for SysCtrl to starting RADIO (setting RADIO TASK RXEN
+ * or TXEN)
+ */
+#define HMPAN_216_DELAY_US (40)
+
+static K_SEM_DEFINE(errata_216_sem, 0, 1);
+
+/**
+ * @brief Send errata HMPAN-216 on request signal to SysCtrl
+ *
+ * Also ensure RADIO is not started within 40 us after the signal is triggered,
+ * so execution is blocked until then by a semaphore.
+ *
+ * @return 0 if successful, otherwise a negative error code
+ */
+static int errata_216_on_wait(void)
+{
+	if (!nrf54h_errata_216()) {
+		return 0;
+	}
+
+	int err = 0;
+
+	nrfx_timer_disable(&timer);
+	nrf_timer_shorts_disable(timer.p_reg, ~0);
+	nrf_timer_int_disable(timer.p_reg, ~0);
+
+	nrfx_timer_compare(&timer,
+		NRF_TIMER_CC_CHANNEL1,
+		nrfx_timer_us_to_ticks(&timer, HMPAN_216_DELAY_US),
+		true);
+
+#if NRF54H_ERRATA_216_PRESENT
+	err = mbox_send_dt(&on_channel, NULL);
+#endif /* NRF54H_ERRATA_216_PRESENT */
+
+	if (!err) {
+		nrfx_timer_enable(&timer);
+
+		/* Wait for the TIMER to count the required delay before starting the Radio*/
+		err = k_sem_take(&errata_216_sem, K_FOREVER);
+	}
+
+	return err;
+}
+
+/**
+ * @brief Send errata HMPAN-216 off request signal to SysCtrl
+ *
+ * @return 0 if successful, otherwise a negative error code
+ */
+static int errata_216_off(void)
+{
+	if (!nrf54h_errata_216()) {
+		return 0;
+	}
+
+#if NRF54H_ERRATA_216_PRESENT
+	return mbox_send_dt(&off_channel, NULL);
+#else
+	return 0;
+#endif /* NRF54H_ERRATA_216_PRESENT */
+}
+
+/**
+ * @brief Return to code execution after the required delay for errata HMPAN-216 has elapsed.
+ */
+static void errata_216_release(void)
+{
+	if (!nrf54h_errata_216()) {
+		return;
+	}
+
+	/* Release the waiting semaphore, continue code execution and disable TIMER */
+	k_sem_give(&errata_216_sem);
+	nrfx_timer_disable(&timer);
+	nrf_timer_int_disable(timer.p_reg, ~0);
+}
 
 #if CONFIG_FEM
 static struct radio_test_fem fem;
@@ -305,7 +398,7 @@ static void radio_power_set(nrf_radio_mode_t mode, uint8_t channel, int8_t power
 
 	if (IS_ENABLED(CONFIG_RADIO_TEST_POWER_CONTROL_AUTOMATIC)) {
 		frequency = channel_to_frequency(mode, channel);
-		output_power = fem_tx_output_power_prepare(power, &radio_power, frequency);
+		output_power = fem_tx_output_power_prepare(power, &radio_power, mode, frequency);
 	}
 #else
 	ARG_UNUSED(mode);
@@ -336,23 +429,22 @@ static void radio_power_set(nrf_radio_mode_t mode, uint8_t channel, int8_t power
 static void endpoints_clear(void)
 {
 	if (atomic_test_and_clear_bit(&endpoint_state, ENDPOINT_FORK_EGU_TIMER)) {
-		nrfx_gppi_fork_endpoint_clear(ppi_radio_start,
-			nrf_timer_task_address_get(timer.p_reg, NRF_TIMER_TASK_START));
+		nrfx_gppi_ep_clear(nrf_timer_task_address_get(timer.p_reg, NRF_TIMER_TASK_START));
 	}
 	if (atomic_test_and_clear_bit(&endpoint_state, ENDPOINT_EGU_RADIO_TX)) {
-		nrfx_gppi_channel_endpoints_clear(ppi_radio_start,
-			nrf_egu_event_address_get(RADIO_TEST_EGU, RADIO_TEST_EGU_EVENT),
-			nrf_radio_task_address_get(NRF_RADIO, NRF_RADIO_TASK_TXEN));
+		nrfx_gppi_ep_clear(
+				nrf_egu_event_address_get(RADIO_TEST_EGU, RADIO_TEST_EGU_EVENT));
+		nrfx_gppi_ep_clear(nrf_radio_task_address_get(NRF_RADIO, NRF_RADIO_TASK_TXEN));
 	}
 	if (atomic_test_and_clear_bit(&endpoint_state, ENDPOINT_EGU_RADIO_RX)) {
-		nrfx_gppi_channel_endpoints_clear(ppi_radio_start,
-			nrf_egu_event_address_get(RADIO_TEST_EGU, RADIO_TEST_EGU_EVENT),
-			nrf_radio_task_address_get(NRF_RADIO, NRF_RADIO_TASK_RXEN));
+		nrfx_gppi_ep_clear(
+				nrf_egu_event_address_get(RADIO_TEST_EGU, RADIO_TEST_EGU_EVENT));
+		nrfx_gppi_ep_clear(nrf_radio_task_address_get(NRF_RADIO, NRF_RADIO_TASK_RXEN));
 	}
 	if (atomic_test_and_clear_bit(&endpoint_state, ENDPOINT_TIMER_RADIO_TX)) {
-		nrfx_gppi_channel_endpoints_clear(ppi_radio_start,
-			nrf_timer_event_address_get(timer.p_reg, NRF_TIMER_EVENT_COMPARE0),
-			nrf_radio_task_address_get(NRF_RADIO, NRF_RADIO_TASK_TXEN));
+		nrfx_gppi_ep_clear(
+			nrf_timer_event_address_get(timer.p_reg, NRF_TIMER_EVENT_COMPARE0));
+		nrfx_gppi_ep_clear(nrf_radio_task_address_get(NRF_RADIO, NRF_RADIO_TASK_TXEN));
 	}
 }
 
@@ -360,33 +452,33 @@ static void radio_ppi_config(bool rx)
 {
 	endpoints_clear();
 
-	nrfx_gppi_channel_endpoints_setup(ppi_radio_start,
-			nrf_egu_event_address_get(RADIO_TEST_EGU, RADIO_TEST_EGU_EVENT),
-			nrf_radio_task_address_get(NRF_RADIO,
-						   rx ? NRF_RADIO_TASK_RXEN : NRF_RADIO_TASK_TXEN));
+	nrfx_gppi_ep_attach(nrf_egu_event_address_get(RADIO_TEST_EGU, RADIO_TEST_EGU_EVENT),
+			    ppi_radio_start);
+	nrfx_gppi_ep_attach(nrf_radio_task_address_get(NRF_RADIO,
+					   rx ? NRF_RADIO_TASK_RXEN : NRF_RADIO_TASK_TXEN),
+			    ppi_radio_start);
 	atomic_set_bit(&endpoint_state, (rx ? ENDPOINT_EGU_RADIO_RX : ENDPOINT_EGU_RADIO_TX));
 
-	nrfx_gppi_fork_endpoint_setup(ppi_radio_start,
-			nrf_timer_task_address_get(timer.p_reg, NRF_TIMER_TASK_START));
+	nrfx_gppi_ep_attach(nrf_timer_task_address_get(timer.p_reg, NRF_TIMER_TASK_START),
+			    ppi_radio_start);
 	atomic_set_bit(&endpoint_state, ENDPOINT_FORK_EGU_TIMER);
 
-	nrfx_gppi_channels_enable(BIT(ppi_radio_start));
+	nrfx_gppi_conn_enable(ppi_radio_start);
 }
 
 static void radio_ppi_tx_reconfigure(void)
 {
-	if (nrfx_gppi_channel_check(ppi_radio_start)) {
-		nrfx_gppi_channels_disable(BIT(ppi_radio_start));
-	}
+	nrfx_gppi_conn_disable(ppi_radio_start);
 
 	endpoints_clear();
 
-	nrfx_gppi_channel_endpoints_setup(ppi_radio_start,
-		nrf_timer_event_address_get(timer.p_reg, NRF_TIMER_EVENT_COMPARE1),
-		nrf_radio_task_address_get(NRF_RADIO, NRF_RADIO_TASK_TXEN));
+	nrfx_gppi_ep_attach(nrf_timer_event_address_get(timer.p_reg, NRF_TIMER_EVENT_COMPARE1),
+			    ppi_radio_start);
+	nrfx_gppi_ep_attach(nrf_radio_task_address_get(NRF_RADIO, NRF_RADIO_TASK_TXEN),
+			    ppi_radio_start);
 	atomic_set_bit(&endpoint_state, ENDPOINT_TIMER_RADIO_TX);
 
-	nrfx_gppi_channels_enable(BIT(ppi_radio_start));
+	nrfx_gppi_conn_enable(ppi_radio_start);
 }
 
 #if CONFIG_FEM
@@ -705,6 +797,8 @@ static void radio_disable(void)
 		(void)fem_power_down();
 	}
 #endif /* CONFIG_FEM */
+
+	test_is_running = false;
 }
 
 static void mltpan_6(nrf_radio_mode_t mode)
@@ -779,9 +873,9 @@ static void radio_modulated_tx_carrier(uint8_t mode, int8_t txpower, uint8_t cha
 	case NRF_RADIO_MODE_IEEE802154_250KBIT:
 	case NRF_RADIO_MODE_BLE_LR125KBIT:
 	case NRF_RADIO_MODE_BLE_LR500KBIT:
-		nrf_radio_shorts_enable(NRF_RADIO,
-					NRF_RADIO_SHORT_READY_START_MASK |
-					NRF_RADIO_SHORT_PHYEND_START_MASK);
+		nrf_radio_shorts_enable(NRF_RADIO, NRF_RADIO_SHORT_READY_START_MASK);
+		nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_PHYEND);
+		nrf_radio_int_enable(NRF_RADIO, NRF_RADIO_INT_PHYEND_MASK);
 		break;
 
 #endif /* CONFIG_HAS_HW_NRF_RADIO_IEEE802154 || CONFIG_HAS_HW_NRF_RADIO_BLE_CODED */
@@ -806,9 +900,9 @@ static void radio_modulated_tx_carrier(uint8_t mode, int8_t txpower, uint8_t cha
 #if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4)
 	case NRF_RADIO_MODE_NRF_4MBIT_BT_0_4:
 #endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT4) */
-		nrf_radio_shorts_enable(NRF_RADIO,
-					NRF_RADIO_SHORT_READY_START_MASK |
-					RADIO_TEST_SHORT_END_START_MASK);
+		nrf_radio_shorts_enable(NRF_RADIO, NRF_RADIO_SHORT_READY_START_MASK);
+		nrf_radio_event_clear(NRF_RADIO, RADIO_TEST_EVENT_END);
+		nrf_radio_int_enable(NRF_RADIO, RADIO_TEST_INT_END_MASK);
 		break;
 	}
 
@@ -819,10 +913,6 @@ static void radio_modulated_tx_carrier(uint8_t mode, int8_t txpower, uint8_t cha
 
 	tx_packet_cnt = 0;
 
-	nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_END);
-	if (packets_num != 0U) {
-		nrf_radio_int_enable(NRF_RADIO, NRF_RADIO_INT_END_MASK);
-	}
 
 #if CONFIG_FEM
 	(void)fem_configure(false, mode, &fem);
@@ -913,6 +1003,8 @@ static void radio_modulated_tx_carrier_duty_cycle(uint8_t mode, int8_t txpower,
 				RADIO_TEST_SHORT_END_DISABLE_MASK);
 	radio_power_set(mode, channel, txpower);
 	radio_channel_set(mode, channel);
+	nrf_radio_event_clear(NRF_RADIO, RADIO_TEST_EVENT_END);
+	nrf_radio_int_enable(NRF_RADIO, RADIO_TEST_INT_END_MASK);
 
 	const uint32_t total_time_per_payload = time_in_us_per_byte[mode] * total_payload_size;
 
@@ -957,6 +1049,11 @@ void radio_test_start(const struct radio_test_config *config)
 	fem = config->fem;
 #endif /* CONFIG_FEM */
 
+	/* Execute nRF54H20 errata 216 workaround */
+	if (errata_216_on_wait()) {
+		printk("Failed to send the nRF54H20 errata 216 on request to SysCtrl.\n");
+	}
+
 	switch (config->type) {
 	case UNMODULATED_TX:
 		radio_unmodulated_tx_carrier(config->mode,
@@ -992,21 +1089,38 @@ void radio_test_start(const struct radio_test_config *config)
 			config->params.modulated_tx_duty_cycle.duty_cycle);
 		break;
 	}
+
+	test_is_running = true;
 }
 
-void radio_test_cancel(void)
+static void cancel(void)
 {
+	cancel_request = false;
+
 	nrfx_timer_disable(&timer);
 	nrfx_timer_clear(&timer);
 
 	sweep_processing = false;
 
-	if (nrfx_gppi_channel_check(ppi_radio_start)) {
-		nrfx_gppi_channels_disable(BIT(ppi_radio_start));
-	}
-
+	nrfx_gppi_conn_disable(ppi_radio_start);
 	endpoints_clear();
 	radio_disable();
+
+	if (errata_216_off()) {
+		printk("Failed to send errata HMPAN-216 off.\n");
+	}
+}
+
+void radio_test_cancel(enum radio_test_mode type)
+{
+	if (test_is_running) {
+		if (type == MODULATED_TX ||
+		    type == MODULATED_TX_DUTY_CYCLE) {
+			cancel_request = true;
+		} else {
+			cancel();
+		}
+	}
 }
 
 void radio_rx_stats_get(struct radio_rx_stats *rx_stats)
@@ -1057,6 +1171,10 @@ void toggle_dcdc_state(uint8_t dcdc_state)
 static void rx_timeout_work_handler(struct k_work *work)
 {
 	radio_disable();
+	/* Send off signal for nRF54H20 errata HMPAN-216 */
+	if (errata_216_off()) {
+		printk("Failed to send errata HMPAN-216 off\n");
+	}
 	if (rx_timeout_cb != NULL && *rx_timeout_cb != NULL) {
 		(*rx_timeout_cb)();
 	}
@@ -1067,7 +1185,7 @@ static void timer_handler(nrf_timer_event_t event_type, void *context)
 	const struct radio_test_config *config =
 		(const struct radio_test_config *) context;
 
-	if (event_type == NRF_TIMER_EVENT_COMPARE0) {
+	if (event_type == NRF_TIMER_EVENT_COMPARE0) { /* sweep test running */
 		uint8_t channel_start;
 		uint8_t channel_end;
 
@@ -1099,12 +1217,16 @@ static void timer_handler(nrf_timer_event_t event_type, void *context)
 		if (current_channel > channel_end) {
 			current_channel = channel_start;
 		}
+	} else if (event_type == NRF_TIMER_EVENT_COMPARE1) { /* HMPAN-216 errata */
+		errata_216_release();
+	} else {
+		/* Do nothing */
 	}
 }
 
 static void timer_init(const struct radio_test_config *config)
 {
-	nrfx_err_t          err;
+	int                 err;
 	nrfx_timer_config_t timer_cfg = {
 		.frequency = NRFX_MHZ_TO_HZ(1),
 		.mode      = NRF_TIMER_MODE_TIMER,
@@ -1113,8 +1235,26 @@ static void timer_init(const struct radio_test_config *config)
 	};
 
 	err = nrfx_timer_init(&timer, &timer_cfg, timer_handler);
-	if (err != NRFX_SUCCESS) {
+	if (err != 0) {
 		printk("nrfx_timer_init failed with: %d\n", err);
+	}
+}
+
+void on_radio_end(const struct radio_test_config *config)
+{
+	tx_packet_cnt++;
+	if (tx_packet_cnt == config->params.modulated_tx.packets_num &&
+	    config->type == MODULATED_TX) {
+		radio_disable();
+		/* Send off signal for nRF54H20 errata HMPAN-216 */
+		if (errata_216_off()) {
+			printk("Failed to send errata HMPAN-216 off\n");
+		}
+		config->params.modulated_tx.cb();
+	} else if (cancel_request) {
+		cancel();
+	} else if (config->type == MODULATED_TX) {
+		nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_START);
 	}
 }
 
@@ -1136,31 +1276,35 @@ void radio_handler(const void *context)
 		}
 	}
 
+#if defined(RADIO_INTENSET_PHYEND_Msk) || defined(RADIO_INTENSET00_PHYEND_Msk)
+	if (nrf_radio_int_enable_check(NRF_RADIO, NRF_RADIO_INT_PHYEND_MASK) &&
+	    nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_PHYEND)) {
+		nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_PHYEND);
+		on_radio_end(config);
+	}
+#endif /* defined(RADIO_INTENSET_PHYEND_Msk) || defined(RADIO_INTENSET00_PHYEND_Msk) */
+
 	if (nrf_radio_int_enable_check(NRF_RADIO, NRF_RADIO_INT_END_MASK) &&
 	    nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_END)) {
 		nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_END);
-
-		tx_packet_cnt++;
-		if (tx_packet_cnt == config->params.modulated_tx.packets_num) {
-			radio_disable();
-			config->params.modulated_tx.cb();
-		}
+		on_radio_end(config);
 	}
 }
 
 int radio_test_init(struct radio_test_config *config)
 {
-	nrfx_err_t nrfx_err;
+	int nrfx_err;
+	uint32_t rad_domain = nrfx_gppi_domain_id_get((uint32_t)NRF_RADIO);
 
 	timer_init(config);
 	IRQ_CONNECT(RADIO_TEST_TIMER_IRQn, IRQ_PRIO_LOWEST,
-		RADIO_TEST_TIMER_IRQ_HANDLER, NULL, 0);
+		nrfx_timer_irq_handler, &timer, 0);
 
 	irq_connect_dynamic(RADIO_TEST_RADIO_IRQn, IRQ_PRIO_LOWEST, radio_handler, config, 0);
 	irq_enable(RADIO_TEST_RADIO_IRQn);
 
-	nrfx_err = nrfx_gppi_channel_alloc(&ppi_radio_start);
-	if (nrfx_err != NRFX_SUCCESS) {
+	nrfx_err = nrfx_gppi_domain_conn_alloc(rad_domain, rad_domain, &ppi_radio_start);
+	if (nrfx_err != 0) {
 		printk("Failed to allocate gppi channel.\n");
 		return -EFAULT;
 	}

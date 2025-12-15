@@ -8,15 +8,17 @@
    AVSystem Coiote service
 """
 
-import sys
 import argparse
+import binascii
 import logging
+import os
+import sys
 import time
 
-from coiote import Operationlist
-from coiote import Coiote
+from coiote import Coiote, Operationlist
 
-class firmwareObject():
+
+class firmwareObject:
     def __init__(self):
         self.instance_id = None
         self.state = None
@@ -57,27 +59,17 @@ def fota_state_check(obj_data):
         return obj_data
 
 def fota_ready(obj_list):
-    for obj in obj_list:
-        if obj.ready is False:
-            return False
-    return True
+    return all(obj.ready is not False for obj in obj_list)
 
 def fota_ready_for_update(obj_list):
-    for obj in obj_list:
-        if obj.ready_for_update is False and obj.failure is False:
-            return False
-
-    return True
+    return all(not (obj.ready_for_update is False and obj.failure is False) for obj in obj_list)
 
 def fota_ready_for_test_state(obj_list, test_state):
     if test_state is None:
         return False
-    for obj in obj_list:
-        if obj.state != test_state and obj.failure is False:
-            return False
-    return True
+    return all(not (obj.state != test_state and obj.failure is False) for obj in obj_list)
 
-class Fota():
+class Fota:
     """Interact with Coiote server"""
     def __init__(self):
         #
@@ -179,7 +171,10 @@ class Fota():
         with open(app_binary, mode='rb') as f:
             f_payload = f.read()
         logging.info("Binary %s, Size %d (bytes)", app_binary, len(f_payload))
-        app_resource_id = self.coiote.fota_resource_allocate(app_binary, instance_id)
+        # Generate a random 16-character hex string for instance_id
+        random_instance_id = binascii.b2a_hex(os.urandom(8)).decode()
+        logging.info(f'Generated random instance_id: {random_instance_id}')
+        app_resource_id = self.coiote.fota_resource_allocate(app_binary, random_instance_id)
         if app_resource_id:
             resp = self.coiote.upload_fota_file(app_resource_id, f_payload)
             if resp is None:
@@ -241,7 +236,7 @@ class Fota():
         logging.info("Load Client binary to Coiote")
         app_obj = firmwareObject()
         app_obj.instance_id = self.app_instance_id
-        resource_id = fota.binary_load(app_obj.instance_id, "app_update.bin")
+        resource_id = self.binary_load(app_obj.instance_id, "app_update.bin")
         if resource_id is None:
             return None
         logging.info(f'Client Binary Resource id {resource_id}')
@@ -255,7 +250,7 @@ class Fota():
         logging.info("Init setup for Modem firmware Update :%s", bin_name)
         modem_obj = firmwareObject()
         modem_obj.instance_id = self.modem_instance_id
-        r_id = fota.binary_load(modem_obj.instance_id, bin_name)
+        r_id = self.binary_load(modem_obj.instance_id, bin_name)
         if r_id is None:
             return None
         modem_obj.download_url = self.download_url_generate(r_id, "HTTP")

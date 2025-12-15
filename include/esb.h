@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#include <nrf.h>
+#include <nrfx.h>
 #include <hal/nrf_radio.h>
 
 #include <zephyr/sys/util.h>
@@ -98,8 +98,9 @@ enum esb_protocol {
 
 /** @brief Enhanced ShockBurst modes. */
 enum esb_mode {
-	ESB_MODE_PTX,	/**< Primary transmitter mode. */
-	ESB_MODE_PRX	/**< Primary receiver mode.    */
+	ESB_MODE_PTX,		/**< Primary transmitter mode. */
+	ESB_MODE_PRX,		/**< Primary receiver mode.    */
+	ESB_MODE_MONITOR	/**< Primary monitor mode.     */
 };
 
 /** @brief Enhanced ShockBurst bitrate modes. */
@@ -109,28 +110,23 @@ enum esb_bitrate {
 	/** 2 Mb radio mode. */
 	ESB_BITRATE_2MBPS = NRF_RADIO_MODE_NRF_2MBIT,
 
-#if defined(RADIO_MODE_MODE_Nrf_250Kbit)
+#if defined(RADIO_MODE_MODE_Nrf_250Kbit) || defined(__DOXYGEN__)
 	/** 250 Kb radio mode. */
 	ESB_BITRATE_250KBPS = NRF_RADIO_MODE_NRF_250KBIT,
-#endif /* defined(RADIO_MODE_MODE_Nrf_250Kbit) */
+#endif /* defined(RADIO_MODE_MODE_Nrf_250Kbit) || defined(__DOXYGEN__) */
 
 	/** 1 Mb radio mode using @e Bluetooth low energy radio parameters. */
 	ESB_BITRATE_1MBPS_BLE = NRF_RADIO_MODE_BLE_1MBIT,
 
-#if defined(RADIO_MODE_MODE_Ble_2Mbit)
+#if defined(RADIO_MODE_MODE_Ble_2Mbit) || defined(__DOXYGEN__)
 	/** 2 Mb radio mode using @e Bluetooth low energy radio parameters. */
 	ESB_BITRATE_2MBPS_BLE = NRF_RADIO_MODE_BLE_2MBIT,
-#endif /* defined(RADIO_MODE_MODE_Ble_2Mbit) */
+#endif /* defined(RADIO_MODE_MODE_Ble_2Mbit) || defined(__DOXYGEN__) */
 
-#if defined(RADIO_MODE_MODE_Nrf_4Mbit0_5)
+#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) || defined(__DOXYGEN__)
 	/** 4 Mb radio mode. */
-	ESB_BITRATE_4MBPS = NRF_RADIO_MODE_NRF_4MBIT_H_0_5,
-#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit0_5) */
-
-#if defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6)
-	/** 4 Mb radio mode. */
-	ESB_BITRATE_4MBPS = RADIO_MODE_MODE_Nrf_4Mbit_0BT6,
-#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) */
+	ESB_BITRATE_4MBPS = NRF_RADIO_MODE_NRF_4MBIT_BT_0_6,
+#endif /* defined(RADIO_MODE_MODE_Nrf_4Mbit_0BT6) || defined(__DOXYGEN__) */
 };
 
 /** @brief Enhanced ShockBurst CRC modes. */
@@ -142,123 +138,123 @@ enum esb_crc {
 
 /** @brief Enhanced ShockBurst radio transmission power modes. */
 enum esb_tx_power {
-#if defined(RADIO_TXPOWER_TXPOWER_Pos10dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos10dBm) || defined(__DOXYGEN__)
 	/** +10 dBm radio transmit power. */
 	ESB_TX_POWER_10DBM = RADIO_TXPOWER_TXPOWER_Pos10dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos9dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos9dBm) || defined(__DOXYGEN__)
 	/** +9 dBm radio transmit power. */
 	ESB_TX_POWER_9DBM = RADIO_TXPOWER_TXPOWER_Pos9dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos8dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos8dBm) || defined(__DOXYGEN__)
 	/** +8 dBm radio transmit power. */
 	ESB_TX_POWER_8DBM = RADIO_TXPOWER_TXPOWER_Pos8dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos7dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos7dBm) || defined(__DOXYGEN__)
 	/** +7 dBm radio transmit power. */
 	ESB_TX_POWER_7DBM = RADIO_TXPOWER_TXPOWER_Pos7dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos6dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos6dBm) || defined(__DOXYGEN__)
 	/** +6 dBm radio transmit power. */
 	ESB_TX_POWER_6DBM = RADIO_TXPOWER_TXPOWER_Pos6dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos5dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos5dBm) || defined(__DOXYGEN__)
 	/** +5 dBm radio transmit power. */
 	ESB_TX_POWER_5DBM = RADIO_TXPOWER_TXPOWER_Pos5dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos4dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos4dBm) || defined(__DOXYGEN__)
 	/** +4 dBm radio transmit power. */
 	ESB_TX_POWER_4DBM = RADIO_TXPOWER_TXPOWER_Pos4dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos3dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos3dBm) || defined(__DOXYGEN__)
 	/** +3 dBm radio transmit power. */
 	ESB_TX_POWER_3DBM = RADIO_TXPOWER_TXPOWER_Pos3dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos2dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos2dBm) || defined(__DOXYGEN__)
 	/** +2 dBm radio transmit power. */
 	ESB_TX_POWER_2DBM = RADIO_TXPOWER_TXPOWER_Pos2dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Pos1dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Pos1dBm) || defined(__DOXYGEN__)
 	/** +1 dBm radio transmit power. */
 	ESB_TX_POWER_1DBM = RADIO_TXPOWER_TXPOWER_Pos1dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_0dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_0dBm) || defined(__DOXYGEN__)
 	/** 0 dBm radio transmit power. */
 	ESB_TX_POWER_0DBM = RADIO_TXPOWER_TXPOWER_0dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg1dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg1dBm) || defined(__DOXYGEN__)
 	/** -1 dBm radio transmit power. */
 	ESB_TX_POWER_NEG1DBM = RADIO_TXPOWER_TXPOWER_Neg1dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg2dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg2dBm) || defined(__DOXYGEN__)
 	/** -2 dBm radio transmit power. */
 	ESB_TX_POWER_NEG2DBM = RADIO_TXPOWER_TXPOWER_Neg2dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg3dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg3dBm) || defined(__DOXYGEN__)
 	/** -3 dBm radio transmit power. */
 	ESB_TX_POWER_NEG3DBM = RADIO_TXPOWER_TXPOWER_Neg3dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg4dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg4dBm) || defined(__DOXYGEN__)
 	/** -4 dBm radio transmit power. */
 	ESB_TX_POWER_NEG4DBM = RADIO_TXPOWER_TXPOWER_Neg4dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg5dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg5dBm) || defined(__DOXYGEN__)
 	/** -5 dBm radio transmit power. */
 	ESB_TX_POWER_NEG5DBM = RADIO_TXPOWER_TXPOWER_Neg5dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg6dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg6dBm) || defined(__DOXYGEN__)
 	/** -6 dBm radio transmit power. */
 	ESB_TX_POWER_NEG6DBM = RADIO_TXPOWER_TXPOWER_Neg6dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg7dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg7dBm) || defined(__DOXYGEN__)
 	/** -7 dBm radio transmit power. */
 	ESB_TX_POWER_NEG7DBM = RADIO_TXPOWER_TXPOWER_Neg7dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg8dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg8dBm) || defined(__DOXYGEN__)
 	/** -8 dBm radio transmit power. */
 	ESB_TX_POWER_NEG8DBM = RADIO_TXPOWER_TXPOWER_Neg8dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg9dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg9dBm) || defined(__DOXYGEN__)
 	/** -9 dBm radio transmit power. */
 	ESB_TX_POWER_NEG9DBM = RADIO_TXPOWER_TXPOWER_Neg9dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg10dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg10dBm) || defined(__DOXYGEN__)
 	/** -10 dBm radio transmit power. */
 	ESB_TX_POWER_NEG10DBM = RADIO_TXPOWER_TXPOWER_Neg10dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg12dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg12dBm) || defined(__DOXYGEN__)
 	/** -12 dBm radio transmit power. */
 	ESB_TX_POWER_NEG12DBM = RADIO_TXPOWER_TXPOWER_Neg12dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg14dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg14dBm) || defined(__DOXYGEN__)
 	/** -14 dBm radio transmit power. */
 	ESB_TX_POWER_NEG14DBM = RADIO_TXPOWER_TXPOWER_Neg14dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg16dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg16dBm) || defined(__DOXYGEN__)
 	/** -16 dBm radio transmit power. */
 	ESB_TX_POWER_NEG16DBM = RADIO_TXPOWER_TXPOWER_Neg16dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg20dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg20dBm) || defined(__DOXYGEN__)
 	/** -20 dBm radio transmit power. */
 	ESB_TX_POWER_NEG20DBM = RADIO_TXPOWER_TXPOWER_Neg20dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg26dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg26dBm) || defined(__DOXYGEN__)
 	/** -26 dBm radio transmit power. */
 	ESB_TX_POWER_NEG26DBM = RADIO_TXPOWER_TXPOWER_Neg26dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg30dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg30dBm) || defined(__DOXYGEN__)
 	/** -30 dBm radio transmit power. */
 	ESB_TX_POWER_NEG30DBM = RADIO_TXPOWER_TXPOWER_Neg30dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg40dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg40dBm) || defined(__DOXYGEN__)
 	/** -40 dBm radio transmit power. */
 	ESB_TX_POWER_NEG40DBM = RADIO_TXPOWER_TXPOWER_Neg40dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg46dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg46dBm) || defined(__DOXYGEN__)
 	/** -46 dBm radio transmit power. */
 	ESB_TX_POWER_NEG46DBM = RADIO_TXPOWER_TXPOWER_Neg46dBm,
 #endif
-#if defined(RADIO_TXPOWER_TXPOWER_Neg70dBm) || defined(DOXYGEN)
+#if defined(RADIO_TXPOWER_TXPOWER_Neg70dBm) || defined(__DOXYGEN__)
 	/** -70 dBm radio transmit power. */
 	ESB_TX_POWER_NEG70DBM = RADIO_TXPOWER_TXPOWER_Neg70dBm,
 #endif
@@ -297,10 +293,9 @@ struct esb_payload {
 	uint8_t length; /**< Length of the packet when not in DPL mode. */
 	uint8_t pipe;   /**< Pipe used for this payload. */
 	int8_t rssi;   /**< RSSI for the received packet. */
-	uint8_t noack;  /**< Flag indicating that this packet will not be
-		       *  acknowledged. Flag is ignored when selective auto
-		       *  ack is enabled.
-		       */
+	uint8_t noack; /**< Flag indicating that this packet will not be acknowledged.
+			 *  Flag is ignored when selective auto ack is disabled.
+			 */
 	uint8_t pid;    /**< PID assigned during communication. */
 	uint8_t data[CONFIG_ESB_MAX_PAYLOAD_LENGTH]; /**< The payload data. */
 };
@@ -345,10 +340,10 @@ struct esb_config {
 			       *  on the platforms that are used on each side).
 			       */
 	bool selective_auto_ack; /**< Selective auto acknowledgement.
-				   *  When this feature is disabled, all packets
-				   *  will be acknowledged ignoring the noack
-				   *  field.
-				   */
+				  *  When this feature is disabled, all packets will be acknowledged
+				  *  ignoring the noack field.
+				  *  Always disabled when using @ref ESB_PROTOCOL_ESB.
+				  */
 	bool use_fast_ramp_up; /**<  When this feature is enabled, radio TXEN and
 				 *  RXEN delays are reduced from 130 µs to 40 µs.
 				 *  The radio peripheral needs some time to start up
@@ -442,15 +437,22 @@ int esb_stop_rx(void);
  *
  * This function clears the TX FIFO buffer.
  *
- * @retval 0 If successful.
- *           Otherwise, a (negative) error code is returned.
+ * @note The radio must not be in transmission state for this operation to succeed.
+ *       This requirement prevents erroneous operations on the FIFO queue that could
+ *       occur if the buffer is cleared while the radio is transmitting.
+ *
+ * @retval 0       If successful (FIFO cleared).
+ * @retval -EACCES If ESB is not initialized.
+ * @retval -EBUSY  If radio is transmitting.
  */
 int esb_flush_tx(void);
 
 /** @brief Pop the first item from the TX buffer.
  *
  * @retval 0 If successful.
- *           Otherwise, a (negative) error code is returned.
+ * @retval -EACCES If ESB is not initialized.
+ * @retval -EBUSY  If radio is transmitting.
+ * @retval -ENODATA If TX FIFO is empty.
  */
 int esb_pop_tx(void);
 

@@ -31,21 +31,24 @@ on:
         type: string
         default: nrf/scripts/ci/license_allow_list.yaml
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   license_job:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: Run license checks on patch series (PR)
     steps:
     - name: Checkout sources
       uses: nrfconnect/action-checkout-west-update@main
       with:
         git-fetch-depth: 0
-        git-ref: ${{ github.event.pull_request.head.sha }}
         path: ncs/${{ inputs.path }}
         west-update-args: '-n zephyr bsim'
 
     - name: cache-pip
-      uses: actions/cache@v3
+      uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-doc-pip
@@ -58,17 +61,6 @@ jobs:
         pip3 install -U wheel
         pip3 install --user -U west
         pip3 show -f west
-
-    - name: Git rebase
-      env:
-        BASE_REF: ${{ github.base_ref }}
-      working-directory: ncs/${{ inputs.path }}
-      run: |
-        git remote -v
-        git branch
-        git rebase origin/${BASE_REF}
-        # debug
-        git log --pretty=oneline | head -n 10
 
     - name: West zephyr-export
       working-directory: ncs
@@ -104,7 +96,7 @@ jobs:
             -c origin/${BASE_REF}..
 
     - name: Upload results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
       continue-on-error: true
       if: always() && contains(github.event.pull_request.user.login, 'dependabot[bot]') != true
       with:

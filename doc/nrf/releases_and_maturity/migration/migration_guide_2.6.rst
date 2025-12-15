@@ -39,9 +39,9 @@ Serial LTE Modem (SLM)
     The setting controls whether the SLM connects automatically to the network on startup.
     You can read and write it using the ``AT#XCARRIER="auto_connect"`` command.
 
-  * The ``AT#XCMNG`` AT command, which is activated with the :file:`overlay-native_tls.conf` overlay file, has been changed from using modem certificate storage to Zephyr settings storage.
+  * The ``AT#XCMNG`` AT command, which is activated with the ``overlay-native_tls.conf`` overlay file, has been changed from using modem certificate storage to Zephyr settings storage.
     You need to use the ``AT#XCMNG`` command to store previously stored credentials again.
-  * The ``CONFIG_SLM_WAKEUP_PIN`` Kconfig option was renamed to :ref:`CONFIG_SLM_POWER_PIN <CONFIG_SLM_POWER_PIN>`.
+  * The ``CONFIG_SLM_WAKEUP_PIN`` Kconfig option was renamed to ``CONFIG_SLM_POWER_PIN``.
     If you have defined it separately from the default configurations, you need to update its name accordingly.
 
 Matter
@@ -190,7 +190,7 @@ Security
        It is not backward compatible with the previous PSA ITS implementation.
        Migrating from the PSA ITS implementation, enabled by the ``CONFIG_PSA_NATIVE_ITS`` option, to the new :ref:`trusted_storage_readme` library requires manual data migration.
 
-   * For :ref:`lib_wifi_credentials` library and Wi-Fi samples:
+   * For Wi-Fi credentials library and Wi-Fi samples:
 
      * ``CONFIG_WIFI_CREDENTIALS_BACKEND_PSA_UID_OFFSET`` has been removed because it was specific to the previous solution that used PSA Protected Storage instead of PSA Internal Trusted Storage (ITS).
        Use :kconfig:option:`CONFIG_WIFI_CREDENTIALS_BACKEND_PSA_OFFSET` to specify the key offset for PSA ITS.
@@ -413,7 +413,7 @@ Matter
                *
                * If IPv6 networking and service provisioned, keep the LED On constantly.
                *
-               * If the system has BLE connection(s) uptill the stage above, THEN blink the LED at an even
+               * If the system has BLE connections uptill the stage above, THEN blink the LED at an even
                * rate of 100ms.
                *
                * Otherwise, blink the LED for a very short time. */
@@ -832,7 +832,7 @@ Bluetooth® Mesh
      * :c:struct:`bt_mesh_sensor_value` with a valid format can be converted to and from integer, float and :c:struct:`sensor_value` through ``bt_mesh_sensor_value_to/from*`` functions.
      * Where the applications previously just added values directly to :c:member:`sensor_value.val1` and :c:member:`sensor_value.val2`, the correct way is to use ``bt_mesh_sensor_value_to/from*`` functions to either set or extract the values.
 
-     Example of changes that need to be done for a sensor using sensor values, from e.g. the file :file:`drivers/sensor.h`:
+     Example of changes that need to be done for a sensor using sensor values from the file :file:`drivers/sensor.h`:
 
        ..  code-block:: diff
 

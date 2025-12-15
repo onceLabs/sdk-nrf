@@ -22,7 +22,7 @@ K_THREAD_STACK_DEFINE(at_host_stack_area, CONFIG_AT_HOST_STACK_SIZE);
 
 #define AT_BUF_SIZE CONFIG_AT_HOST_CMD_MAX_LEN
 
-AT_MONITOR(at_host, ANY, response_handler);
+AT_MONITOR(at_host, ANY, notification_handler);
 
 /** @brief Termination Modes. */
 enum term_modes {
@@ -33,12 +33,18 @@ enum term_modes {
 	MODE_COUNT      /* Counter of term_modes */
 };
 
+#define AT_HOST_UART_DEV_GET()                                                                     \
+	DEVICE_DT_GET(COND_CODE_1(DT_HAS_CHOSEN(ncs_at_host_uart),                                 \
+		(DT_CHOSEN(ncs_at_host_uart)), (DT_NODELABEL(uart0))))
+
+#define IS_LOG_BACKEND_UART(_uart_dev)                                                             \
+	(IS_ENABLED(CONFIG_LOG_BACKEND_UART) && COND_CODE_1(DT_HAS_CHOSEN(zephyr_log_uart),        \
+		(_uart_dev == DEVICE_DT_GET(DT_CHOSEN(zephyr_log_uart))),                          \
+		(COND_CODE_1(DT_HAS_CHOSEN(zephyr_console),                                        \
+			(_uart_dev == DEVICE_DT_GET(DT_CHOSEN(zephyr_console))), (false)))))
+
 static enum term_modes term_mode;
-#if DT_HAS_CHOSEN(ncs_at_host_uart)
-static const struct device *const uart_dev = DEVICE_DT_GET(DT_CHOSEN(ncs_at_host_uart));
-#else
-static const struct device *const uart_dev = DEVICE_DT_GET(DT_NODELABEL(uart0));
-#endif
+static const struct device *const uart_dev = AT_HOST_UART_DEV_GET();
 static bool at_buf_busy; /* Guards at_buf while processing a command */
 static char at_buf[AT_BUF_SIZE]; /* AT command and modem response buffer */
 static struct k_work_q at_host_work_q;
@@ -46,10 +52,25 @@ static struct k_work cmd_send_work;
 
 static inline void write_uart_string(const char *str)
 {
-	if (IS_ENABLED(CONFIG_LOG_BACKEND_UART)) {
+	if (IS_LOG_BACKEND_UART(uart_dev)) {
+		/* The chosen AT host UART device is also the UART log backend device.
+		 * Therefore, log the AT response instead of writing directly to the UART device.
+		 */
 		LOG_RAW("%s", str);
 		return;
 	}
+
+	/* Make sure there are both CR and LF between the command and the output (response or
+	 * notification). Otherwise the output will be printed on top of the command or the
+	 * output will have offset. 3GPP TS 27.007 specifies, that responses should be prefixed
+	 * by CRLF. However, the string from the modem does not contain the CRLF prefix.
+	 */
+#if defined(CONFIG_LF_TERMINATION)
+	uart_poll_out(uart_dev, '\r');
+#endif
+#if defined(CONFIG_CR_TERMINATION)
+	uart_poll_out(uart_dev, '\n');
+#endif
 
 	/* Send characters until, but not including, null */
 	for (size_t i = 0; str[i]; i++) {
@@ -57,10 +78,10 @@ static inline void write_uart_string(const char *str)
 	}
 }
 
-static void response_handler(const char *response)
+static void notification_handler(const char *notification)
 {
 	/* Forward the data over UART */
-	write_uart_string(response);
+	write_uart_string(notification);
 }
 
 static void cmd_send(struct k_work *work)
@@ -93,8 +114,14 @@ static void uart_rx_handler(uint8_t character)
 	/* Backspace and DEL character */
 	case 0x08:
 	case 0x7F:
-		if (at_cmd_len > 0) {
-			at_cmd_len--;
+		if (at_cmd_len == 0) {
+			return;
+		}
+
+		at_cmd_len--;
+		/* If the removed character was a quote, need to toggle the flag. */
+		if (at_buf[at_cmd_len] == '"') {
+			inside_quotes = !inside_quotes;
 		}
 		return;
 	}

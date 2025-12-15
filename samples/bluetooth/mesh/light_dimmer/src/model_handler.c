@@ -51,24 +51,24 @@ struct scene_btn_ctx {
 	int64_t press_start_time;
 };
 
-#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_CONF)
+#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_BASELINE)
 static const uint8_t cmp2_elem_offset[1] = { 0 };
 
 static const struct bt_mesh_comp2_record comp_rec[2] = {
-	{
+	{/* Basic Scene Selector NLC Profile 1.0.1*/
 	.id = BT_MESH_NLC_PROFILE_ID_BASIC_SCENE_SELECTOR,
 	.version.x = 1,
 	.version.y = 0,
-	.version.z = 0,
+	.version.z = 1,
 	.elem_offset_cnt = 1,
 	.elem_offset = cmp2_elem_offset,
 	.data_len = 0
 	},
-	{
+	{/* Dimming Control NLC Profile 1.0.1 */
 	.id = BT_MESH_NLC_PROFILE_ID_DIMMING_CONTROL,
 	.version.x = 1,
 	.version.y = 0,
-	.version.z = 0,
+	.version.z = 1,
 	.elem_offset_cnt = 1,
 	.elem_offset = cmp2_elem_offset,
 	.data_len = 0
@@ -306,7 +306,7 @@ static const struct bt_mesh_comp comp = {
 
 const struct bt_mesh_comp *model_handler_init(void)
 {
-#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_CONF)
+#if IS_ENABLED(CONFIG_BT_MESH_NLC_PERF_BASELINE)
 	if (bt_mesh_comp2_register(&comp_p2)) {
 		printf("Failed to register comp2\n");
 	}

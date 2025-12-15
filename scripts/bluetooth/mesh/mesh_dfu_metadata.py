@@ -16,16 +16,18 @@ The script produces the following output to the build folder:
 This output is also appended to the archive located at build/zephyr/dfu_application.zip.
 '''
 
+import argparse
+import json
+import os
+import string
 import struct
 import sys
-import os
-from elftools.elf.elffile import ELFFile
-import json
+import traceback
+from zipfile import ZipFile
+
 from cryptography.hazmat.primitives import cmac
 from cryptography.hazmat.primitives.ciphers import algorithms
-from zipfile import ZipFile
-import traceback
-import argparse
+from elftools.elf.elffile import ELFFile
 
 FILE_NAME_IN_ZIP = 'ble_mesh_metadata.json'
 FILE_NAME = 'dfu_application.zip_ble_mesh_metadata.json'
@@ -34,7 +36,6 @@ FILE_NAME = 'dfu_application.zip_ble_mesh_metadata.json'
 def exit_with_error_msg():
     traceback.print_exc()
     print("Extracting BLE Mesh metadata failed")
-    print("You can bypass this script by disabling the CONFIG_BT_MESH_DFU_METADATA_ON_BUILD option in your project config")
     sys.exit(0)
 
 
@@ -81,7 +82,7 @@ class Comp0:
     ]
 
     def __init__(self, cid, pid, vid, kconfig):
-        if 'CONFIG_BT_MESH_CRPL' not in kconfig.keys():
+        if 'CONFIG_BT_MESH_CRPL' not in kconfig:
             raise Exception("Could not find CONFIG_BT_MESH_CRPL Kconfig option")
         self.elems = []
         self.cid = cid
@@ -149,9 +150,9 @@ class KConfig(dict):
         """
         configs = cls()
         try:
-            with open(filename, 'r') as config:
+            with open(filename) as config:
                 for line in config:
-                    if not line.startswith("CONFIG_"):
+                    if not (line.startswith("CONFIG_") or line.startswith("SB_CONFIG_")):
                         continue
                     kconfig, value = line.split("=", 1)
                     configs[kconfig] = value.strip()
@@ -171,6 +172,22 @@ class KConfig(dict):
             }
         except Exception as err :
             raise Exception("Unable to parse CONFIG_MCUBOOT_IMGTOOL_SIGN_VERSION Kconfig option") from err
+
+    def fwid_mcuboot_version_get(self):
+        try:
+            version = self.version_parse()
+            company_id = int(self['CONFIG_BT_COMPANY_ID'], 0)
+
+            fwid = bytearray()
+            fwid.extend(company_id.to_bytes(2, 'little'))
+            fwid.append(version["major"])
+            fwid.append(version["minor"])
+            fwid.extend(version["revision"].to_bytes(2, 'little'))
+            fwid.extend(version["build_number"].to_bytes(4, 'little'))
+
+            return str(fwid.hex())
+        except Exception as err :
+            raise Exception("Unable to generate FWID using mcuboot version") from err
 
 
 def read_symbol_data(elf, symbol_addr):
@@ -305,8 +322,8 @@ def read_comp_data(elf_path, addr, kconfigs):
         Parsed Composition data
     """
 
-    label_cnt = int(kconfigs['CONFIG_BT_MESH_LABEL_COUNT']) if 'CONFIG_BT_MESH_LABEL_COUNT' in kconfigs.keys() else 0
-    lcd_srv = (kconfigs['CONFIG_BT_MESH_LARGE_COMP_DATA_SRV'] == 'y') if 'CONFIG_BT_MESH_LARGE_COMP_DATA_SRV' in kconfigs.keys() else False
+    label_cnt = int(kconfigs['CONFIG_BT_MESH_LABEL_COUNT']) if 'CONFIG_BT_MESH_LABEL_COUNT' in kconfigs else 0
+    lcd_srv = (kconfigs['CONFIG_BT_MESH_LARGE_COMP_DATA_SRV'] == 'y') if 'CONFIG_BT_MESH_LARGE_COMP_DATA_SRV' in kconfigs else False
 
     with open(elf_path, 'rb') as elf_file:
         elf = ELFFile(elf_file)
@@ -342,7 +359,7 @@ def read_comp_data(elf_path, addr, kconfigs):
                         if not vnd:
                             elem_item.sig_model_add(id1)
                         else:
-                            elem_item.vnd_model_add(id1, id2)
+                            elem_item.vnd_model_add(id2, id1)
 
                 if sig_count > 0:
                     models_unpack(sig_ptr, elem_item, False)
@@ -389,29 +406,37 @@ def input_parse():
 
 def existing_metadata_print(path):
     try:
-        metadata_file = open(path, 'r')
+        metadata_file = open(path)
         print(json.dumps(json.load(metadata_file), indent=4))
     except Exception as err :
         raise Exception("Failed to get existing metadata") from err
+
+def is_hex_string(s):
+    return len(s) % 2 == 0 and all(c in string.hexdigits for c in s)
+
+def compute_fwid(sysbuild_kconfigs, kconfigs):
+    if "SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA_FWID_CUSTOM" in sysbuild_kconfigs:
+        fwid = sysbuild_kconfigs["SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA_FWID_CUSTOM_HEX"].strip('"')
+        if not is_hex_string(fwid):
+            raise Exception("Value of SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA_FWID_CUSTOM_HEX is not a hex string")
+        if len(fwid) < 4:
+            raise Exception("SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA_FWID_CUSTOM_HEX too short, " +
+                            "must contain at least 2 bytes of Company ID")
+        return fwid
+    elif "SB_CONFIG_DFU_ZIP_BLUETOOTH_MESH_METADATA_FWID_MCUBOOT_VERSION" in sysbuild_kconfigs:
+        return kconfigs.fwid_mcuboot_version_get()
+    return None
 
 if __name__ == "__main__":
     try:
         args = input_parse()
 
-        sysbuild_config_path = os.path.abspath(os.path.join(args.bin_path, '.config.sysbuild'))
-
-        if os.path.isfile(sysbuild_config_path):
-            # Sysbuild
-            zip_path = os.path.abspath(os.path.join(args.bin_path, '..', '..', 'dfu_application.zip'))
-            sysbuild = True
-        else:
-            # Child/parent image
-            zip_path = os.path.abspath(os.path.join(args.bin_path, 'dfu_application.zip'))
-            sysbuild = False
-
+        sysbuild_config_path = os.path.abspath(os.path.join(args.bin_path, '..', '..', 'zephyr', '.config'))
+        zip_path = os.path.abspath(os.path.join(args.bin_path, '..', '..', 'dfu_application.zip'))
         metadata_path = os.path.abspath(os.path.join(args.bin_path, FILE_NAME))
         config_path = os.path.abspath(os.path.join(args.bin_path, '.config'))
         kconfigs = KConfig.from_file(config_path)
+        sysbuild_kconfigs = KConfig.from_file(sysbuild_config_path)
         kernel_name = kconfigs['CONFIG_KERNEL_BIN_NAME'].replace("\"", "")
         elf_path = os.path.abspath(os.path.join(args.bin_path, (kernel_name + '.elf')))
 
@@ -427,24 +452,25 @@ if __name__ == "__main__":
 
         comps = parse_comp_data(elf_path, kconfigs)
         version = kconfigs.version_parse()
-
-        if sysbuild:
-            binary_size = os.path.getsize(os.path.join(args.bin_path, (kernel_name + '.signed.bin')))
-        else:
-            binary_size = os.path.getsize(os.path.join(args.bin_path, 'app_update.bin'))
+        fwid = compute_fwid(sysbuild_kconfigs, kconfigs)
+        binary_size = os.path.getsize(os.path.join(args.bin_path, (kernel_name + '.signed.bin')))
         core_type = 1
+
         json_data = []
 
         for comp in comps:
             encoded_metadata = encoded_metadata_get(version, comp, binary_size, core_type)
-            json_data.append({
+            data = {
                 "sign_version": version,
                 "binary_size": binary_size,
                 "core_type": core_type,
                 "composition_data": comp.dict_generate(),
-                "composition_hash": str(hex(comp.hash_generate())),
-                "encoded_metadata": str(encoded_metadata.hex()),
-            })
+                "composition_hash": comp.hash_generate(),
+                "encoded_metadata": str(encoded_metadata.hex())
+            }
+            if fwid is not None:
+                data["firmware_id"] = fwid
+            json_data.append(data)
 
         with open(metadata_path, "w") as outfile:
             outfile.write(json.dumps(json_data if len(json_data) > 1 else json_data[0], indent=4))
@@ -457,6 +483,7 @@ if __name__ == "__main__":
             print(f"\tAll metadata variants written to: {zip_path}")
         else:
             print(f"\tEncoded metadata: {json_data[0]['encoded_metadata']}")
+            print(f"\tFirmware ID: {fwid}")
             print(f"\tFull metadata written to: {zip_path}")
     except Exception:
         exit_with_error_msg()

@@ -19,7 +19,7 @@ If the device has sufficiently large external flash storage, the modem can be en
 
 nRF Cloud also helps your devices determine their locations using GNSS.
 It uses both assisted GNSS (A-GNSS) and predicted GPS (P-GPS).
-It can determine device location from cellular and Wi-Fi network information sent by the device.
+It can determine device location from cellular and Wi-Fi® network information sent by the device.
 
 Additionally, nRF Cloud allows devices to report data to the cloud for collection and analysis later.
 To read more about nRF Cloud, see the `nRF Cloud`_ website and the `nRF Cloud documentation`_.
@@ -46,7 +46,7 @@ You can use the services offered by nRF Cloud in the following scenarios:
 
   The services can be used from the customer cloud service that communicates over REST to interact with the `nRF Cloud REST API`_ in a proxy configuration.
 
-Choosing a device ID format: prefix-IMEI, device UUID, or other
+Choosing a device ID format: Prefix-IMEI, device UUID, or other
 ***************************************************************
 
 nRF Cloud supports a variety of device ID formats:
@@ -236,10 +236,6 @@ For more information on the various services, see the following documentation:
 Applications and samples
 ************************
 
-The following application uses the :ref:`lib_nrf_cloud` for services in |NCS|:
-
-* :ref:`asset_tracker_v2`
-
 The following sample demonstrates nRF Cloud-specific functionality using CoAP:
 
 * :ref:`nrf_cloud_multi_service`
@@ -259,6 +255,4 @@ Other related samples and applications that use nRF Cloud services:
 
 * :ref:`gnss_sample`
 * :ref:`modem_shell_application`
-* :ref:`lte_sensor_gateway`
 * :ref:`location_sample`
-* :ref:`serial_lte_modem`

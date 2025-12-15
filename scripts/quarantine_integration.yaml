@@ -4,21 +4,21 @@
 - scenarios:
     - sample.matter.lock.release
     - sample.matter.lock.debug
-    - sample.matter.lock.lto
+    - sample.matter.lock.release.power_consumption
     - sample.matter.light_switch.debug
     - sample.matter.thermostat.debug
     - sample.matter.light_switch.persistent_subscriptions
     - sample.matter.light_bulb.debug
     - sample.matter.light_bulb.release
-    - sample.matter.light_bulb.lto
     - sample.matter.light_switch.release
-    - sample.matter.light_switch.lto
     - sample.matter.thermostat.release
-    - sample.matter.thermostat.lto
     - sample.matter.window_cover.release
-    - sample.matter.window_cover.lto
+    - sample.matter.window_cover.release.power_consumption
     - sample.matter.thermostat.ext_temp
     - sample.matter.light_bulb.memory_profiling
+    - sample.matter.smoke_co_alarm.release.power_consumption
+    - sample.matter.temperature_sensor.release
+    - sample.matter.contact_sensor.release
   platforms:
     - nrf52840dk/nrf52840
   comment: "Configurations excluded to limit resources usage in integration builds"
@@ -26,22 +26,22 @@
 - scenarios:
     - sample.matter.lock.nus
     - sample.matter.lock.debug
-    - sample.matter.lock.lto
+    - sample.matter.lock.release.power_consumption
     - sample.matter.window_cover.debug
     - sample.matter.light_bulb.ffs
     - sample.matter.light_switch.persistent_subscriptions
     - sample.matter.light_bulb.debug
     - sample.matter.light_bulb.release
-    - sample.matter.light_bulb.lto
     - sample.matter.light_switch.release
-    - sample.matter.light_switch.lto
     - sample.matter.thermostat.release
-    - sample.matter.thermostat.lto
     - sample.matter.window_cover.release
-    - sample.matter.window_cover.lto
+    - sample.matter.window_cover.release.power_consumption
+    - sample.matter.smoke_co_alarm.release.power_consumption
+    - sample.matter.temperature_sensor.release
+    - sample.matter.contact_sensor.release
     - sample.matter.thermostat.ext_temp
     - sample.matter.light_bulb.memory_profiling
-    - applications.matter_bridge.lto.br_ble.memory_profiling
+    - applications.matter_bridge.br_ble.memory_profiling
     - applications.matter_bridge.release
     - applications.matter_bridge.release.br_ble
   platforms:
@@ -58,18 +58,13 @@
 - scenarios:
     - sample.matter.lock.release
     - sample.matter.lock.debug
-    - sample.matter.lock.lto
     - sample.matter.light_bulb.memory_profiling.persistent_subscriptions
     - sample.matter.light_switch.persistent_subscriptions
     - sample.matter.light_bulb.debug
     - sample.matter.light_bulb.release
-    - sample.matter.light_bulb.lto
     - sample.matter.light_switch.release
-    - sample.matter.light_switch.lto
     - sample.matter.thermostat.release
-    - sample.matter.thermostat.lto
     - sample.matter.thermostat.ext_temp
-    - applications.matter_bridge.lto.br_ble.memory_profiling
     - applications.matter_bridge.release
     - applications.matter_bridge.release.br_ble
   platforms:
@@ -85,23 +80,23 @@
 - scenarios:
     - sample.matter.lock.debug
     - sample.matter.lock.release
-    - sample.matter.lock.lto
     - sample.matter.lock.smp_dfu
     - sample.matter.lock.nus
+    - sample.matter.lock.release.power_consumption
     - sample.matter.light_bulb.memory_profiling.persistent_subscriptions
     - sample.matter.light_switch.persistent_subscriptions
     - sample.matter.light_bulb.debug
     - sample.matter.light_bulb.release
-    - sample.matter.light_bulb.lto
     - sample.matter.light_switch.release
     - sample.matter.light_switch.debug
-    - sample.matter.light_switch.lto
     - sample.matter.thermostat.debug
     - sample.matter.thermostat.release
-    - sample.matter.thermostat.lto
     - sample.matter.window_cover.release
     - sample.matter.window_cover.debug
-    - sample.matter.window_cover.lto
+    - sample.matter.window_cover.release.power_consumption
+    - sample.matter.smoke_co_alarm.release.power_consumption
+    - sample.matter.temperature_sensor.release
+    - sample.matter.contact_sensor.release
   platforms:
     - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
@@ -117,12 +112,24 @@
   comment: "Configurations excluded to limit resources usage in integration Matter ns builds"
 
 - scenarios:
-    - applications.matter_bridge.lto.br_ble.memory_profiling
-    - applications.matter_bridge.release.br_ble.nrf54h20.wifi
+    - sample.matter.light_bulb.nrf7002eb2.debug
+    - sample.matter.light_bulb.nrf7002eb2.release
+    - sample.matter.light_switch.nrf7002eb2.debug
+    - sample.matter.light_switch.nrf7002eb2.release
+    - sample.matter.lock.nrf7002eb2.debug
+    - sample.matter.lock.nrf7002eb2.release
+    - sample.matter.manufacturer_specific.nrf7002eb2.debug
+    - sample.matter.manufacturer_specific.nrf7002eb2.release
+    - sample.matter.thermostat.nrf7002eb2.debug
+    - sample.matter.thermostat.nrf7002eb2.release
+    - applications.matter_bridge.br_ble.memory_profiling
+    - applications.matter_bridge.release
+    - applications.matter_bridge.nrf7002eb2.release
+    - applications.matter_bridge.release.br_ble
+    - applications.matter_bridge.nrf7002eb2.release.br_ble
   platforms:
-    - nrf54h20dk/nrf54h20/cpuapp
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
+    - nrf54lm20dk/nrf54lm20a/cpuapp
+  comment: "Configurations excluded to limit resources usage in Matter integration builds"
 
 - scenarios:
     - sample.nrf7002.iot_devices
@@ -251,7 +258,7 @@
     - sample.cellular.modem_shell_debug
     - sample.cellular.modem_shell_modem_uart_trace
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -277,7 +284,7 @@
     - sample.cellular.location.nrf7002ek_wifi
     - sample.cellular.location.pgps
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -294,21 +301,14 @@
     - sample.cellular.http_update.full_modem_update
     - sample.cellular.http_update.modem_delta_update
   platforms:
-    - nrf9160dk/nrf9160/ns
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.cellular.slm_shell
-  platforms:
-    - nrf5340dk/nrf5340/cpuapp
-    - nrf7002dk/nrf5340/cpuapp
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - samples.cellular.nidd
     - sample.cellular.udp
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
     - thingy91/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
@@ -318,28 +318,28 @@
     - sample.cellular.battery
     - sample.cellular.modem_callbacks
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.net.azure_iot_hub
   platforms:
     - nrf7002dk/nrf5340/cpuapp
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
     - nrf9161dk/nrf9161/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.net.azure_iot_hub.dps
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.net.coap_client
   platforms:
     - nrf7002dk/nrf5340/cpuapp/ns
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
     - thingy91/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
@@ -347,7 +347,6 @@
     - sample.matter.template.smp_dfu
   platforms:
     - nrf52840dk/nrf52840
-    - nrf7002dk/nrf5340/cpuapp
     - nrf5340dk/nrf5340/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
@@ -358,26 +357,28 @@
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
-    - samples.npm1300_fuel_gauge
-    - samples.npm1300_one_button
+    - sample.npm1300_fuel_gauge_compile
+    - sample.npm1304_fuel_gauge_compile
+    - sample.npm1300_one_button_compile
+    - sample.npm1304_one_button_compile
   platforms:
     - nrf52840dk/nrf52840
     - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.hw_id.device_id
   platforms:
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.debug.memfault
     - sample.debug.memfault.etb
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
     - thingy91/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
@@ -408,28 +409,6 @@
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
-    - applications.serial_lte_modem
-    - applications.serial_lte_modem.lwm2m_carrier
-  platforms:
-    - nrf9160dk/nrf9160/ns
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - applications.serial_lte_modem
-    - applications.serial_lte_modem.native_tls
-  platforms:
-    - nrf9161dk/nrf9161/ns
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - applications.serial_lte_modem.lwm2m_carrier
-    - applications.serial_lte_modem.native_tls
-  platforms:
-    - thingy91/nrf9160/ns
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-
-- scenarios:
     - nrf5340_audio.sw_codec_lc3_test
   platforms:
     - nrf5340_audio_dk/nrf5340/cpuapp
@@ -455,10 +434,17 @@
     - fast_pair.storage.factory_reset.7keys
     - fast_pair.storage.factory_reset.8keys
     - fast_pair.storage.factory_reset.9keys
+  platforms:
+    - nrf52840dk/nrf52840
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
     - fast_pair.storage.factory_reset.default
     - fast_pair.storage.factory_reset.ak_minimal_backend
   platforms:
     - nrf52840dk/nrf52840
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -475,14 +461,17 @@
     - fast_pair.storage.account_key_storage.minimal
   platforms:
     - nrf52840dk/nrf52840
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - fast_pair.crypto.oberon
-    - fast_pair.crypto.tinycrypt
     - fast_pair.crypto.psa
   platforms:
     - nrf52840dk/nrf52840
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -492,13 +481,21 @@
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
+    - applications.nrf_desktop.zdebug_fast_pair.gmouse.uart.kmu_provision
+    - applications.nrf_desktop.zdebug_keyboard.uart.kmu_provision
+  platforms:
+    - nrf54l15dk/nrf54l10/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
     - applications.nrf_desktop.zrelease
   platforms:
-    - nrf52810dmouse/nrf52810
     - nrf52840dk/nrf52840
     - nrf52833dk/nrf52833
     - nrf52833dongle/nrf52833
     - nrf52dmouse/nrf52832
+    - nrf54l15dk/nrf54l05/cpuapp
+    - nrf54l15dk/nrf54l10/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -518,6 +515,12 @@
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
+    - applications.nrf_desktop.zdebug_dongle_small
+  platforms:
+    - nrf52833dk/nrf52833
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
     - applications.nrf_desktop.zdebug_3bleconn
     - applications.nrf_desktop.zrelease_4llpmconn
     - applications.nrf_desktop.zrelease.usb_next
@@ -533,10 +536,24 @@
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
-    - sample.find_my.coexistence.debug
+    - sample.bluetooth.fast_pair.input_device
   platforms:
-    - nrf52840dk/nrf52840
-    - nrf5340dk/nrf5340/cpuapp
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
+    - sample.bluetooth.fast_pair.locator_tag
+  platforms:
+    - nrf54l15dk/nrf54l05/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
+    - sample.bluetooth.fast_pair.locator_tag.release
+  platforms:
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -544,6 +561,8 @@
   platforms:
     - nrf52dk/nrf52832
     - nrf52833dk/nrf52833
+    - nrf54l15dk/nrf54l05/cpuapp
+    - nrf54l15dk/nrf54l10/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -556,64 +575,103 @@
 - scenarios:
     - sample.benchmark.coremark.heap_memory
   platforms:
-    - nrf52dk/nrf52832
     - nrf52833dk/nrf52833
+    - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
+    - nrf54h20dk@0.9.0/nrf54h20/cpuapp
+    - nrf54l15dk/nrf54l05/cpuapp
+    - nrf54l15dk/nrf54l10/cpuapp
     - nrf54l15dk/nrf54l15/cpuapp
-    - nrf54h20dk/nrf54h20/cpuapp
+    - nrf54lm20dk/nrf54lm20a/cpuapp
+    - nrf54lv10dk/nrf54lv10a/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.benchmark.coremark.static_memory
   platforms:
-    - nrf52dk/nrf52832
     - nrf52833dk/nrf52833
+    - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
+    - nrf54h20dk@0.9.0/nrf54h20/cpuapp
+    - nrf54l15dk/nrf54l05/cpuapp
+    - nrf54l15dk/nrf54l10/cpuapp
     - nrf54l15dk/nrf54l15/cpuapp
-    - nrf54h20dk/nrf54h20/cpuapp
+    - nrf54lm20dk/nrf54lm20a/cpuapp
+    - nrf54lv10dk/nrf54lv10a/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.benchmark.coremark.multiple_threads
   platforms:
-    - nrf52dk/nrf52832
     - nrf52833dk/nrf52833
+    - nrf52dk/nrf52832
+    - nrf5340dk/nrf5340/cpuapp
+    - nrf54h20dk@0.9.0/nrf54h20/cpuapp
+    - nrf54l15dk/nrf54l05/cpuapp
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
+    - nrf54lm20dk/nrf54lm20a/cpuapp
+    - nrf54lv10dk/nrf54lv10a/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
+    - sample.find_my.pair_before_use.debug
+  platforms:
+    - nrf52840dk/nrf52840
+    - nrf5340dk/nrf5340/cpuapp
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
+    - sample.find_my.pair_before_use.release
+  platforms:
+    - nrf52dk/nrf52832
+    - nrf5340dk/nrf5340/cpuapp/ns
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
+    - sample.find_my.locator_tag.qualification.release
+  platforms:
+    - nrf52840dk/nrf52840
+    - nrf5340dk/nrf5340/cpuapp/ns
+    - nrf54l15dk/nrf54l15/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
+    - sample.find_my.locator_tag.qualification.debug
+  platforms:
     - nrf5340dk/nrf5340/cpuapp
     - nrf54l15dk/nrf54l15/cpuapp
-    - nrf54h20dk/nrf54h20/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
-    - sample.find_my.coexistence.release
-  platforms:
-    - nrf52dk/nrf52832
-    - nrf5340dk/nrf5340/cpuapp/ns
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.find_my.qualification.release
-  platforms:
-    - nrf52840dk/nrf52840
-    - nrf5340dk/nrf5340/cpuapp/ns
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.find_my.qualification.debug
-  platforms:
-    - nrf5340dk/nrf5340/cpuapp
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.find_my.simple.release
+    - sample.find_my.locator_tag.release
   platforms:
     - nrf52840dk/nrf52840
     - nrf5340dk/nrf5340/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
-    - sample.find_my.simple.debug
+    - sample.find_my.locator_tag.debug
   platforms:
     - nrf5340dk/nrf5340/cpuapp/ns
+    - nrf54l15dk/nrf54l15/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
+    - sample.find_my.switchable_networks.release.ui_switch
+  platforms:
+    - nrf54l15dk/nrf54l15/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
+    - sample.find_my.switchable_networks.debug.ui_switch
+  platforms:
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -623,9 +681,16 @@
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
+    - test.find_my.crypto
+  platforms:
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
+  comment: "Configurations excluded to limit resources usage in integration builds"
+
+- scenarios:
     - sample.cellular.nrf7002ek_wifi.scan
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -643,19 +708,19 @@
 - scenarios:
     - sample.cellular.nrf_cloud_rest_device_message
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.cellular.nrf_cloud_rest_cell_pos
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - sample.cellular.nrf_cloud_rest_fota
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -676,7 +741,7 @@
     - examples.nrfx_pwm.common_mode
     - examples.nrfx_gppi.fork
   platforms:
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
     - nrf5340dk/nrf5340/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
@@ -699,7 +764,7 @@
     - nrf52840dk/nrf52840
     - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -707,7 +772,7 @@
   platforms:
     - nrf52840dk/nrf52840
     - nrf5340dk/nrf5340/cpuapp
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -715,7 +780,7 @@
   platforms:
     - nrf5340dk/nrf5340/cpuapp
     - nrf52dk/nrf52832
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -791,6 +856,8 @@
     - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
     - nrf5340dk/nrf5340/cpuapp/ns
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -799,6 +866,8 @@
     - nrf52840dk/nrf52840
     - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -807,6 +876,8 @@
     - nrf52840dk/nrf52840
     - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp/ns
+    - nrf54l15dk/nrf54l10/cpuapp
+    - nrf54l15dk/nrf54l15/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -918,7 +989,7 @@
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
-    - sample.bluetooth.central_and_peripheral_hr.build
+    - sample.bluetooth.central_and_peripheral_hrs.build
   platforms:
     - nrf52840dk/nrf52840
     - nrf5340dk/nrf5340/cpuapp
@@ -934,100 +1005,6 @@
     - sample.bluetooth.peripheral_bms
   platforms:
     - nrf52dk/nrf52832
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - applications.asset_tracker_v2.aws
-    - applications.asset_tracker_v2.azure
-    - applications.asset_tracker_v2.debug
-    - applications.asset_tracker_v2.nrf_cloud
-  platforms:
-    - native_sim
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - applications.asset_tracker_v2.aws
-    - applications.asset_tracker_v2.aws-all
-    - applications.asset_tracker_v2.aws-pgps
-    - applications.asset_tracker_v2.aws-pgps.sysbuild
-    - applications.asset_tracker_v2.aws.sysbuild
-    - applications.asset_tracker_v2.azure
-    - applications.asset_tracker_v2.debug
-    - applications.asset_tracker_v2.debug-memfault
-    - applications.asset_tracker_v2.debug.sysbuild
-    - applications.asset_tracker_v2.low-power
-    - applications.asset_tracker_v2.low-power.sysbuild
-    - applications.asset_tracker_v2.lwm2m.debug
-    - applications.asset_tracker_v2.lwm2m.low-power.sysbuild
-    - applications.asset_tracker_v2.lwm2m.memfault
-    - applications.asset_tracker_v2.memfault
-    - applications.asset_tracker_v2.memfault-low-power
-    - applications.asset_tracker_v2.memfault.sysbuild
-    - applications.asset_tracker_v2.nrf7002ek_wifi-debug.sysbuild
-    - applications.asset_tracker_v2.nrf7002ek_wifi.nrf9160dk
-    - applications.asset_tracker_v2.nrf7002ek_wifi.nrf9160dk.sysbuild
-    - applications.asset_tracker_v2.nrf_cloud
-    - applications.asset_tracker_v2.nrf_cloud-no-agnss
-    - applications.asset_tracker_v2.nrf_cloud-no-agnss.sysbuild
-    - applications.asset_tracker_v2.nrf_cloud-pgps
-    - applications.asset_tracker_v2.nrf_cloud.sysbuild
-    - applications.asset_tracker_v2.nrf7002ek_wifi-debug
-    - applications.asset_tracker_v2.nrf7002ek_wifi.nrf9161dk
-  platforms:
-    - nrf9160dk/nrf9160/ns
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - applications.asset_tracker_v2.aws
-    - applications.asset_tracker_v2.aws-all
-    - applications.asset_tracker_v2.aws-pgps
-    - applications.asset_tracker_v2.aws-pgps.sysbuild
-    - applications.asset_tracker_v2.aws.sysbuild
-    - applications.asset_tracker_v2.azure
-    - applications.asset_tracker_v2.debug
-    - applications.asset_tracker_v2.debug-memfault
-    - applications.asset_tracker_v2.debug.sysbuild
-    - applications.asset_tracker_v2.low-power
-    - applications.asset_tracker_v2.low-power.sysbuild
-    - applications.asset_tracker_v2.lwm2m.debug
-    - applications.asset_tracker_v2.lwm2m.low-power.sysbuild
-    - applications.asset_tracker_v2.lwm2m.memfault
-    - applications.asset_tracker_v2.memfault
-    - applications.asset_tracker_v2.memfault-low-power
-    - applications.asset_tracker_v2.memfault.sysbuild
-    - applications.asset_tracker_v2.nrf_cloud
-    - applications.asset_tracker_v2.nrf_cloud-no-agnss
-    - applications.asset_tracker_v2.nrf_cloud-no-agnss.sysbuild
-    - applications.asset_tracker_v2.nrf_cloud-pgps
-    - applications.asset_tracker_v2.nrf_cloud.sysbuild
-  platforms:
-    - thingy91/nrf9160/ns
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - applications.asset_tracker_v2.cloud.cloud_codec.json_common.aws
-    - applications.asset_tracker_v2.cloud.cloud_codec.json_common.azure
-  platforms:
-    - nrf9160dk/nrf9160
-    - qemu_cortex_m3
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - asset_tracker_v2.location_module_test.tester
-    - asset_tracker_v2.lwm2m_codec
-    - asset_tracker_v2.nrf_cloud_codec_test
-    - asset_tracker_v2.debug_module_test.tester
-    - asset_tracker_v2.lwm2m_integration
-    - asset_tracker_v2.ui_module_test.tester
-  platforms:
-    - nrf9160dk/nrf9160/ns
-    - qemu_cortex_m3
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - asset_tracker_v2.nrf_cloud_codec_mocked_cjson_test
-  platforms:
-    - qemu_cortex_m3
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1095,7 +1072,7 @@
     - tfm.psa_test_storage_lvl1
   platforms:
     - nrf5340dk/nrf5340/cpuapp/ns
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1115,7 +1092,7 @@
     - tfm.regression_ipc_lvl2.oberon
     - tfm.regression_sfn_lvl1
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1137,8 +1114,8 @@
 - scenarios:
     - sample.net.https_client
     - sample.net.https_client.lte.tfm-mbedtls
-    - sample.net.download_client
-    - sample.net.download_client.ci
+    - sample.net.downloader
+    - sample.net.downloader.ci
   platforms:
     - nrf9161dk/nrf9161/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
@@ -1153,7 +1130,7 @@
     - net.lib.aws_fota.aws_fota_json
   platforms:
     - nrf52840dk/nrf52840
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
     - qemu_cortex_m3
   comment: "Configurations excluded to limit resources usage in integration builds"
 
@@ -1171,7 +1148,7 @@
     - nrf52840dk/nrf52840
     - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1180,7 +1157,7 @@
     - nrf52840dk/nrf52840
     - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1195,7 +1172,7 @@
     - lpuart.two_chip_test_busy_sim
     - lpuart.two_chip_test_debug
   platforms:
-    - nrf9160dk/nrf52840
+    - nrf9160dk@0.14.0/nrf52840
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1205,7 +1182,7 @@
     - lpuart.two_chip_test_busy_sim
     - lpuart.two_chip_test_debug
   platforms:
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1248,7 +1225,7 @@
     - sample.nrf7002_eks.raw_scan
     - sample.nrf7002_eks.scan
   platforms:
-    - nrf9160dk/nrf9160/ns
+    - nrf9160dk@0.14.0/nrf9160/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1279,112 +1256,7 @@
     - dfu.target_stream.store_progress
   platforms:
     - nrf5340dk/nrf5340/cpuapp
-    - nrf9160dk/nrf9160
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - zigbee.zboss_api.callback_api
-    - zigbee.zboss_api.alarm_api
-    - zigbee.osif.nvram
-    - zigbee.osif.crypto
-    - zigbee.osif.timer.ktimer
-    - zigbee.osif.serial.logger
-  platforms:
-    - nrf52833dk/nrf52833
-    - nrf52840dk/nrf52840
-    - nrf5340dk/nrf5340/cpuapp
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - zigbee.osif.timer.counter
-    - zigbee.osif.serial.async
-  platforms:
-    - nrf52833dk/nrf52833
-    - nrf5340dk/nrf5340/cpuapp
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - zigbee.osif.serial.basic
-  platforms:
-    - nrf52833dk/nrf52833
-    - nrf52840dk/nrf52840
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.template
-    - sample.zigbee.light_bulb.with_shell
-    - sample.zigbee.light_switch.with_shell
-  platforms:
-    - nrf21540dk/nrf52840
-    - nrf52833dk/nrf52833
-    - nrf52840dk/nrf52840
-    - nrf5340dk/nrf5340/cpuapp
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.network_coordinator
-  platforms:
-    - nrf21540dk/nrf52840
-    - nrf52840dk/nrf52840
-    - nrf5340dk/nrf5340/cpuapp
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.light_bulb
-  platforms:
-    - nrf52833dk/nrf52833
-    - nrf52840dk/nrf52840
-    - nrf5340dk/nrf5340/cpuapp
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.ncp
-    - sample.zigbee.shell
-  platforms:
-    - nrf21540dk/nrf52840
-    - nrf52833dk/nrf52833
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.ncp.usb.nrf21540dk_nrf52840
-    - sample.zigbee.shell.usb.nrf21540dk_nrf52840
-  platforms:
-    - nrf21540dk/nrf52840
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.ncp.usb.nrf52840dk_nrf52840
-    - sample.zigbee.shell.usb.nrf52840dk_nrf52840
-  platforms:
-    - nrf52840dk/nrf52840
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.shell
-  platforms:
-    - nrf5340dk/nrf5340/cpuapp
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.light_switch.fota
-  platforms:
-    - nrf21540dk/nrf52840
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.light_switch
-    - sample.zigbee.light_switch.current_measurement
-  platforms:
-    - nrf52833dk/nrf52833
-  comment: "Configurations excluded to limit resources usage in integration builds"
-
-- scenarios:
-    - sample.zigbee.light_switch
-    - sample.zigbee.light_switch.current_measurement
-    - sample.zigbee.light_switch.multiprotocol
-  platforms:
-    - nrf52840dk/nrf52840
-    - nrf5340dk/nrf5340/cpuapp
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
@@ -1411,13 +1283,13 @@
     - nrf52840dk/nrf52840
     - nrf52dk/nrf52832
     - nrf5340dk/nrf5340/cpuapp
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
   comment: "Configurations excluded to limit resources usage in integration builds"
 
 - scenarios:
     - bootloader.bl_validation.negative
   platforms:
-    - nrf9160dk/nrf9160
+    - nrf9160dk@0.14.0/nrf9160
     - nrf5340dk/nrf5340/cpuapp
   comment: "Configurations excluded to limit resources usage in integration builds"
 
@@ -1452,7 +1324,3 @@
   platforms:
     - thingy53/nrf5340/cpuapp/ns
   comment: "Configurations excluded to limit resources usage in integration builds"
-
-- platforms:
-    - native_posix
-  comment: "native_posix will be removed soon - native_sim platform is the default simulator now"

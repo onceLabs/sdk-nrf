@@ -18,6 +18,55 @@ For certification status of the released versions, see the following documents, 
 * `nRF9161 Mobile network operator certifications`_
 * `nRF9160 Mobile network operator certifications`_
 
+liblwm2m_carrier 3.7.0
+**********************
+
+Release for modem firmware versions 1.3.7 and 2.0.2.
+
+Size
+====
+
+See :ref:`lwm2m_lib_size` for an explanation of the library size in different scenarios.
+
++-------------------------+---------------+------------+
+|                         | Flash (Bytes) | RAM (Bytes)|
++-------------------------+---------------+------------+
+| Library size            | 78147         | 18828      |
+| (binary)                |               |            |
++-------------------------+---------------+------------+
+| Library size            | 98144         | 34568      |
+| (reference application) |               |            |
++-------------------------+---------------+------------+
+
+Changes
+=======
+
+* Added the new :ref:`lib_downloader` library to the glue layer (:file:`lwm2m_os.c/h`).
+  Removed the deprecated Download client from the glue layer.
+* Added missing documentation for some glue layer functions.
+* Removed the error type ``LWM2M_CARRIER_ERROR_RUN``.
+
+  * Errors that were previously notified to the application with the ``LWM2M_CARRIER_ERROR_RUN`` event type have instead been added to :c:macro:`LWM2M_CARRIER_ERROR_CONFIGURATION`.
+
+* Improved the error codes to more uniquely identify possible errors.
+  In addition, some previously unlisted errors have now been documented.
+  For more information, see the following events:
+
+  * :c:macro:`LWM2M_CARRIER_ERROR_INIT`
+  * :c:macro:`LWM2M_CARRIER_ERROR_CONFIGURATION`
+  * :c:macro:`LWM2M_CARRIER_ERROR_FOTA_FAIL`
+  * :c:macro:`LWM2M_CARRIER_ERROR_CONNECT`
+
+* Improved the handling of failures during the download of FOTA images.
+  This is to ensure that the relevant DFU target is reinitialized appropriately before the download is resumed.
+* Optimizations in the CoAP implementation to reduce the memory footprint.
+* Fixed an issue for delayed bootstrap when connecting to two servers.
+
+  * Previously, if the second connection failed and caused a delayed bootstrap, the first server would disconnect (and connect again once the deferred time had passed).
+  * Now, the first server will remain connected while the LwM2M carrier library is waiting to bootstrap again.
+
+* Fixed a bug where the Signal Strength resource in the Connection Monitoring object was off by 1 dB.
+
 liblwm2m_carrier 3.6.0
 **********************
 
@@ -168,7 +217,7 @@ Changes
 * Added preliminary support for Bell Canada subscriber ID.
   This carrier can be disabled or enabled with the Kconfig option :kconfig:option:`CONFIG_LWM2M_CARRIER_BELL_CA`.
 
-* Changed the default string of the Device Type resource to say "Module" instead of "Smart Device".
+* Changed the default string of the Device Type resource to say ``Module`` instead of ``Smart Device``.
   This can be changed to other strings using the Kconfig option :kconfig:option:`CONFIG_LWM2M_CARRIER_DEVICE_TYPE`.
 
 * Added ``disable_queue_mode`` to the configuration :c:macro:`lwm2m_carrier_config_t`.
@@ -298,7 +347,7 @@ Changes
   Instead, the :c:member:`LWM2M_CARRIER_ERROR_FOTA_FAIL` error event indicates an error code ``error.value`` in :c:struct:`lwm2m_carrier_event_t` (when :c:member:`LWM2M_CARRIER_ERROR_FOTA_FAIL` is received).
 * Removed the dependency on the :ref:`lte_lc_readme` library.
 
-  * This was primarily done to save space in the :ref:`serial_lte_modem` application.
+  * This was primarily done to save space in the Serial LTE modem application.
   * All other relevant samples and applications use the :ref:`lte_lc_readme` library.
     It is highly recommended that you include it in your applications.
 
@@ -454,6 +503,8 @@ Changes
      * :c:macro:`LWM2M_CARRIER_REQUEST_LINK_DOWN`
 
   * This function allows the LwM2M carrier library to disconnect gracefully and it is mandatory to use when the Subscriber ID is LG U+.
+
+* Updated the name of the ``CONFIG_LWM2M_CARRIER_IS_SERVER_BOOTSTRAP`` Kconfig option to :kconfig:option:`CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER`.
 
 liblwm2m_carrier 0.30.2
 ***********************
@@ -911,7 +962,7 @@ liblwm2m_carrier 0.6.0
 
 Initial public release for modem firmware version 1.0.1.
 This release is intended to let users begin the integration on the Verizon Wireless device management platform and start the certification process with Verizon Wireless.
-We recommend upgrading to the next release when it becomes available.
+It is recommended to upgrade to the next release when it becomes available.
 The testing performed on this release does not meet Nordic standard for mass production release testing.
 
 

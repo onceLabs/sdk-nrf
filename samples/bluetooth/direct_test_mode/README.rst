@@ -8,6 +8,8 @@ Bluetooth: Direct Test Mode
    :depth: 2
 
 This sample enables the Direct Test Mode functions described in `Bluetooth® Core Specification <Bluetooth Core Specification_>`_ (Vol. 6, Part F).
+The actual encoding of the test commands and events are described in sections 3.3 and 3.4, respectively, of Vol. 6, Part F of this specification document.
+The `Vendor-specific packet payload`_ section describes some vendor-specific commands that comply with the core specification.
 
 Requirements
 ************
@@ -186,7 +188,7 @@ Antenna matrix configuration
 To use this sample to test the Bluetooth Direction Finding feature, additional configuration of GPIOs is required to control the antenna array.
 An example of such configuration is provided in a devicetree overlay file :file:`nrf5340dk_nrf5340_cpunet.overlay`.
 
-The overlay file provides the information about of the GPIOs to be used by the Radio peripheral to switch between antenna patches during the Constant Tone Extension (CTE) reception or transmission.
+The overlay file provides the information of the GPIOs to be used by the Radio peripheral to switch between antenna patches during the Constant Tone Extension (CTE) reception or transmission.
 At least one GPIO must be provided to enable antenna switching.
 
 The GPIOs are used by the radio peripheral in the order provided by the ``dfegpio#-gpios`` properties.
@@ -248,12 +250,15 @@ The following table presents the patterns that you can use to switch antennas on
 | RFU    | 15 (0b1111)  |
 +--------+--------------+
 
-nRF21540 front-end module
-=========================
+Front-end module
+================
 
 .. include:: /includes/sample_dtm_radio_test_fem.txt
 
-You can configure the transmitted power gain, antenna output and activation delay in nRF21540 using vendor-specific commands, see `Vendor-specific packet payload`_.
+You can configure the transmitted power gain, antenna output, and activation delay in FEMs using vendor-specific commands, see `Vendor-specific packet payload`_.
+
+.. note::
+   Each front-end module (FEM) has different capabilities and operating modes, so some commands may not be supported by a specific FEM and those supported may work differently on different FEMs.
 
 Skyworks front-end module
 =========================
@@ -279,10 +284,10 @@ Vendor-specific commands can be divided into different categories as follows:
 * If the **Length** field is set to ``1`` (symbol ``CARRIER_TEST_STUDIO``), the field value is used by the nRFgo Studio to indicate that an unmodulated carrier is turned on at the channel.
   It remains turned on until a ``TEST_END`` or ``RESET`` command is issued.
 * If the **Length** field is set ``2`` (symbol ``SET_TX_POWER``), the **Frequency** field sets the TX power in dBm.
-  The valid TX power values are specified in the product specification ranging from -40 to +4, where ``0`` dBm is the reset value.
+  The valid TX power values are specified in the product specification of the SoC used, where ``0`` dBm is the reset value.
   Only the six least significant bits will fit in the **Length** field.
-  The two most significant bits are calculated by the DTM module.
-  This is possible because the six least significant bits of all valid TX power values are unique.
+  The two most significant bits are calculated by the DTM module, assuming the maximum possible positive power value requested is 15 dBm.
+  This way, the available theoretical range of the TX power values set by this command is from ``-48`` dBm to ``15`` dBm.
   The TX power can be modified only when no Transmitter Test or Receiver Test is running.
 * If the **Length** field is set to ``3`` (symbol ``FEM_ANTENNA_SELECT``), the **Frequency** field sets the front-end module (FEM) antenna output.
   The valid values are:
@@ -324,8 +329,8 @@ The :file:`dtm_uart_twowire.c` file is an implementation of the UART interface s
 The :file:`dtm_hci.c` and :file:`hci_uart.c` files are an implementation of the HCI UART interface specified in the `Bluetooth Core Specification`_, Volume 4, Part A (the flow control can be configured by an overlay file).
 
 The default selection of UART pins is defined in :file:`zephyr/boards/arm/board_name/board_name.dts`.
-You can change the defaults using the symbols ``tx-pin`` and ``rx-pin`` in the DTS overlay file of the child image at the project level.
-The configuration files for the :ref:`nrf5340_remote_shell` subimage are located in the :file:`child_image/remote_shell` or :file:`sysbuild/remote_shell` directory.
+You can change the defaults using the symbols ``tx-pin`` and ``rx-pin`` in the DTS overlay file of the image at the project level.
+The configuration files for the :ref:`nrf5340_remote_shell` subimage are located in the :file:`sysbuild/remote_shell` directory.
 The HCI interface allows for a custom ``remote_hci`` image to be used with |nRF5340DKnoref|.
 
 .. note::
@@ -396,19 +401,26 @@ On the |nRF5340DKnoref|, you can build the sample with HCI interface with the ``
 USB CDC ACM transport variant
 =============================
 
-On the nRF5340 development kit, you can build this sample configured to use the USB interface as a communication interface with the tester.
-Use the following command:
+On the nRF5340 and nRF54H20 development kits, you can build this sample configured to use the USB interface as a communication interface with the tester.
+
+Use the following command for nRF54H20:
 
 .. code-block:: console
 
-   west build samples/bluetooth/direct_test_mode -b nrf5340dk/nrf5340/cpunet -- -DFILE_SUFFIX=usb
+   west build samples/bluetooth/direct_test_mode -b nrf54h20dk/nrf54h20/cpurad -- -DFILE_SUFFIX=usb_54h20
+
+Use the following command for nRF5340:
+
+.. code-block:: console
+
+   west build samples/bluetooth/direct_test_mode -b nrf5340dk/nrf5340/cpunet -- -DFILE_SUFFIX=usb_5340
 
 You can also build this sample with support for the front-end module.
 Use the following command:
 
 .. code-block:: console
 
-   west build samples/bluetooth/direct_test_mode -b nrf5340dk/nrf5340/cpunet -- -DSHIELD=nrf21540ek -DFILE_SUFFIX=usb
+   west build samples/bluetooth/direct_test_mode -b nrf5340dk/nrf5340/cpunet -- -DSHIELD=nrf21540ek -DFILE_SUFFIX=usb_5340
 
 .. _dtm_testing:
 
@@ -419,9 +431,6 @@ After programming the sample to your development kit, you can test it in three w
 
 .. note::
    For the |nRF5340DKnoref|, see :ref:`logging_cpunet` for information about the COM terminals on which the logging output is available.
-
-.. note::
-   |54H_engb_2_8|
 
 .. _direct_test_mode_testing_anritsu:
 
@@ -439,7 +448,8 @@ Testing with another development kit
 ------------------------------------
 
 1. Connect both development kits to the computer using a USB cable.
-   The computer assigns to the development kit a COM port on Windows or a ttyACM device on Linux, which is visible in the Device Manager.
+   The computer assigns to the development kit a serial port.
+   |serial_port_number_list|
 #. Connect to both kits with a terminal emulator.
    See `Direct Test Mode terminal connection`_ for the required settings.
 #. Start ``TRANSMITTER_TEST`` by sending the ``0x80 0x96`` DTM command to one of the connected development kits.

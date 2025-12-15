@@ -19,6 +19,7 @@
 #include <nrf_provisioning_cbor_encode.h>
 #include "nrf_provisioning_cbor_decode_types.h"
 #include "nrf_provisioning_cbor_encode_types.h"
+#include "nrf_provisioning_internal.h"
 
 #include <modem/lte_lc.h>
 #include <modem/modem_key_mgmt.h>
@@ -39,8 +40,9 @@ LOG_MODULE_REGISTER(nrf_provisioning_codec, CONFIG_NRF_PROVISIONING_LOG_LEVEL);
 	(&((ofd)->rsps.responses_response_m[(ofd)->rsps.responses_response_m_count++]))
 
 #define AT_RESP_MAX_SIZE 4096
+#define KEYGEN_BUFFER_SIZE 1024
 
-static struct nrf_provisioning_mm_change mm;
+static nrf_provisioning_event_cb_t callback_local;
 
 static struct cdc_out_fmt_data {
 	/* Data */
@@ -68,10 +70,9 @@ char * const nrf_provisioning_codec_get_latest_cmd_id(void)
 	return nrf_provisioning_latest_corr_id;
 }
 
-int nrf_provisioning_codec_init(struct nrf_provisioning_mm_change *mmode)
+int nrf_provisioning_codec_init(nrf_provisioning_event_cb_t callback)
 {
-	mm.cb = mmode->cb;
-	mm.user_data = mmode->user_data;
+	callback_local = callback;
 
 	return 0;
 }
@@ -266,11 +267,26 @@ int filter_cme_error(struct command *cmd, int cme_error)
 	return filtered ? 0 : cme_error;
 }
 
+static size_t check_at_cmd(char *at_buff, bool *clear_tag, int *sec_tag, int *type)
+{
+	/* Check if the command is a keygen command */
+	if (sscanf(at_buff, "AT%%KEYGEN=%d,%d,%*s", sec_tag, type) == 2) {
+		LOG_DBG("Keygen: sec_tag %d, type %d", *sec_tag, *type);
+		*clear_tag = true;
+		return KEYGEN_BUFFER_SIZE;
+	}
+
+	return CONFIG_NRF_PROVISIONING_CODEC_RX_SZ_START;
+}
+
 static int exec_at_cmd(struct command *cmd_req, struct cdc_out_fmt_data *out)
 {
 	int ret;
 	char *resp;
-	size_t resp_sz = CONFIG_NRF_PROVISIONING_CODEC_RX_SZ_START;
+	size_t resp_sz;
+	int sec_tag;
+	int type;
+	bool clear_tag = false;
 
 	ret = form_at_str(cmd_req, out->at_buff, out->at_buff_sz);
 	if (ret < 0) {
@@ -278,33 +294,35 @@ static int exec_at_cmd(struct command *cmd_req, struct cdc_out_fmt_data *out)
 		goto out;
 	}
 
+	resp_sz = check_at_cmd(out->at_buff, &clear_tag, &sec_tag, &type);
+
 	while (true) {
 		resp = k_malloc(resp_sz);
 		if (!resp) {
 			LOG_ERR("Unable to write response msg field");
+			LOG_ERR("Not enough memory for AT response, size %d", resp_sz);
+			__ASSERT_NO_MSG(false);
 			return -ENOMEM;
 		}
 		memset(resp, 0, resp_sz);
-
 		LOG_DBG("command: \"%s\", input buff len: %d", out->at_buff, resp_sz);
 		ret = nrf_provisioning_at_cmd(resp, resp_sz, out->at_buff);
 
 		if (ret == -E2BIG) {
-			int tag = 0;
-			int type = 0;
-
 			LOG_DBG("Buffer too small for AT response, retrying");
 			k_free(resp);
 			resp = NULL;
-			if (sscanf(out->at_buff, "AT%%KEYGEN=%d,%d,%*s", &tag, &type) == 2) {
-				LOG_DBG("Clear sec_tag %d, type %d", tag, type);
+
+			if (clear_tag) {
+				LOG_DBG("Clear sec_tag %d, type %d", sec_tag, type);
 				int err;
 
-				err = nrf_provisioning_at_del_credential(tag, type);
+				err = nrf_provisioning_at_del_credential(sec_tag, type);
 				if (err < 0) {
-					LOG_ERR("AT cmd failed, error: %d", err);
+					LOG_ERR("Failed to clear sec_tag, error: %d", err);
 				}
 			}
+
 			resp_sz *= 2; /* Previous size wasn't sufficient */
 			if (resp_sz > AT_RESP_MAX_SIZE) {
 				LOG_ERR("Key or CSR too big");
@@ -350,10 +368,8 @@ static int write_config(struct command *cmd_req, struct cdc_out_fmt_data *out)
 {
 	struct config *aconf = &cmd_req->command_union_config_m;
 	int max_key_sz = 1;
-	int max_value_sz = 1;
 	struct properties_tstrtstr *pair;
 	char *key;
-	char *value = NULL;
 	int ret = 0;
 
 	char *resp = NULL;
@@ -364,17 +380,10 @@ static int write_config(struct command *cmd_req, struct cdc_out_fmt_data *out)
 		pair = &aconf->properties_tstrtstr[i];
 
 		max_key_sz = MAX(max_key_sz, pair->config_properties_tstrtstr_key.len + 1);
-		max_value_sz = MAX(max_value_sz, pair->properties_tstrtstr.len + 1);
 	}
 
 	key = k_malloc(max_key_sz);
 	if (!key) {
-		ret = -ENOMEM;
-		goto exit;
-	}
-
-	value = k_malloc(max_value_sz);
-	if (!value) {
 		ret = -ENOMEM;
 		goto exit;
 	}
@@ -393,25 +402,22 @@ static int write_config(struct command *cmd_req, struct cdc_out_fmt_data *out)
 		ret = charseq2cstr(key, &pair->config_properties_tstrtstr_key, max_key_sz);
 		if (ret < 0) {
 			LOG_WRN("Unable to store key: %s; err: %d", key, ret);
-			snprintk(resp, resp_sz, "key [%d](0-indexed) too big", i);
+			snprintk(resp, resp_sz, "Key [%d](0-indexed) too big", i);
 			goto exit;
 		}
 
-		ret = charseq2cstr(value, &pair->properties_tstrtstr, max_value_sz);
-		if (ret < 0) {
-			LOG_WRN("Unable to store value: %s; err: %d", value, ret);
-			snprintk(resp, resp_sz, "value [%d](0-indexed) too big", i);
-			goto exit;
-		}
-
-		ret = settings_save_one(key, value, strlen(value)+1);
+		ret = settings_save_one(key, pair->properties_tstrtstr.value,
+					pair->properties_tstrtstr.len);
 		if (ret) {
-			snprintk(resp, resp_sz,
-				"unable to store [%d](0-indexed) key-value-pair", i);
-			LOG_WRN("Unable to store key: %s; value: %s; err: %d", key, value, ret);
+			snprintk(resp, resp_sz, "Unable to store [%d](0-indexed) key-value-pair",
+				 i);
+			LOG_WRN("Unable to store key: %s, err: %d", key, ret);
+			LOG_HEXDUMP_WRN(pair->properties_tstrtstr.value,
+					pair->properties_tstrtstr.len, "Value");
 			goto exit;
 		}
-		LOG_DBG("Stored key: \"%s\"; value: \"%s\"", key, value);
+		LOG_HEXDUMP_DBG(pair->properties_tstrtstr.value, pair->properties_tstrtstr.len,
+				key);
 	}
 
 	/* No error to report */
@@ -421,9 +427,6 @@ static int write_config(struct command *cmd_req, struct cdc_out_fmt_data *out)
 exit:
 	if (key) {
 		k_free(key);
-	}
-	if (value) {
-		k_free(value);
 	}
 
 	/* Keeps track of response messages to be freed once the whole responses request is send */
@@ -453,35 +456,30 @@ static void decode_fail_info(int err, void *payload, int len)
 
 	LOG_ERR("Decoding commands response failed, reason %d", err);
 	LOG_HEXDUMP_ERR(payload, len, "Payload: ");
-
-	switch (err) {
-	case ZCBOR_ERR_HIGH_ELEM_COUNT:
-		LOG_ERR("CONFIG_NRF_PROVISIONING_CBOR_RECORDS is too small");
-	}
 }
 
 int nrf_provisioning_codec_process_commands(void)
 {
-	int mret, ret;
+	int ret;
 	struct cdc_in_fmt_data *ifd = CDC_IFMT_DATA_PTR(cctx);
 	struct cdc_out_fmt_data *ofd = CDC_OFMT_DATA_PTR(cctx);
-	enum lte_lc_func_mode orig;
+
 	int fpos = -1;
 	bool cmee_orig;
 
 	ret = cbor_decode_commands(cctx->ipkt, cctx->ipkt_sz,
-					cctx->i_data, &cctx->i_data_sz);
+				   cctx->i_data, &cctx->i_data_sz);
 	if (ret != ZCBOR_SUCCESS) {
 		decode_fail_info(ret, cctx->ipkt, cctx->ipkt_sz);
-		ret = -EINVAL;
-		return ret;
-	}
-	LOG_HEXDUMP_DBG(cctx->ipkt, cctx->ipkt_sz, "command response: ");
 
-	mret = lte_lc_func_mode_get(&orig);
-	if (mret < 0) {
-		return mret;
+		if (ret == ZCBOR_ERR_HIGH_ELEM_COUNT) {
+			LOG_ERR("CONFIG_NRF_PROVISIONING_CBOR_RECORDS is too small");
+			return -ENOMEM;
+		}
+
+		return -EINVAL;
 	}
+	LOG_HEXDUMP_DBG(cctx->ipkt, cctx->ipkt_sz, "received commands: ");
 
 	cmee_orig = nrf_provisioning_at_cmee_enable();
 
@@ -500,9 +498,23 @@ int nrf_provisioning_codec_process_commands(void)
 			fpos = i; /* Defer writing FINISHED until we know if we have errors */
 			break;
 		case command_union_at_command_m_c:
-			mret = mm.cb(LTE_LC_FUNC_MODE_OFFLINE, mm.user_data);
-			if (mret < 0) {
+
+			enum lte_lc_func_mode func_mode;
+
+			ret = lte_lc_func_mode_get(&func_mode);
+			if (ret < 0) {
 				goto stop_provisioning;
+			}
+
+			if (func_mode != LTE_LC_FUNC_MODE_OFFLINE) {
+				ret = nrf_provisioning_notify_event_and_wait_for_modem_state(
+					CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS,
+					NRF_PROVISIONING_EVENT_NEED_LTE_DEACTIVATED,
+					callback_local);
+				if (ret) {
+					LOG_ERR("Failed to set modem offline, err %d", ret);
+					return ret;
+				}
 			}
 
 			ret = exec_at_cmd(CDC_IFMT_CMD_I_GET(cctx, i), cctx->o_data);
@@ -537,11 +549,12 @@ stop_provisioning:
 		NRF_PROVISIONING_AT_CMEE_STATE_ENABLE :
 		NRF_PROVISIONING_AT_CMEE_STATE_DISABLE);
 
-	mret = mm.cb(orig, mm.user_data);
-
-	/* Can't send anything if modem connection is not restored */
-	if (mret < 0) {
-		return mret;
+	ret = nrf_provisioning_notify_event_and_wait_for_modem_state(
+		CONFIG_NRF_PROVISIONING_MODEM_STATE_WAIT_TIMEOUT_SECONDS,
+		NRF_PROVISIONING_EVENT_NEED_LTE_ACTIVATED, callback_local);
+	if (ret) {
+		LOG_ERR("Failed to set modem online, err %d", ret);
+		return ret;
 	}
 
 	/* Respond to FINISHED only if there are no errors */
@@ -552,7 +565,6 @@ stop_provisioning:
 	}
 
 	/* Encoded size will replace max size */
-	LOG_DBG("Payload %p size %d", cctx->opkt, cctx->opkt_sz);
 	ret = cbor_encode_responses(cctx->opkt, cctx->opkt_sz,
 				    CDC_OFMT_RESPONSES_GET(cctx),
 				    CDC_OPKT_SZ_PTR(cctx));

@@ -9,6 +9,7 @@
 #include "common.h"
 #include <cracen/mem_helpers.h>
 #include "cracen_psa_primitives.h"
+#include <cracen/statuscodes.h>
 #include "psa/crypto_driver_contexts_key_derivation.h"
 #include "psa/crypto_sizes.h"
 #include "psa/crypto_types.h"
@@ -21,10 +22,6 @@
 #include <silexpk/sxops/rsa.h>
 #include <silexpk/sxops/ecjpake.h>
 #include <psa_crypto_driver_wrappers.h>
-
-#define MAKE_SX_POINT(name, ptr, point_size)                                                       \
-	sx_pk_affine_point name = {{.bytes = (ptr), .sz = (point_size) / 2},                       \
-				   {.bytes = (ptr) + (point_size) / 2, .sz = (point_size) / 2}};
 
 /*
  * This driver supports uncompressed points only. Uncompressed types
@@ -71,8 +68,8 @@ psa_status_t cracen_jpake_set_password_key(cracen_jpake_operation_t *operation,
 	 */
 	const uint8_t *order = sx_pk_curve_order(operation->curve);
 
-	sx_op modulo = {.sz = CRACEN_P256_KEY_SIZE, .bytes = (char *)order};
-	sx_op b = {.sz = password_length, .bytes = (char *)password};
+	sx_const_op modulo = {.sz = CRACEN_P256_KEY_SIZE, .bytes = order};
+	sx_const_op b = {.sz = password_length, .bytes = password};
 	sx_op result = {.sz = sizeof(operation->secret), .bytes = operation->secret};
 
 	/* The nistp256 curve order (n) is prime so we use the ODD variant of the reduce command. */
@@ -172,7 +169,7 @@ static psa_status_t cracen_ecjpake_get_public_key(cracen_jpake_operation_t *oper
 		return silex_statuscodes_to_psa(status);
 	}
 
-	const char **outputs = sx_pk_get_output_ops(pkreq.req);
+	const uint8_t **outputs = sx_pk_get_output_ops(pkreq.req);
 
 	sx_rdpkmem(&public_key[0], outputs[0], opsz);
 	sx_rdpkmem(&public_key[32], outputs[1], opsz);
@@ -250,17 +247,17 @@ static psa_status_t cracen_get_zkp_hash(psa_algorithm_t hash_alg,
 		goto exit;
 	}
 	status = cracen_update_hash_with_prefix(&hash_op, G, CRACEN_P256_POINT_SIZE,
-						SI_ECC_PUBKEY_UNCOMPRESSED);
+						CRACEN_ECC_PUBKEY_UNCOMPRESSED);
 	if (status != PSA_SUCCESS) {
 		goto exit;
 	}
 	status = cracen_update_hash_with_prefix(&hash_op, V, CRACEN_P256_POINT_SIZE,
-						SI_ECC_PUBKEY_UNCOMPRESSED);
+						CRACEN_ECC_PUBKEY_UNCOMPRESSED);
 	if (status != PSA_SUCCESS) {
 		goto exit;
 	}
 	status = cracen_update_hash_with_prefix(&hash_op, X, CRACEN_P256_POINT_SIZE,
-						SI_ECC_PUBKEY_UNCOMPRESSED);
+						CRACEN_ECC_PUBKEY_UNCOMPRESSED);
 	if (status != PSA_SUCCESS) {
 		goto exit;
 	}
@@ -321,14 +318,14 @@ static psa_status_t cracen_write_key_share(cracen_jpake_operation_t *operation, 
 		memcpy(generator, curve_pt, CRACEN_P256_POINT_SIZE);
 	} else if (idx == 2) {
 		/* Second round of J-PAKE: Compute G_a, x2s and A. */
-		MAKE_SX_POINT(G4, operation->P[0], CRACEN_P256_POINT_SIZE);
-		MAKE_SX_POINT(G3, operation->P[1], CRACEN_P256_POINT_SIZE);
-		MAKE_SX_POINT(G1, operation->X[0], CRACEN_P256_POINT_SIZE);
+		MAKE_SX_CONST_POINT(G4, operation->P[0], CRACEN_P256_POINT_SIZE);
+		MAKE_SX_CONST_POINT(G3, operation->P[1], CRACEN_P256_POINT_SIZE);
+		MAKE_SX_CONST_POINT(G1, operation->X[0], CRACEN_P256_POINT_SIZE);
 		MAKE_SX_POINT(ga, generator, CRACEN_P256_POINT_SIZE);
 		MAKE_SX_POINT(a, operation->X[2], CRACEN_P256_POINT_SIZE);
 
-		sx_ecop x2s = {.bytes = operation->x[1], .sz = CRACEN_P256_KEY_SIZE};
-		sx_ecop s = {.bytes = operation->secret, .sz = CRACEN_P256_KEY_SIZE};
+		sx_const_ecop x2s = {.bytes = operation->x[1], .sz = CRACEN_P256_KEY_SIZE};
+		sx_const_ecop s = {.bytes = operation->secret, .sz = CRACEN_P256_KEY_SIZE};
 		sx_ecop rx2s = {.bytes = operation->x[2], .sz = CRACEN_P256_KEY_SIZE};
 
 		sx_status = sx_ecjpake_gen_step_2(operation->curve, &G4, &G3, &G1, &x2s, &s, &a,
@@ -361,9 +358,9 @@ static psa_status_t cracen_write_key_share(cracen_jpake_operation_t *operation, 
 		return status;
 	}
 
-	sx_ecop sx_v = {.bytes = v, .sz = sizeof(v)};
-	sx_ecop sx_x = {.bytes = operation->x[idx], .sz = sizeof(operation->x[idx])};
-	sx_ecop sx_h = {.bytes = h, .sz = PSA_HASH_LENGTH(PSA_ALG_SHA_256)};
+	sx_const_ecop sx_v = {.bytes = v, .sz = sizeof(v)};
+	sx_const_ecop sx_x = {.bytes = operation->x[idx], .sz = sizeof(operation->x[idx])};
+	sx_const_ecop sx_h = {.bytes = h, .sz = PSA_HASH_LENGTH(PSA_ALG_SHA_256)};
 	sx_ecop sx_r = {.bytes = operation->r, .sz = sizeof(operation->r)};
 
 	sx_status = sx_ecjpake_generate_zkp(operation->curve, &sx_v, &sx_x, &sx_h, &sx_r);
@@ -372,7 +369,7 @@ static psa_status_t cracen_write_key_share(cracen_jpake_operation_t *operation, 
 		return silex_statuscodes_to_psa(sx_status);
 	}
 
-	output[0] = SI_ECC_PUBKEY_UNCOMPRESSED;
+	output[0] = CRACEN_ECC_PUBKEY_UNCOMPRESSED;
 	memcpy(output + 1, operation->X[idx], sizeof(operation->X[idx]));
 	*output_length = sizeof(operation->X[idx]) + 1;
 
@@ -385,7 +382,7 @@ static psa_status_t cracen_write_zk_public(cracen_jpake_operation_t *operation, 
 		return PSA_ERROR_BUFFER_TOO_SMALL;
 	}
 
-	output[0] = SI_ECC_PUBKEY_UNCOMPRESSED;
+	output[0] = CRACEN_ECC_PUBKEY_UNCOMPRESSED;
 	memcpy(&output[1], operation->V, sizeof(operation->V));
 	*output_length = sizeof(operation->V) + 1;
 
@@ -427,7 +424,7 @@ static psa_status_t cracen_read_key_share(cracen_jpake_operation_t *operation, c
 	int idx = operation->rd_idx;
 
 	if (input_length != sizeof(operation->P[idx]) + 1 ||
-	    input[0] != SI_ECC_PUBKEY_UNCOMPRESSED) {
+	    input[0] != CRACEN_ECC_PUBKEY_UNCOMPRESSED) {
 		return PSA_ERROR_INVALID_ARGUMENT;
 	}
 
@@ -439,7 +436,8 @@ static psa_status_t cracen_read_key_share(cracen_jpake_operation_t *operation, c
 static psa_status_t cracen_read_zk_public(cracen_jpake_operation_t *operation, const uint8_t *input,
 					  size_t input_length)
 {
-	if (input_length != sizeof(operation->V) + 1 || input[0] != SI_ECC_PUBKEY_UNCOMPRESSED) {
+	if (input_length != sizeof(operation->V) + 1 ||
+	    input[0] != CRACEN_ECC_PUBKEY_UNCOMPRESSED) {
 		return PSA_ERROR_INVALID_ARGUMENT;
 	}
 
@@ -489,9 +487,9 @@ static psa_status_t cracen_read_zk_proof(cracen_jpake_operation_t *operation, co
 
 	} else if (idx == 2) {
 		/* Second round of J-PAKE: Compute G_B. */
-		MAKE_SX_POINT(G1, operation->X[0], CRACEN_P256_POINT_SIZE);
-		MAKE_SX_POINT(G2, operation->X[1], CRACEN_P256_POINT_SIZE);
-		MAKE_SX_POINT(G3, operation->P[0], CRACEN_P256_POINT_SIZE);
+		MAKE_SX_CONST_POINT(G1, operation->X[0], CRACEN_P256_POINT_SIZE);
+		MAKE_SX_CONST_POINT(G2, operation->X[1], CRACEN_P256_POINT_SIZE);
+		MAKE_SX_CONST_POINT(G3, operation->P[0], CRACEN_P256_POINT_SIZE);
 		MAKE_SX_POINT(g, generator, CRACEN_P256_POINT_SIZE);
 
 		int sx_status = sx_ecjpake_3pt_add(operation->curve, &G1, &G2, &G3, &g);
@@ -511,12 +509,12 @@ static psa_status_t cracen_read_zk_proof(cracen_jpake_operation_t *operation, co
 		return status;
 	}
 
-	MAKE_SX_POINT(sx_v, operation->V, CRACEN_P256_POINT_SIZE);
-	MAKE_SX_POINT(sx_x, operation->P[idx], CRACEN_P256_POINT_SIZE);
-	MAKE_SX_POINT(sx_g, generator, CRACEN_P256_POINT_SIZE);
+	MAKE_SX_CONST_POINT(sx_v, operation->V, CRACEN_P256_POINT_SIZE);
+	MAKE_SX_CONST_POINT(sx_x, operation->P[idx], CRACEN_P256_POINT_SIZE);
+	MAKE_SX_CONST_POINT(sx_g, generator, CRACEN_P256_POINT_SIZE);
 
-	sx_ecop sx_r = {.bytes = operation->r, .sz = sizeof(operation->r)};
-	sx_ecop sx_h = {.bytes = h, .sz = h_len};
+	sx_const_ecop sx_r = {.bytes = operation->r, .sz = sizeof(operation->r)};
+	sx_const_ecop sx_h = {.bytes = h, .sz = h_len};
 
 	int sx_status = sx_ecjpake_verify_zkp(operation->curve, &sx_v, &sx_x, &sx_r, &sx_h,
 					      idx == 2 ? &sx_g : SX_PT_CURVE_GENERATOR);
@@ -554,13 +552,13 @@ psa_status_t cracen_jpake_get_shared_key(cracen_jpake_operation_t *operation,
 	if (output_size <= CRACEN_P256_POINT_SIZE) {
 		return PSA_ERROR_BUFFER_TOO_SMALL;
 	}
-	output[0] = SI_ECC_PUBKEY_UNCOMPRESSED;
+	output[0] = CRACEN_ECC_PUBKEY_UNCOMPRESSED;
 
 	/* get PMSK */
-	MAKE_SX_POINT(x4, operation->P[1], CRACEN_P256_POINT_SIZE);
-	MAKE_SX_POINT(b, operation->P[2], CRACEN_P256_POINT_SIZE);
-	sx_ecop x2 = {.bytes = operation->x[1], .sz = CRACEN_P256_KEY_SIZE};
-	sx_ecop x2s = {.bytes = operation->x[2], .sz = CRACEN_P256_KEY_SIZE};
+	MAKE_SX_CONST_POINT(x4, operation->P[1], CRACEN_P256_POINT_SIZE);
+	MAKE_SX_CONST_POINT(b, operation->P[2], CRACEN_P256_POINT_SIZE);
+	sx_const_ecop x2 = {.bytes = operation->x[1], .sz = CRACEN_P256_KEY_SIZE};
+	sx_const_ecop x2s = {.bytes = operation->x[2], .sz = CRACEN_P256_KEY_SIZE};
 
 	MAKE_SX_POINT(t, output + 1, CRACEN_P256_POINT_SIZE);
 	sx_status = sx_ecjpake_gen_sess_key(operation->curve, &x4, &b, &x2, &x2s, &t);

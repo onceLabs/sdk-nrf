@@ -11,7 +11,7 @@
 #include <cJSON.h>
 #endif
 
-#include <modem/at_params.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,9 +43,9 @@ extern "C" {
 #define MODEM_INFO_SHORT_OP_NAME_SIZE 65
 
 /** SNR unavailable value. */
-#define SNR_UNAVAILABLE	 127
+#define SNR_UNAVAILABLE	127
 
-/** SNR offset value. */
+/** SNR offset value to the upper bound. */
 #define SNR_OFFSET_VAL 24
 
 /** @brief Converts RSRP index value returned by the modem to dBm.
@@ -121,6 +121,28 @@ extern "C" {
 			       (((float)(rsrq) - 40) * 0.5f) : \
 			       (((float)(rsrq) - 41) * 0.5f)))
 
+/** @brief Converts SNR index value returned by the modem to dB.
+ *
+ * The index value of SNR can be converted to dB with the following formula:
+ * * index – 24
+ *
+ * Example values:
+ * * 0: SNR < -24 dB
+ * * 1: -24 ≤ SNR < -23 dB
+ * * 2: -23 ≤ SNR < -22 dB
+ * * ...
+ * * 47: 22 ≤ SNR < 23 dB
+ * * 48: 23 ≤ SNR < 24 dB
+ * * 49: 24 ≤ SNR dB
+ *
+ * See modem AT command reference guide for more information.
+ *
+ * @param[in] snr SNR index value as 'int'.
+ *
+ * @return SNR upper bound in dB as 'int'.
+ */
+#define SNR_IDX_TO_DB(snr) ((snr) - SNR_OFFSET_VAL)
+
 /**@brief RSRP event handler function prototype. */
 typedef void (*rsrp_cb_t)(char rsrp_value);
 
@@ -149,6 +171,16 @@ enum modem_info {
 	MODEM_INFO_DATE_TIME,	/**< Mobile network time and date */
 	MODEM_INFO_APN,		/**< Access point name. */
 	MODEM_INFO_COUNT,	/**< Number of legal elements in the enum. */
+};
+
+/** @brief LTE link information data types. */
+enum modem_info_data_type {
+	/** Data of type invalid. */
+	MODEM_INFO_DATA_TYPE_INVALID,
+	/** Data of type integer. */
+	MODEM_INFO_DATA_TYPE_NUM_INT,
+	/** Data of type string. */
+	MODEM_INFO_DATA_TYPE_STRING,
 };
 
 /**@brief LTE parameter data. **/
@@ -294,9 +326,8 @@ int modem_info_name_get(enum modem_info info, char *name);
  * @param info The requested information type.
  *
  * @return The data type of the requested modem information data.
- *         Otherwise, a (negative) error code is returned.
  */
-enum at_param_type modem_info_type_get(enum modem_info info);
+enum modem_info_data_type modem_info_data_type_get(enum modem_info info);
 
 /** @brief Obtain the modem parameters.
  *
@@ -408,6 +439,18 @@ int modem_info_get_temperature(int *val);
  */
 int modem_info_get_rsrp(int *val);
 
+/** @brief Obtain the RSRQ.
+ *
+ * Get the reference signal received quality (RSRQ), in dB.
+ *
+ * @param val Pointer to the target variable.
+ *
+ * @retval 0 if the operation was successful.
+ * @retval -ENOENT if there is no valid RSRQ.
+ *         Otherwise, a (negative) error code is returned.
+ */
+int modem_info_get_rsrq(float *val);
+
 /**
  * @brief Obtain the connectivity statistics.
  *
@@ -449,6 +492,8 @@ int modem_info_get_operator(char *buf, size_t buf_size);
 
 /**
  * @brief Obtain the signal-to-noise ratio.
+ *
+ * Get the upper bound of the signal-to-noise ratio (SNR), in dB.
  *
  * @param val Pointer to the target variable.
  *

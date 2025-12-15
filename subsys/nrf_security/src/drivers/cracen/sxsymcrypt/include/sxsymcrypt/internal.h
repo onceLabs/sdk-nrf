@@ -13,29 +13,29 @@ extern "C" {
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <cracen/statuscodes.h>
 
 #ifndef SX_EXTRA_IN_DESCS
 #define SX_EXTRA_IN_DESCS 0
 #endif
-#ifndef SX_HASH_PRIV_SZ
-#define SX_HASH_PRIV_SZ 344
-#endif
 
-#define SX_BLKCIPHER_PRIV_SZ 16
+#define SX_BLKCIPHER_PRIV_SZ (16)
 #define SX_AEAD_PRIV_SZ	     (70)
+
+#define SX_MAX(p, q) ((p >= q) ? p : q)
 
 /** Mode Register value for context loading */
 #define BA417_MODEID_CTX_LOAD (1u << 5)
 /** Mode Register value for context saving */
 #define BA417_MODEID_CTX_SAVE (1u << 6)
 
+struct sx3gppalg;
 struct sx_blkcipher_cmdma_cfg;
 struct sx_aead_cmdma_cfg;
-struct sxhashalg;
 
 /** A cryptomaster DMA descriptor */
 struct sxdesc {
-	char *addr;
+	uint8_t *addr;
 	struct sxdesc *next;
 	uint32_t sz;
 	uint32_t dmatag;
@@ -55,7 +55,7 @@ struct sx_dmactl {
 	bool hw_acquired;
 	struct sxdesc *d;
 	struct sxdesc *out;
-	char *mapped;
+	uint8_t *mapped;
 	struct sx_dmaslot dmamem;
 };
 
@@ -69,7 +69,7 @@ struct sx_dmactl {
  * All members should be considered INTERNAL and may not be accessed directly.
  */
 struct sxkeyref {
-	const char *key;
+	const uint8_t *key;
 	size_t sz;
 	uint32_t cfg;
 	int (*prepare_key)(const uint8_t *arg0);
@@ -87,17 +87,18 @@ struct sxkeyref {
  */
 struct sxaead {
 	const struct sx_aead_cmdma_cfg *cfg;
-	const char *expectedtag;
+	const uint8_t *expectedtag;
 	uint32_t discardaadsz;
 	uint32_t datainsz;
 	size_t dataintotalsz;
 	size_t totalaadsz;
 	uint8_t tagsz;
 	bool is_in_ctx;
+	bool has_countermeasures;
 	uint8_t ctxsz;
 	const struct sxkeyref *key;
 	struct sx_dmactl dma;
-	struct sxdesc allindescs[7];
+	struct sxdesc descs[7];
 	uint8_t extramem[SX_AEAD_PRIV_SZ];
 };
 
@@ -110,44 +111,27 @@ struct sxaead {
  */
 struct sxblkcipher {
 	const struct sx_blkcipher_cmdma_cfg *cfg;
-	size_t inminsz;
-	size_t granularity;
-	uint32_t mode;
-	struct sxkeyref key;
+	const struct sxkeyref *key;
+	uint32_t textsz;
 	struct sx_dmactl dma;
-	struct sxdesc allindescs[5];
-	char extramem[SX_BLKCIPHER_PRIV_SZ];
+	struct sxdesc descs[5];
+	uint8_t extramem[SX_BLKCIPHER_PRIV_SZ];
 };
 
-/** A hash operation.
+/** A simple 3gpp operation
  *
- * To be used with sx_hash_*() functions.
+ * To be used with sx_3gpp_*() functions.
  *
  * All members should be considered INTERNAL and may not be accessed
  * directly.
  */
-struct sxhash {
-	const struct sxhashalg *algo;
-	const struct sx_digesttags *dmatags;
-	uint32_t cntindescs;
-	size_t totalsz;
-	uint32_t feedsz;
-	void (*digest)(struct sxhash *c, char *digest);
+struct sx3gpp {
+	const struct sx3gppalg *cfg;
 	struct sx_dmactl dma;
-	struct sxdesc allindescs[7 + SX_EXTRA_IN_DESCS];
-	uint8_t extramem[SX_HASH_PRIV_SZ];
-};
-
-/** A operation to load a countermeasures mask into the hardware.
- *
- * To be used with sx_cm_*() functions.
- *
- * All members should be considered INTERNAL and may not be accessed
- * directly.
- */
-struct sxcmmask {
-	struct sx_dmactl dma;
-	struct sxdesc allindescs[1];
+	struct sxdesc descs[5];
+	uint32_t params[2];
+	size_t insz;
+	size_t outsz;
 };
 
 /** A simple MAC(message authentication code) operation
@@ -164,9 +148,40 @@ struct sxmac {
 	int macsz;
 	const struct sxkeyref *key;
 	struct sx_dmactl dma;
-	struct sxdesc allindescs[7];
+	struct sxdesc descs[7];
 	uint8_t extramem[16];
 };
+
+struct sxchannel {
+	struct sx_dmactl dma;
+	struct sxdesc descs[1];
+};
+
+/** A operation to load a countermeasures mask into the hardware.
+ * This operation is based on channel.
+ *
+ * To be used with sx_cm_*() functions.
+ *
+ * All members should be considered INTERNAL and may not be accessed
+ * directly.
+ */
+struct sxcmmask {
+	struct sxchannel channel;
+};
+
+/**
+ * @brief Function to handle CRACEN nested errors in the sxsymcrypt
+ *
+ * @param[in] nested_err	Nested error occurred while handling an error.
+ * @param[in] err		Original error code.
+ *
+ * @return Return the nested error if it is not SX_OK, otherwise return
+ *         the original error code.
+ */
+static inline int sx_handle_nested_error(int nested_err, int err)
+{
+	return nested_err ? nested_err != SX_OK : err;
+}
 
 #ifdef __cplusplus
 }

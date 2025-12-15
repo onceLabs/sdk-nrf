@@ -110,7 +110,7 @@ To install the toolchain and the SDK using the Toolchain Manager app, complete t
 
    a. Open Toolchain Manager in nRF Connect for Desktop.
 
-      .. figure:: ../../../../nrf/installation/images/gs-assistant_tm.png
+      .. figure:: ../../../../nrf/images/gs-assistant_tm.png
          :alt: The Toolchain Manager window
 
          The Toolchain Manager window
@@ -145,7 +145,7 @@ To install the toolchain and the SDK using the Toolchain Manager app, complete t
          #. Restart the Toolchain Manager application.
          #. Click the dropdown menu for the installed nRF Connect SDK version.
 
-            .. figure:: ../../../../nrf/installation/images/gs-assistant_tm_dropdown.png
+            .. figure:: ../../../../nrf/images/gs-assistant_tm.png
                :alt: The Toolchain Manager dropdown menu for the installed nRF Connect SDK version, cropped
 
                The Toolchain Manager dropdown menu options
@@ -214,7 +214,7 @@ Programming the BICR
 The Board Information Configuration Registers (BICR) are non-volatile memory (NVM) registers that contain information on how the nRF54H20 SoC must interact with other board elements, including the information about the power and clock delivery to the SoC.
 To prepare the nRF54H20 DK for first use, you must manually program the values of the BICR using a precompiled BICR binary file (:file:`bicr_ext_loadcap.hex`).
 
-1. Download the `BICR binary file`_ .
+1. Download the ``BICR binary file``.
 #. Connect the nRF54H20 DK to your computer using the **DEBUGGER** port on the DK.
 
 .. note::

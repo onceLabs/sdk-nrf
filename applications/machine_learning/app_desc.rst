@@ -379,15 +379,16 @@ For more information, see the :ref:`nrf_machine_learning_configuration` page.
 Multi-image builds
 ------------------
 
-The Thingy:53 and the nRF5340 DK use multi-image build with the following child images:
+The Thingy:53, and the nRF5340 and nRF54H20 DKs use :ref:`zephyr:sysbuild` to perform multi-image build with the following additional images:
 
 * MCUboot bootloader
-* Bluetooth HCI RPMsg
+* IPC Radio
 
-You can define the application-specific configuration for the mentioned child images in the board-specific directory in the :file:`applications/machine_learning/configuration/` directory.
-The Kconfig configuration file should be located in subdirectory :file:`child_image/<child_image_name>` and its name should match the application Kconfig file name, and it should contain the build type if necessary.
-For example, the :file:`applications/machine_learning/configuration/thingy53_nrf5340_cpuapp/child_image/hci_ipc/prj.conf` file defines configuration of Bluetooth HCI RPMsg for the ``debug`` build type on ``thingy53_nrf5340_cpuapp`` board, while the :file:`applications/machine_learning/configuration/thingy53_nrf5340_cpuapp/child_image/hci_ipc/prj_release.conf` file defines configuration of Bluetooth HCI RPMsg for the ``release`` build type.
-See :ref:`ug_multi_image` for detailed information about multi-image builds and child image configuration.
+You can define the application-specific configuration for the mentioned images in the board-specific directory in the :file:`applications/machine_learning/sysbuild/` directory.
+The Kconfig configuration file should be located in a subdirectory :file:`sysbuild/<image_name>/boards/<configuration_file>` and its name should match the application Kconfig file name, and it should contain the build type if necessary.
+For example, the :file:`applications/machine_learning/sysbuild/ipc_radio/boards/thingy53_nrf5340_cpunet.conf` file defines the configuration of IPC Radio for the ``debug`` build type for ``thingy53_nrf5340_cpunet`` board target, while the :file:`applications/machine_learning/sysbuild/ipc_radio/boards/thingy53_nrf5340_cpunet_release.conf` file defines the configuration of IPC Radio for the ``release`` build type.
+If you want to build the application for the nRF54H20 DK in the dual-core mode, the configuration files for the :term:`Peripheral Processor (PPR) <Peripheral Processor (PPR, pronounced “Pepper”)>` image are located in the :file:`applications/machine_learning/remote` folder.
+See :ref:`zephyr:sysbuild` for detailed information about using sysbuild for building multiple images with desired configurations.
 
 .. _nrf_machine_learning_app_requirements_build_types:
 .. _nrf_machine_learning_app_configuration_build_types:
@@ -448,8 +449,6 @@ nRF54H20 DK
    .. note::
       This application does not work in the default configuration for the nRF54H20 DK without additional parameters like shields or snippets.
 
-      |54H_engb_2_8|
-
   To build the application for the nRF54H20 DK with the sensor sampling done by the Application core (single-core application), run the following command:
 
   .. code-block:: console
@@ -466,7 +465,7 @@ nRF54H20 DK
 
   .. code-block:: console
 
-     west build -b nrf54h20dk/nrf54h20/cpuapp -- -DSB_CONFIG_ML_APP_INCLUDE_REMOTE_IMAGE=y -Dmachine_learning_SNIPPET=nordic-ppr -Dmachine_learning_SHIELD=pca63566_fwd -Dremote_SHIELD=pca63566
+     west build -b nrf54h20dk/nrf54h20/cpuapp -- -DSB_CONFIG_PPRCORE_REMOTE=y -Dmachine_learning_SNIPPET=nordic-ppr -Dmachine_learning_SHIELD=pca63566_fwd -Dremote_SHIELD=pca63566
 
   or use twister test case:
 
@@ -659,7 +658,7 @@ Forwarding data.
 
    a. Open the `nRF Connect for Mobile`_ application and connect to the device again.
    #. Bond with the device from the `nRF Connect for Mobile`_ application on your smartphone or tablet.
-   #. Find **Nordic UART Service** and enable notification of its "TX Characteristic".
+   #. Find :guilabel:`Nordic UART Service` and enable notification of its :guilabel:`TX Characteristic`.
    #. Observe the sensor readouts represented as comma-separated values.
       Every new value represents a single sensor readout.
 

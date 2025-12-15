@@ -12,7 +12,12 @@ Developing with nRF7002 EB
 The nRF7002 :term:`Expansion Board (EB)` (PCA63561), part of the `nRF70 Series Family <nRF70 Series product page_>`_, can be used to provide Wi-Fi® connectivity to compatible development or evaluation boards through the nRF7002 Wi-Fi 6 companion IC.
 For example, you can use it with the :ref:`Nordic Thingy:53 <ug_thingy53>`, an IoT prototyping platform from Nordic Semiconductor.
 
-You can also use the nRF7002 EB to provide Wi-Fi connectivity to the :ref:`zephyr:nrf54h20dk_nrf54h20` and :ref:`zephyr:nrf54l15dk_nrf54l15`.
+.. note::
+   .. deprecated:: v3.0.0
+      Support for the nRF7002 EB is deprecated for all boards except the Thingy:53.
+      This support will be removed in the next major release of the |NCS|.
+
+You can also use the nRF7002 EB to provide Wi-Fi connectivity to the :zephyr:board:`nrf54h20dk` and :zephyr:board:`nrf54l15dk`.
 
 .. figure:: images/nRF7002eb.png
    :alt: nRF7002 EB
@@ -108,7 +113,7 @@ For example, if you build for Thingy:53 on the command line, you can use the fol
 
    west build -b thingy53/nrf5340/cpuapp -- -DSHIELD=nrf7002eb
 
-If you use the |nRFVSC|, specify ``-DSHIELD=nrf7002eb`` in the **Extra Cmake arguments** field when `setting up a build configuration <How to work with build configurations_>`_.
+If you use |nRFVSC|, specify ``-DSHIELD=nrf7002eb`` in the **Extra Cmake arguments** field when `setting up a build configuration <How to work with build configurations_>`_.
 
 Alternatively, add the shield in the project's :file:`CMakeLists.txt` file by using the following command:
 

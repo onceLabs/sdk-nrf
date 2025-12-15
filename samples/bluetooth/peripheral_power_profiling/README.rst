@@ -18,8 +18,6 @@ The sample supports the following development kits:
 
 .. table-from-sample-yaml::
 
-.. include:: /includes/hci_ipc_overlay.txt
-
 Optionally, you can use the `Power Profiler Kit II (PPK2)`_ for power profiling and optimizing your configuration.
 You can use also your proprietary solution for measuring the power consumption.
 
@@ -226,12 +224,29 @@ CONFIG_BT_POWER_PROFILING_NON_CONNECTABLE_ADV_INTERVAL_MAX - Non-connectable adv
 CONFIG_BT_POWER_PROFILING_LED_DISABLED - Disable LEDs
    Disables the LEDs to reduce power consumption.
 
+.. _CONFIG_BT_POWER_PROFILING_NFC_DISABLED:
+
+CONFIG_BT_POWER_PROFILING_NFC_DISABLED - Disable NFC
+   Disables the NFC to reduce power consumption.
+
+The console is disabled by default to reduce power consumption.
+To enable the console, set the following Kconfig options to ``y``:
+
+* :kconfig:option:`CONFIG_SERIAL`
+* :kconfig:option:`CONFIG_CONSOLE`
+* :kconfig:option:`CONFIG_UART_CONSOLE`
+
 Building and running
 ********************
 
 .. |sample path| replace:: :file:`samples/bluetooth/peripheral_power_profiling`
 
 .. include:: /includes/build_and_run.txt
+
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
 
 Testing
 =======
@@ -245,6 +260,12 @@ Testing with Bluetooth Low Energy app and Power Profiler Kit II (PPK2)
 
 1. Set up `Power Profiler Kit II (PPK2)`_ and prepare your development kit for current measurement.
 #. Run the `Power Profiler app`_ from nRF Connect for Desktop.
+#. To see terminal messages (at the cost of a very small increase in power consumption), enable the following Kconfig  options:
+
+   * :kconfig:option:`CONFIG_SERIAL`
+   * :kconfig:option:`CONFIG_CONSOLE`
+   * :kconfig:option:`CONFIG_UART_CONSOLE`
+
 #. |connect_terminal_ANSI|
 #. Reset your development kit.
 #. Observe that the sample starts.

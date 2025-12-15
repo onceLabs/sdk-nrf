@@ -7,12 +7,16 @@
 #include <zephyr/kernel.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci.h>
+#include <zephyr/drivers/timer/nrf_grtc_timer.h>
 #include <bluetooth/radio_notification_cb.h>
 #include <bluetooth/hci_vs_sdc.h>
 
 #if defined(CONFIG_SOC_COMPATIBLE_NRF52X) || defined(CONFIG_SOC_COMPATIBLE_NRF5340_CPUNET)
 #include <hal/nrf_rtc.h>
-static uint32_t sys_clock_start_to_bt_clk_start_us;
+/* Use signed integer to allow to get time difference no matter of order in which RTCx instances
+ * are started.
+ */
+static int32_t sys_clock_start_to_bt_clk_start_us;
 #endif
 
 static uint32_t configured_prepare_distance_us;
@@ -30,7 +34,7 @@ static uint32_t conn_interval_us_get(const struct bt_conn *conn)
 		return 0;
 	}
 
-	return BT_CONN_INTERVAL_TO_US(info.le.interval);
+	return info.le.interval_us;
 }
 
 static void work_handler(struct k_work *work)
@@ -91,7 +95,9 @@ static bool on_vs_evt(struct net_buf_simple *buf)
 
 #if defined(CONFIG_SOC_COMPATIBLE_NRF52X) || defined(CONFIG_SOC_COMPATIBLE_NRF5340_CPUNET)
 	timer_trigger_us -= sys_clock_start_to_bt_clk_start_us;
-#endif
+#else
+	timer_trigger_us -= z_nrf_grtc_timer_startup_value_get();
+#endif /* CONFIG_SOC_COMPATIBLE_NRF52X || CONFIG_SOC_COMPATIBLE_NRF5340_CPUNET */
 
 	/* Start/Restart a timer triggering every conn_interval_us from the last anchor point. */
 	k_timer_start(&timers[conn_index], K_TIMEOUT_ABS_US(timer_trigger_us),
@@ -103,10 +109,6 @@ static bool on_vs_evt(struct net_buf_simple *buf)
 int bt_radio_notification_conn_cb_register(const struct bt_radio_notification_conn_cb *cb,
 					   uint32_t prepare_distance_us)
 {
-	if (registered_cb) {
-		return -EALREADY;
-	}
-
 	int err;
 
 	err = bt_hci_register_vnd_evt_cb(on_vs_evt);
@@ -168,12 +170,10 @@ static int set_sys_clock_start_to_bt_clk_start_us(void)
 		}
 	}
 
-	const uint64_t rtc_ticks_in_femto_units = 30517578125UL;
-
-	__ASSERT_NO_MSG(ticks_difference >= 0);
+	const int64_t rtc_ticks_in_femto_units = 30517578125L;
 
 	sys_clock_start_to_bt_clk_start_us =
-		((ticks_difference * rtc_ticks_in_femto_units) / 1000000000UL);
+		((ticks_difference * rtc_ticks_in_femto_units) / 1000000000L);
 	return 0;
 }
 

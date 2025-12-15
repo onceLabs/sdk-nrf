@@ -27,23 +27,24 @@
 #define AEAD_BLOCK_SZ	      (16)
 /** Size of AEAD GCM and CCM context saving state, in bytes */
 #define AES_AEAD_CTX_STATE_SZ (32)
+/** Size of AEAD lenAlenC, in bytes */
+#define AEAD_LENA_LENC_SZ     (16)
 
 static int lenAlenC_aesgcm_ba411(size_t aadsz, size_t datasz, uint8_t *out);
 static int lenAlenC_nop(size_t aadsz, size_t datasz, uint8_t *out);
 
-static const char zeros[SX_CCM_MAX_TAG_SZ] = {0};
+static const uint8_t zeros[SX_CCM_MAX_TAG_SZ] = {0};
 
 static const struct sx_aead_cmdma_tags ba411aeadtags = {
 	.cfg = DMATAG_BA411 | DMATAG_CONFIG(0),
 	.iv_or_state = DMATAG_BA411 | DMATAG_CONFIG(0x28),
 	.key = DMATAG_BA411 | DMATAG_CONFIG(0x08),
 	.aad = DMATAG_BA411 | DMATAG_DATATYPE_HEADER,
-	.tag = 0,
+	.tag = DMATAG_BA411,
 	.data = DMATAG_BA411};
 
 #define BA411_MODEID_GCM 6
-static const struct sx_aead_cmdma_cfg ba411gcmcfg = {.encr = 0,
-						     .decr = CM_CFG_DECRYPT,
+static const struct sx_aead_cmdma_cfg ba411gcmcfg = {.decr = CM_CFG_DECRYPT,
 						     .mode = BA411_MODEID_GCM,
 						     .dmatags = &ba411aeadtags,
 						     .verifier = NULL,
@@ -51,11 +52,11 @@ static const struct sx_aead_cmdma_cfg ba411gcmcfg = {.encr = 0,
 						     .ctxsave = AES_AEAD_MODEID_CTX_SAVE,
 						     .ctxload = AES_AEAD_MODEID_CTX_LOAD,
 						     .granularity = AEAD_BLOCK_SZ,
-						     .ctxsz = AES_AEAD_CTX_STATE_SZ};
+						     .statesz = AES_AEAD_CTX_STATE_SZ,
+						     .inputminsz = 0};
 
 #define BA411_MODEID_CCM 5
-static const struct sx_aead_cmdma_cfg ba411ccmcfg = {.encr = 0,
-						     .decr = CM_CFG_DECRYPT,
+static const struct sx_aead_cmdma_cfg ba411ccmcfg = {.decr = CM_CFG_DECRYPT,
 						     .mode = BA411_MODEID_CCM,
 						     .dmatags = &ba411aeadtags,
 						     .verifier = zeros,
@@ -63,7 +64,8 @@ static const struct sx_aead_cmdma_cfg ba411ccmcfg = {.encr = 0,
 						     .ctxsave = AES_AEAD_MODEID_CTX_SAVE,
 						     .ctxload = AES_AEAD_MODEID_CTX_LOAD,
 						     .granularity = AEAD_BLOCK_SZ,
-						     .ctxsz = AES_AEAD_CTX_STATE_SZ};
+						     .statesz = AES_AEAD_CTX_STATE_SZ,
+						     .inputminsz = 0};
 
 static int lenAlenC_nop(size_t aadsz, size_t datasz, uint8_t *out)
 {
@@ -93,45 +95,52 @@ static int lenAlenC_aesgcm_ba411(size_t aadsz, size_t datasz, uint8_t *out)
 	return 1;
 }
 
-void sx_aead_free(struct sxaead *c)
+int sx_aead_free(struct sxaead *aead_ctx)
 {
-	if (c->key->clean_key) {
-		c->key->clean_key(c->key->user_data);
+	int sx_err = SX_OK;
+
+	if (aead_ctx->key->clean_key) {
+		sx_err = aead_ctx->key->clean_key(aead_ctx->key->user_data);
 	}
-	sx_cmdma_release_hw(&c->dma);
+	sx_cmdma_release_hw(&aead_ctx->dma);
+	return sx_err;
 }
 
-static int sx_aead_hw_reserve(struct sxaead *c)
+int sx_aead_hw_reserve(struct sxaead *aead_ctx)
 {
 	int err = SX_OK;
 	uint32_t prng_value;
 
-	err = cracen_prng_value_from_pool(&prng_value);
-	if (err != SX_OK) {
-		return err;
+	if (aead_ctx->has_countermeasures) {
+		err = cracen_prng_value_from_pool(&prng_value);
+		if (err != SX_OK) {
+			return err;
+		}
 	}
 
-	sx_hw_reserve(&c->dma);
+	sx_hw_reserve(&aead_ctx->dma);
 
-	err = sx_cm_load_mask(prng_value);
-	if (err != SX_OK) {
-		goto exit;
+	if (aead_ctx->has_countermeasures) {
+		err = sx_cm_load_mask(prng_value);
+		if (err != SX_OK) {
+			goto exit;
+		}
 	}
 
-	if (c->key->prepare_key) {
-		err = c->key->prepare_key(c->key->user_data);
+	if (aead_ctx->key->prepare_key) {
+		err = aead_ctx->key->prepare_key(aead_ctx->key->user_data);
 	}
 
 exit:
 	if (err != SX_OK) {
-		sx_aead_free(c);
+		return sx_handle_nested_error(sx_aead_free(aead_ctx), err);
 	}
 
 	return err;
 }
 
-static int sx_aead_create_aesgcm(struct sxaead *c, const struct sxkeyref *key, const char *iv,
-				 size_t tagsz)
+static int sx_aead_create_aesgcm(struct sxaead *aead_ctx, const struct sxkeyref *key,
+				 const uint8_t *iv, size_t tagsz)
 {
 	uint32_t keyszfld = 0;
 	int err;
@@ -147,69 +156,67 @@ static int sx_aead_create_aesgcm(struct sxaead *c, const struct sxkeyref *key, c
 		}
 	}
 
-	c->key = key;
-	err = sx_aead_hw_reserve(c);
+	/* has countermeasures and the key need to be set before callling sx_aead_hw_reserve */
+	aead_ctx->has_countermeasures = true;
+	aead_ctx->key = key;
+	err = sx_aead_hw_reserve(aead_ctx);
 	if (err != SX_OK) {
 		return err;
 	}
 
-	c->cfg = &ba411gcmcfg;
+	aead_ctx->cfg = &ba411gcmcfg;
 	keyszfld = 0;
 
-	sx_cmdma_newcmd(&c->dma, c->allindescs,
-			CMDMA_AEAD_MODE_SET(c->cfg->mode) | KEYREF_BA411E_HWKEY_CONF(key->cfg) |
+	sx_cmdma_newcmd(&aead_ctx->dma, aead_ctx->descs,
+			CMDMA_AEAD_MODE_SET(aead_ctx->cfg->mode) | KEYREF_AES_HWKEY_CONF(key->cfg) |
 				keyszfld,
-			c->cfg->dmatags->cfg);
+			aead_ctx->cfg->dmatags->cfg);
 
 	if (KEYREF_IS_USR(key)) {
-		ADD_CFGDESC(c->dma, key->key, key->sz, c->cfg->dmatags->key);
+		ADD_CFGDESC(aead_ctx->dma, key->key, key->sz, aead_ctx->cfg->dmatags->key);
 	}
-	ADD_CFGDESC(c->dma, iv, SX_GCM_IV_SZ, c->cfg->dmatags->iv_or_state);
-	c->totalaadsz = 0;
-	c->discardaadsz = 0;
-	c->datainsz = 0;
-	c->dataintotalsz = 0;
-	c->is_in_ctx = false;
-	c->tagsz = tagsz;
-	c->expectedtag = c->cfg->verifier;
-	c->dma.out = c->dma.dmamem.outdescs;
+	ADD_CFGDESC(aead_ctx->dma, iv, SX_GCM_IV_SZ, aead_ctx->cfg->dmatags->iv_or_state);
+	aead_ctx->totalaadsz = 0;
+	aead_ctx->discardaadsz = 0;
+	aead_ctx->datainsz = 0;
+	aead_ctx->dataintotalsz = 0;
+	aead_ctx->tagsz = tagsz;
+	aead_ctx->expectedtag = aead_ctx->cfg->verifier;
 
 	return SX_OK;
 }
 
-int sx_aead_create_aesgcm_enc(struct sxaead *c, const struct sxkeyref *key, const char *iv,
-			      size_t tagsz)
+int sx_aead_create_aesgcm_enc(struct sxaead *aead_ctx, const struct sxkeyref *key,
+			      const uint8_t *iv, size_t tagsz)
 {
-	int r;
+	int status;
 
-	r = sx_aead_create_aesgcm(c, key, iv, tagsz);
-	if (r) {
-		return r;
+	status = sx_aead_create_aesgcm(aead_ctx, key, iv, tagsz);
+	if (status) {
+		return status;
 	}
-
-	c->dma.dmamem.cfg |= c->cfg->encr;
 
 	return SX_OK;
 }
 
-int sx_aead_create_aesgcm_dec(struct sxaead *c, const struct sxkeyref *key, const char *iv,
-			      size_t tagsz)
+int sx_aead_create_aesgcm_dec(struct sxaead *aead_ctx, const struct sxkeyref *key,
+			      const uint8_t *iv, size_t tagsz)
 {
-	int r;
+	int status;
 
-	r = sx_aead_create_aesgcm(c, key, iv, tagsz);
-	if (r) {
-		return r;
+	status = sx_aead_create_aesgcm(aead_ctx, key, iv, tagsz);
+	if (status) {
+		return status;
 	}
 
-	c->dma.dmamem.cfg |= c->cfg->decr;
+	aead_ctx->dma.dmamem.cfg |= aead_ctx->cfg->decr;
 
 	return SX_OK;
 }
 
-static int sx_aead_create_aesccm(struct sxaead *c, const struct sxkeyref *key, const char *nonce,
-				 size_t noncesz, size_t tagsz, size_t aadsz, size_t datasz,
-				 const uint32_t dir)
+static int sx_aead_create_aesccm(struct sxaead *aead_ctx, const struct sxkeyref *key,
+				 const uint8_t *nonce, size_t noncesz, size_t tagsz, size_t aadsz,
+				 size_t datasz, const uint32_t dir)
 {
 	int err;
 
@@ -237,264 +244,274 @@ static int sx_aead_create_aesccm(struct sxaead *c, const struct sxkeyref *key, c
 		return SX_ERR_TOO_BIG;
 	}
 
-	c->key = key;
-	err = sx_aead_hw_reserve(c);
+	/* has countermeasures and the key need to be set before callling sx_aead_hw_reserve */
+	aead_ctx->has_countermeasures = true;
+	aead_ctx->key = key;
+	err = sx_aead_hw_reserve(aead_ctx);
 	if (err != SX_OK) {
 		return err;
 	}
 
-	c->cfg = &ba411ccmcfg;
-	sx_cmdma_newcmd(&c->dma, c->allindescs,
-			CMDMA_AEAD_MODE_SET(c->cfg->mode) | KEYREF_BA411E_HWKEY_CONF(key->cfg) |
+	aead_ctx->cfg = &ba411ccmcfg;
+	sx_cmdma_newcmd(&aead_ctx->dma, aead_ctx->descs,
+			CMDMA_AEAD_MODE_SET(aead_ctx->cfg->mode) | KEYREF_AES_HWKEY_CONF(key->cfg) |
 				dir,
-			c->cfg->dmatags->cfg);
+			aead_ctx->cfg->dmatags->cfg);
 
 	if (KEYREF_IS_USR(key)) {
-		ADD_CFGDESC(c->dma, key->key, key->sz, c->cfg->dmatags->key);
+		ADD_CFGDESC(aead_ctx->dma, key->key, key->sz, aead_ctx->cfg->dmatags->key);
 	}
 
-	c->totalaadsz = 0;
-	c->discardaadsz = 0;
-	c->datainsz = 0;
-	c->dataintotalsz = 0;
-	c->is_in_ctx = false;
-	c->tagsz = tagsz;
-	c->dma.out = c->dma.dmamem.outdescs;
+	aead_ctx->totalaadsz = 0;
+	aead_ctx->discardaadsz = 0;
+	aead_ctx->datainsz = 0;
+	aead_ctx->dataintotalsz = 0;
+	aead_ctx->tagsz = tagsz;
 	/* For CCM decryption, BA411 engine will compute the output tag as
 	 * tagInputed ^ tagComputed. If inputed tag and computed tag are
 	 * identical, the outputted tag will be an array of zeros with tagsz
 	 * length. For encryption, expectedtag will be set to NULL by
 	 * sx_aead_crypt() to disable verification.
 	 */
-	c->expectedtag = c->cfg->verifier;
+	aead_ctx->expectedtag = aead_ctx->cfg->verifier;
 
 	return SX_OK;
 }
 
-int sx_aead_create_aesccm_enc(struct sxaead *c, const struct sxkeyref *key, const char *nonce,
-			      size_t noncesz, size_t tagsz, size_t aadsz, size_t datasz)
+int sx_aead_create_aesccm_enc(struct sxaead *aead_ctx, const struct sxkeyref *key,
+			      const uint8_t *nonce, size_t noncesz, size_t tagsz, size_t aadsz,
+			      size_t datasz)
 {
-	return sx_aead_create_aesccm(c, key, nonce, noncesz, tagsz, aadsz, datasz,
-				     ba411ccmcfg.encr);
+	return sx_aead_create_aesccm(aead_ctx, key, nonce, noncesz, tagsz, aadsz, datasz, 0);
 }
 
-int sx_aead_create_aesccm_dec(struct sxaead *c, const struct sxkeyref *key, const char *nonce,
-			      size_t noncesz, size_t tagsz, size_t aadsz, size_t datasz)
+int sx_aead_create_aesccm_dec(struct sxaead *aead_ctx, const struct sxkeyref *key,
+			      const uint8_t *nonce, size_t noncesz, size_t tagsz, size_t aadsz,
+			      size_t datasz)
 {
-	return sx_aead_create_aesccm(c, key, nonce, noncesz, tagsz, aadsz, datasz,
+	return sx_aead_create_aesccm(aead_ctx, key, nonce, noncesz, tagsz, aadsz, datasz,
 				     ba411ccmcfg.decr);
 }
 
-int sx_aead_feed_aad(struct sxaead *c, const char *aad, size_t aadsz)
+int sx_aead_feed_aad(struct sxaead *aead_ctx, const uint8_t *aad, size_t aadsz)
 {
-	if (!c->dma.hw_acquired) {
+	if (!aead_ctx->dma.hw_acquired) {
 		return SX_ERR_UNINITIALIZED_OBJ;
 	}
 	if (aadsz >= DMA_MAX_SZ) {
-		sx_aead_free(c);
-		return SX_ERR_TOO_BIG;
+		return sx_handle_nested_error(sx_aead_free(aead_ctx), SX_ERR_TOO_BIG);
 	}
-	if (c->dataintotalsz) {
-		sx_aead_free(c);
-		return SX_ERR_FEED_AFTER_DATA;
+	if (aead_ctx->dataintotalsz) {
+		return sx_handle_nested_error(sx_aead_free(aead_ctx), SX_ERR_FEED_AFTER_DATA);
 	}
 
-	c->totalaadsz += aadsz;
-	c->discardaadsz += aadsz;
+	aead_ctx->totalaadsz += aadsz;
+	aead_ctx->discardaadsz += aadsz;
 
-	ADD_INDESC(c->dma, aad, aadsz, c->cfg->dmatags->aad);
+	ADD_INDESCA(aead_ctx->dma, aad, aadsz, aead_ctx->cfg->dmatags->aad, 0xf);
 
 	return SX_OK;
 }
 
-static void sx_aead_discard_aad(struct sxaead *c)
+static void sx_aead_discard_aad(struct sxaead *aead_ctx)
 {
-	if (c->discardaadsz) {
-		ADD_DISCARDDESC(c->dma.out, ALIGN_SZ(c->discardaadsz));
-		c->discardaadsz = 0;
+	if (aead_ctx->discardaadsz) {
+		ADD_DISCARDDESC(aead_ctx->dma, ALIGN_SZA(aead_ctx->discardaadsz, 0xf));
+		aead_ctx->discardaadsz = 0;
 	}
 }
 
-int sx_aead_crypt(struct sxaead *c, const char *datain, size_t datainsz, char *dataout)
+int sx_aead_crypt(struct sxaead *aead_ctx, const uint8_t *datain, size_t datainsz, uint8_t *dataout)
 {
-	if (!c->dma.hw_acquired) {
+	if (!aead_ctx->dma.hw_acquired) {
 		return SX_ERR_UNINITIALIZED_OBJ;
 	}
 	if (datainsz >= DMA_MAX_SZ) {
-		sx_aead_free(c);
-		return SX_ERR_TOO_BIG;
+		return sx_handle_nested_error(sx_aead_free(aead_ctx), SX_ERR_TOO_BIG);
 	}
+
+	sx_aead_discard_aad(aead_ctx);
 
 	if (datainsz) {
-		ADD_INDESC(c->dma, datain, datainsz, c->cfg->dmatags->data);
-		c->dataintotalsz += datainsz;
-		c->datainsz = datainsz;
+		ADD_INDESCA(aead_ctx->dma, datain, datainsz, aead_ctx->cfg->dmatags->data, 0xf);
+		aead_ctx->dataintotalsz += datainsz;
+		aead_ctx->datainsz = datainsz;
+		ADD_OUTDESCA(aead_ctx->dma, dataout, datainsz, 0xf);
 	}
+	return SX_OK;
+}
 
-	sx_aead_discard_aad(c);
-
-	ADD_OUTDESC(c->dma.out, dataout, datainsz);
+static int sx_aead_run(struct sxaead *aead_ctx)
+{
+	sx_cmdma_start(&aead_ctx->dma, sizeof(aead_ctx->descs) + sizeof(aead_ctx->extramem),
+		       aead_ctx->descs);
 
 	return SX_OK;
 }
 
-static int sx_aead_run(struct sxaead *c)
+int sx_aead_produce_tag(struct sxaead *aead_ctx, uint8_t *tagout)
 {
-	sx_cmdma_finalize_descs(c->allindescs, c->dma.d - 1);
-	sx_cmdma_finalize_descs(c->dma.dmamem.outdescs, c->dma.out - 1);
-
-	sx_cmdma_start(&c->dma, sizeof(c->allindescs) + sizeof(c->extramem), c->allindescs);
-
-	return SX_OK;
-}
-
-int sx_aead_produce_tag(struct sxaead *c, char *tagout)
-{
-	if (!c->dma.hw_acquired) {
+	if (!aead_ctx->dma.hw_acquired) {
 		return SX_ERR_UNINITIALIZED_OBJ;
 	}
-	if (c->cfg->mode == BA411_MODEID_CCM) {
-		if ((c->is_in_ctx) && (c->datainsz == 0) && (c->discardaadsz == 0)) {
-			sx_aead_free(c);
-			return SX_ERR_INPUT_BUFFER_TOO_SMALL;
+	if (aead_ctx->cfg->mode == BA411_MODEID_CCM) {
+		if ((aead_ctx->dma.dmamem.cfg & aead_ctx->cfg->ctxload) &&
+		    (aead_ctx->datainsz == 0) && (aead_ctx->discardaadsz == 0)) {
+			return sx_handle_nested_error(sx_aead_free(aead_ctx),
+						      SX_ERR_INPUT_BUFFER_TOO_SMALL);
 		}
 	}
-
-	if (c->cfg->lenAlenC(c->totalaadsz, c->dataintotalsz, &c->extramem[0])) {
-		ADD_INDESC_PRIV(c->dma, OFFSET_EXTRAMEM(c), 16, c->cfg->dmatags->data);
+	if ((aead_ctx->dataintotalsz + aead_ctx->totalaadsz) < aead_ctx->cfg->inputminsz) {
+		return sx_handle_nested_error(sx_aead_free(aead_ctx), SX_ERR_INCOMPATIBLE_HW);
 	}
 
-	sx_aead_discard_aad(c);
+	if (aead_ctx->cfg->lenAlenC(aead_ctx->totalaadsz, aead_ctx->dataintotalsz,
+				    &aead_ctx->extramem[0])) {
+		ADD_INDESC_PRIV(aead_ctx->dma, OFFSET_EXTRAMEM(aead_ctx), AEAD_LENA_LENC_SZ,
+				aead_ctx->cfg->dmatags->data);
+	}
 
-	ADD_OUTDESC(c->dma.out, tagout, c->tagsz);
+	sx_aead_discard_aad(aead_ctx);
 
-	c->expectedtag = NULL;
-	c->is_in_ctx = false;
+	ADD_OUTDESCA(aead_ctx->dma, tagout, aead_ctx->tagsz, 0xf);
 
-	return sx_aead_run(c);
+	aead_ctx->expectedtag = NULL;
+
+	return sx_aead_run(aead_ctx);
 }
 
-int sx_aead_verify_tag(struct sxaead *c, const char *tagin)
+int sx_aead_verify_tag(struct sxaead *aead_ctx, const uint8_t *tagin)
 {
-	if (!c->dma.hw_acquired) {
+	if (!aead_ctx->dma.hw_acquired) {
 		return SX_ERR_UNINITIALIZED_OBJ;
 	}
-	if (c->cfg->mode == BA411_MODEID_CCM) {
-		if ((c->is_in_ctx) && (c->datainsz == 0) && (c->discardaadsz == 0)) {
-			sx_aead_free(c);
-			return SX_ERR_INPUT_BUFFER_TOO_SMALL;
+	if (aead_ctx->cfg->mode == BA411_MODEID_CCM) {
+		if ((aead_ctx->dma.dmamem.cfg & aead_ctx->cfg->ctxload) &&
+		    (aead_ctx->datainsz == 0) && (aead_ctx->discardaadsz == 0)) {
+			return sx_handle_nested_error(sx_aead_free(aead_ctx),
+						      SX_ERR_INPUT_BUFFER_TOO_SMALL);
 		}
 	}
+	if ((aead_ctx->dataintotalsz + aead_ctx->totalaadsz) < aead_ctx->cfg->inputminsz) {
+		return sx_handle_nested_error(sx_aead_free(aead_ctx), SX_ERR_INCOMPATIBLE_HW);
+	}
 
-	if (c->cfg->lenAlenC(c->totalaadsz, c->dataintotalsz, &c->extramem[0])) {
-		ADD_INDESC_PRIV(c->dma, OFFSET_EXTRAMEM(c), 16, c->cfg->dmatags->data);
-		c->expectedtag = tagin;
+	if (aead_ctx->cfg->lenAlenC(aead_ctx->totalaadsz, aead_ctx->dataintotalsz,
+				    &aead_ctx->extramem[0])) {
+		ADD_INDESC_PRIV(aead_ctx->dma, OFFSET_EXTRAMEM(aead_ctx), AEAD_LENA_LENC_SZ,
+				aead_ctx->cfg->dmatags->data);
+		aead_ctx->expectedtag = tagin;
 	} else {
-		ADD_INDESC(c->dma, tagin, c->tagsz, c->cfg->dmatags->data);
+		if (DMATAG_DATATYPE_REFERENCE ==
+		    (aead_ctx->cfg->dmatags->tag & DMATAG_DATATYPE_REFERENCE)) {
+			UPDATE_LASTDESC_TAG(aead_ctx->dma, DMATAG_LAST);
+		}
+
+		ADD_INDESCA(aead_ctx->dma, tagin, aead_ctx->tagsz, aead_ctx->cfg->dmatags->tag,
+			    0xf);
 	}
 
-	sx_aead_discard_aad(c);
+	sx_aead_discard_aad(aead_ctx);
 
-	if (c->cfg->dmatags->tag) {
-		/* The hardware will output a 4 bytes tag. It will be all 0 if
-		 * authentication with the tag succeeded. Set tagsz to the size
-		 * of that "computed validation tag" for the check by
-		 * sx_aead_status().
-		 */
-		c->tagsz = 4;
-	}
-	ADD_OUTDESC_PRIV(c->dma, c->dma.out, OFFSET_EXTRAMEM(c), c->tagsz, 0xf);
-	c->is_in_ctx = false;
+	ADD_OUTDESC_PRIV(aead_ctx->dma, OFFSET_EXTRAMEM(aead_ctx), aead_ctx->tagsz, 0xf);
 
-	return sx_aead_run(c);
+	return sx_aead_run(aead_ctx);
 }
 
-int sx_aead_resume_state(struct sxaead *c)
+int sx_aead_resume_state(struct sxaead *aead_ctx)
 {
 	int err;
 
-	if (c->dma.hw_acquired) {
+	if (aead_ctx->dma.hw_acquired) {
 		return SX_ERR_UNINITIALIZED_OBJ;
 	}
 
-	err = sx_aead_hw_reserve(c);
+	err = sx_aead_hw_reserve(aead_ctx);
 	if (err != SX_OK) {
 		return err;
 	}
 
-	c->dma.dmamem.cfg &= ~(c->cfg->ctxsave);
-	sx_cmdma_newcmd(&c->dma, c->allindescs, c->dma.dmamem.cfg | c->cfg->ctxload,
-			c->cfg->dmatags->cfg);
-	if (KEYREF_IS_USR(c->key)) {
-		ADD_CFGDESC(c->dma, c->key->key, c->key->sz, c->cfg->dmatags->key);
+	aead_ctx->dma.dmamem.cfg &= ~(aead_ctx->cfg->ctxsave);
+	sx_cmdma_newcmd(&aead_ctx->dma, aead_ctx->descs,
+			aead_ctx->dma.dmamem.cfg | aead_ctx->cfg->ctxload,
+			aead_ctx->cfg->dmatags->cfg);
+	if (KEYREF_IS_USR(aead_ctx->key)) {
+		ADD_CFGDESC(aead_ctx->dma, aead_ctx->key->key, aead_ctx->key->sz,
+			    aead_ctx->cfg->dmatags->key);
 	}
-	ADD_INDESC_PRIV(c->dma, (OFFSET_EXTRAMEM(c) + sizeof(c->extramem) - c->cfg->ctxsz),
-			c->cfg->ctxsz, c->cfg->dmatags->iv_or_state);
+	ADD_INDESC_PRIV(
+		aead_ctx->dma,
+		(OFFSET_EXTRAMEM(aead_ctx) + sizeof(aead_ctx->extramem) - aead_ctx->cfg->statesz),
+		aead_ctx->cfg->statesz, aead_ctx->cfg->dmatags->iv_or_state);
 
-	c->datainsz = 0;
-	c->dma.out = c->dma.dmamem.outdescs;
-	c->discardaadsz = 0;
+	aead_ctx->datainsz = 0;
+	aead_ctx->discardaadsz = 0;
 
 	return SX_OK;
 }
 
-int sx_aead_save_state(struct sxaead *c)
+int sx_aead_save_state(struct sxaead *aead_ctx)
 {
-	if (!c->dma.hw_acquired) {
+	if (!aead_ctx->dma.hw_acquired) {
 		return SX_ERR_UNINITIALIZED_OBJ;
 	}
 
-	sx_aead_discard_aad(c);
+	if (aead_ctx->cfg->statesz == 0) {
+		return sx_handle_nested_error(sx_aead_free(aead_ctx),
+					      SX_ERR_CONTEXT_SAVING_NOT_SUPPORTED);
+	}
 
-	ADD_OUTDESC_PRIV(c->dma, c->dma.out,
-			 (OFFSET_EXTRAMEM(c) + sizeof(c->extramem) - c->cfg->ctxsz), c->cfg->ctxsz,
-			 0x0F);
+	sx_aead_discard_aad(aead_ctx);
 
-	c->dma.dmamem.cfg |= c->cfg->ctxsave;
-	c->is_in_ctx = true;
+	ADD_OUTDESC_PRIV(
+		aead_ctx->dma,
+		(OFFSET_EXTRAMEM(aead_ctx) + sizeof(aead_ctx->extramem) - aead_ctx->cfg->statesz),
+		aead_ctx->cfg->statesz, 0x0F);
 
-	sx_cmdma_finalize_descs(c->allindescs, c->dma.d - 1);
-	sx_cmdma_finalize_descs(c->dma.dmamem.outdescs, c->dma.out - 1);
+	aead_ctx->dma.dmamem.cfg |= aead_ctx->cfg->ctxsave;
 
-	sx_cmdma_start(&c->dma, sizeof(c->allindescs) + sizeof(c->extramem), c->allindescs);
+	sx_cmdma_start(&aead_ctx->dma, sizeof(aead_ctx->descs) + sizeof(aead_ctx->extramem),
+		       aead_ctx->descs);
 
 	return SX_OK;
 }
 
-int sx_aead_status(struct sxaead *c)
+int sx_aead_status(struct sxaead *aead_ctx)
 {
-	int r;
+	int status;
 
-	if (!c->dma.hw_acquired) {
+	if (!aead_ctx->dma.hw_acquired) {
 		return SX_ERR_UNINITIALIZED_OBJ;
 	}
-	r = sx_cmdma_check();
-	if (r == SX_ERR_HW_PROCESSING) {
-		return r;
+	status = sx_cmdma_check();
+	if (status == SX_ERR_HW_PROCESSING) {
+		return status;
+	}
+	if (status) {
+		return sx_handle_nested_error(sx_aead_free(aead_ctx), status);
 	}
 
 #if CONFIG_DCACHE
-	sys_cache_data_invd_range((void *)&c->extramem, sizeof(c->extramem));
+	sys_cache_data_invd_range((void *)&aead_ctx->extramem, sizeof(aead_ctx->extramem));
 #endif
 
-	if ((!r) && (c->expectedtag != NULL) && (!c->is_in_ctx)) {
-		r = sx_memdiff(c->expectedtag, (const char *)c->extramem, c->tagsz)
-			    ? SX_ERR_INVALID_TAG
-			    : SX_OK;
+	if (!(aead_ctx->dma.dmamem.cfg & aead_ctx->cfg->ctxsave) && aead_ctx->expectedtag != NULL) {
+		status = sx_memdiff(aead_ctx->expectedtag, (const uint8_t *)aead_ctx->extramem,
+				    aead_ctx->tagsz)
+				 ? SX_ERR_INVALID_TAG
+				 : SX_OK;
 	}
 
-	sx_aead_free(c);
-
-	return r;
+	return sx_handle_nested_error(sx_aead_free(aead_ctx), status);
 }
 
-int sx_aead_wait(struct sxaead *c)
+int sx_aead_wait(struct sxaead *aead_ctx)
 {
-	int r = SX_ERR_HW_PROCESSING;
+	int status = SX_ERR_HW_PROCESSING;
 
-	while (r == SX_ERR_HW_PROCESSING) {
-		r = sx_aead_status(c);
+	while (status == SX_ERR_HW_PROCESSING) {
+		status = sx_aead_status(aead_ctx);
 	}
 
-	return r;
+	return status;
 }

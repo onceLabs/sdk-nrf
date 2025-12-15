@@ -82,7 +82,7 @@ static int setup_connection_event_trigger(struct bt_conn *conn, bool enable)
 		cmd_params.task_address =
 			nrf_egu_task_address_get(NRF_EGU, NRF_EGU_TASK_TRIGGER0);
 
-		IRQ_DIRECT_CONNECT(DT_IRQN(EGU_NODE), 5, egu_handler, 0);
+		IRQ_CONNECT(DT_IRQN(EGU_NODE), 5, egu_handler, 0, 0);
 		nrf_egu_int_enable(NRF_EGU, NRF_EGU_INT_TRIGGERED0);
 		NVIC_EnableIRQ(DT_IRQN(EGU_NODE));
 	} else {
@@ -175,7 +175,7 @@ static void adv_start(void)
 	int err;
 
 	err = bt_le_adv_start(
-		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE | BT_LE_ADV_OPT_ONE_TIME,
+		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONN,
 			BT_GAP_ADV_FAST_INT_MIN_2,
 			BT_GAP_ADV_FAST_INT_MAX_2,
 			NULL),
@@ -257,7 +257,7 @@ int main(void)
 
 	k_work_init(&work, work_handler);
 	console_init();
-	printk("Starting Event Trigger Example.\n");
+	printk("Starting Event Trigger Sample.\n");
 
 	err = bt_enable(NULL);
 	if (err) {

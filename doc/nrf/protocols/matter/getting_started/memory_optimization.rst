@@ -46,6 +46,13 @@ You can reduce the memory usage of your Matter application by enabling Link Time
 
 LTO is an advanced compilation technique that performs optimization across all compiled units of an application at the link stage, rather than within each unit separately.
 
+LTO is enabled by default for the following:
+
+* The :ref:`matter_bridge_app` application.
+* The ``release`` configuration of the :ref:`matter_samples` and the :ref:`matter_weather_station_app`.
+* The ``nrf7002dk/nrf5340/cpuapp`` build target in the :ref:`matter_samples`.
+
+
 To enable LTO, set the :kconfig:option:`CONFIG_LTO` and :kconfig:option:`CONFIG_ISR_TABLES_LOCAL_DECLARATION` Kconfig options to ``y``.
 
 .. _ug_matter_device_memory_profiling:
@@ -60,7 +67,7 @@ Measuring memory usage
 ======================
 
 You can obtain the current memory statistics from the device using Kconfig options and UART shell commands.
-To do this, set the :kconfig:option:`CONFIG_CHIP_MEMORY_PROFILING` global Matter memory profiling Kconfig to ``y``.
+Set the :ref:`CONFIG_CHIP_MEMORY_PROFILING` Kconfig option to ``y``.
 This activates all the other necessary Kconfig options and enables all UART shell commands for measuring memory usage.
 Alternatively, you can enable each option separately.
 
@@ -319,7 +326,7 @@ Settings usage
     The data used within this partition may increase with updates to Matter and the |NCS|.
 
 To adjust the settings usage, you need to modify the :file:`pm_static` file related to your target board.
-For example, to modify the ``settings_storage`` partition in the :ref:`Matter Template <matter_template_sample>` sample for the ``nrf52840dk_nrf52840`` target, complete the following steps:
+For example, to modify the ``settings_storage`` partition in the :ref:`Matter Template <matter_template_sample>` sample for the ``nrf52840dk/nrf52840`` target, complete the following steps:
 
 1. Locate the :file:`pm_static_nrf52840dk_nrf52840.yml` in the sample directory
 #. Locate the ``settings_storage`` partition within the ``pm_static`` file.
@@ -388,7 +395,7 @@ The following table presents the possible threads used in a Matter application a
 |                     |                                                                  | For Matter over Thread only.                                   |
 +---------------------+------------------------------------------------------------------+----------------------------------------------------------------+
 | net_mgmt            | :kconfig:option:`CONFIG_NET_MGMT_EVENT_STACK_SIZE`               | Zephyr network management event processing thread stack.       |
-|                     |                                                                  | For Matter over Wi-Fi only.                                    |
+|                     |                                                                  | For Matter over Wi-Fi® only.                                   |
 +---------------------+------------------------------------------------------------------+----------------------------------------------------------------+
 | wpa_supplicant_main | :kconfig:option:`CONFIG_WIFI_NM_WPA_SUPPLICANT_THREAD_STACK_SIZE`| WPA supplicant main thread.                                    |
 |                     |                                                                  | Processing Wi-Fi requests and connections.                     |
@@ -415,7 +422,14 @@ The static size is determined by the :kconfig:option:`CONFIG_CHIP_MALLOC_SYS_HEA
 To use a dynamic heap size on your Matter device, set them both to ``n``.
 
 The static heap size means that you can define the maximum heap size for your application by setting the :kconfig:option:`CONFIG_CHIP_MALLOC_SYS_HEAP_SIZE` Kconfig value.
-You can also adjust the heap dedicated for MbedTLS purposes by setting the :kconfig:option:`CONFIG_MBEDTLS_HEAP_SIZE` Kconfig option value.
+You can also adjust the heap dedicated for Mbed TLS purposes by setting the :kconfig:option:`CONFIG_MBEDTLS_HEAP_SIZE` Kconfig option value.
+
+Packet buffer pool size
+-----------------------
+
+The Matter application uses a fixed-size pool for packet buffer memory management.
+The pool size is determined by the :kconfig:option:`CONFIG_CHIP_SYSTEM_PACKETBUFFER_POOL_SIZE` Kconfig option.
+You can adjust the pool size to reduce the memory usage of your application, but that can have a negative effect on the performance of the application.
 
 .. note::
    The Thread protocol has a separate configuration for memory allocation.

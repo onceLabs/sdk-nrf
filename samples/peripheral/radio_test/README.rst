@@ -38,12 +38,15 @@ The sample also requires one of the following testing devices:
    You can perform the radio test also using a spectrum analyzer.
    This method of testing is not covered by this documentation.
 
-nRF21540 front-end module
-=========================
+Front-end module
+================
 
 .. include:: /includes/sample_dtm_radio_test_fem.txt
 
-You can configure the nRF21540 front-end module (FEM) transmitted power control, antenna output and activation delay using the main shell commands of the :ref:`radio_test_ui`.
+You can configure the front-end module (FEM) transmitted power control, antenna output, and activation delay using the main shell commands of the :ref:`radio_test_ui`.
+
+.. note::
+   Each front-end module (FEM) has different capabilities and operating modes, so some commands may not be supported by a specific FEM and those supported may work differently on different FEMs.
 
 Skyworks front-end module
 =========================
@@ -107,7 +110,7 @@ User interface
      - Start channel for the sweep or the channel for the constant carrier (in MHz, as difference from 2400 MHz).
    * - start_duty_cycle_modulated_tx
      - <duty_cycle>
-     - Duty cycle in percent (two decimal digits, between 01 and 90).
+     - Duty cycle as a percentage (two decimal digits, ranging from 01 to 90).
    * - start_rx
      - <packet_num>
      - Start RX (continuous RX mode is used if no argument is provided).
@@ -194,12 +197,8 @@ Building and running
 .. include:: /includes/nRF54H20_erase_UICR.txt
 
 .. note::
-   |54H_engb_2_8|
-
-.. note::
    On the nRF5340 or nRF7002 development kit, the Radio Test sample requires the :ref:`nrf5340_remote_shell` sample on the application core.
    The Remote IPC shell sample is built and programmed automatically by default.
-   If you want to program your custom solution for the application core, unset the :kconfig:option:`CONFIG_NCS_SAMPLE_REMOTE_SHELL_CHILD_IMAGE` Kconfig option.
 
 Remote USB CDC ACM Shell variant
 ================================
@@ -241,7 +240,8 @@ Testing with another development kit
 Complete the following steps:
 
 1. Connect both development kits to the computer using a USB cable.
-   The kits are assigned a COM port (Windows) or ttyACM device (Linux), which is visible in the Device Manager.
+   The kits are assigned serial ports.
+   |serial_port_number_list|
 #. |connect_terminal_both_ANSI|
 #. Run the following commands on one of the kits:
 

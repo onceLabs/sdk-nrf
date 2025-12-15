@@ -31,7 +31,7 @@ To generate the test project and run the unit tests, locate the directory with t
 
          <Zephyr_path>/scripts/twister -T .
 
-      This command will generate the test project and run it for :ref:`zephyr:native_sim` and ``qemu_cortex_m3`` boards.
+      This command will generate the test project and run it for :zephyr:board:`native_sim` and ``qemu_cortex_m3`` boards.
       If you want to specify a board target, use the ``-p`` parameter and specify the *board_target*.
       For example, to run the unit test on ``qemu_cortex_m3``, use the following command:
 
@@ -45,7 +45,7 @@ To generate the test project and run the unit tests, locate the directory with t
 
          <Zephyr_path>/scripts/twister -T .
 
-      This command will generate the test project and run it for :ref:`zephyr:native_sim` and ``qemu_cortex_m3`` boards.
+      This command will generate the test project and run it for :zephyr:board:`native_sim` and ``qemu_cortex_m3`` boards.
       If you want to specify a board target, use the ``-p`` parameter and specify the *board_target*.
       For example, to run the unit test on ``qemu_cortex_m3``, use the following command:
 
@@ -61,42 +61,8 @@ To generate the test project and run the unit tests, locate the directory with t
          west build -b *board_target* -t run
 
       The ``-t run`` parameter tells west to run the default test target.
-      For example, to run the unit test on :ref:`zephyr:native_sim` board, use the following command:
+      For example, to run the unit test on :zephyr:board:`native_sim` board, use the following command:
 
       .. code-block:: console
 
          west build -b native_sim -t run
-
-.. _running_unit_tests_example_nrf9160:
-
-Example: Running the unit tests on the nRF9160 DK
-*************************************************
-
-The :ref:`asset_tracker_v2` application provides :ref:`asset_tracker_unit_test` for several of its modules.
-To run the unit test for the :ref:`asset_tracker_v2_debug_module`, complete the following steps:
-
-1. |connect_kit|
-   Take note of the serial port where you receive logs from the DK (this will be ``serial_port`` in the following command).
-#. Navigate to :file:`asset_tracker_v2/tests/debug_module`, where the :file:`testcase.yaml` is located.
-   If you check this file, it includes ``nrf9160dk/nrf9160/ns`` in the ``platform_allow:`` entry.
-#. Enter the following command to execute the unit tests on nRF9160 DK:
-
-   .. tabs::
-
-      .. group-tab:: Twister (Windows)
-
-         .. code-block:: console
-
-            <Zephyr_path>/scripts/twister -T . -p nrf9160dk/nrf9160/ns --device-testing --device-serial <serial_port>
-
-      .. group-tab:: Twister (Linux)
-
-         .. code-block:: console
-
-            <Zephyr_path>/scripts/twister -T . -p nrf9160dk/nrf9160/ns --device-testing --device-serial <serial_port>
-
-      .. group-tab:: west
-
-         .. code-block:: console
-
-            west build -b nrf9160dk/nrf9160/ns -t run

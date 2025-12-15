@@ -7,7 +7,7 @@ CAF: Bluetooth LE state module
    :local:
    :depth: 2
 
-The Bluetooth® LE state module is a core Bluetooth module in :ref:`lib_caf` (CAF).
+The Bluetooth LE state module is a core Bluetooth® module in :ref:`lib_caf` (CAF).
 When enabled for an application, the |ble_state| is responsible for the following actions:
 
 * Enabling Bluetooth (:c:func:`bt_enable`)
@@ -16,9 +16,6 @@ When enabled for an application, the |ble_state| is responsible for the followin
 
 The |ble_state| does not handle Bluetooth advertising or scanning.
 If you want to use these functionalities to connect over Bluetooth LE, use :ref:`CAF's Bluetooth LE advertising module <caf_ble_adv>` or Zephyr's :ref:`Bluetooth API <zephyr:bluetooth_api>` directly.
-
-.. note::
-   CAF assumes that Bluetooth Peripheral device supports only one simultaneous connection.
 
 Configuration
 *************

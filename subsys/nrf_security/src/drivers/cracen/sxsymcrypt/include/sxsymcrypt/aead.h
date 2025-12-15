@@ -82,6 +82,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 
 /** Initialization vector (IV) size, in bytes, for GCM encryption/decryption */
 #define SX_GCM_IV_SZ 12u
@@ -115,7 +116,7 @@ struct sxaead;
  * @remark - in context saving mode, \p aadsz must be multiple of block size
  *           unless it is the last chunk
  */
-int sx_aead_feed_aad(struct sxaead *c, const char *aad, size_t aadsz);
+int sx_aead_feed_aad(struct sxaead *c, const uint8_t *aad, size_t aadsz);
 
 /** Adds data to be encrypted or decrypted.
  *
@@ -144,7 +145,7 @@ int sx_aead_feed_aad(struct sxaead *c, const char *aad, size_t aadsz);
  * @remark - in context saving mode, \p datainsz must be multiple of block size
  *           unless it is the last chunk
  */
-int sx_aead_crypt(struct sxaead *c, const char *datain, size_t datainsz, char *dataout);
+int sx_aead_crypt(struct sxaead *c, const uint8_t *datain, size_t datainsz, uint8_t *dataout);
 
 /** Starts an AEAD encryption and tag computation.
  *
@@ -160,7 +161,8 @@ int sx_aead_crypt(struct sxaead *c, const char *datain, size_t datainsz, char *d
  * @param[out] tag authentication tag
  * @return ::SX_OK
  * @return ::SX_ERR_UNINITIALIZED_OBJ
- * @return ::SX_ERR_TOO_BIG
+ * @return ::SX_ERR_TOO_SMALL
+ * @return ::SX_ERR_INCOMPATIBLE_HW
  *
  * @pre - one of the sx_aead_feed_aad() or sx_aead_crypt() functions must be
  *        called first
@@ -168,7 +170,7 @@ int sx_aead_crypt(struct sxaead *c, const char *datain, size_t datainsz, char *d
  * @remark - if used with context saving(last chunk), the fed data size for
  *         the last chunk can not be 0
  */
-int sx_aead_produce_tag(struct sxaead *c, char *tag);
+int sx_aead_produce_tag(struct sxaead *c, uint8_t *tag);
 
 /** Starts an AEAD decryption and tag validation.
  *
@@ -181,7 +183,8 @@ int sx_aead_produce_tag(struct sxaead *c, char *tag);
  * @param[in] tag authentication tag
  * @return ::SX_OK
  * @return ::SX_ERR_UNINITIALIZED_OBJ
- * @return ::SX_ERR_TOO_BIG
+ * @return ::SX_ERR_TOO_SMALL
+ * @return ::SX_ERR_INCOMPATIBLE_HW
  *
  * @pre - one of the sx_aead_feed_aad() or sx_aead_crypt() functions must be
  *        called first
@@ -191,7 +194,7 @@ int sx_aead_produce_tag(struct sxaead *c, char *tag);
  * @remark - if used with context saving(last chunk), the fed data size for
  *         the last chunk can not be 0
  */
-int sx_aead_verify_tag(struct sxaead *c, const char *tag);
+int sx_aead_verify_tag(struct sxaead *c, const uint8_t *tag);
 
 /** Resumes AEAD operation in context-saving.
  *
@@ -299,12 +302,49 @@ int sx_aead_wait(struct sxaead *c);
  */
 int sx_aead_status(struct sxaead *c);
 
-/**
- * @brief Free AEAD operation context.
+/** Shortens the tag size of the AEAD operation.
  *
- * @param[in,out] c AEAD operation context.
+ * This function is optional and should be used only when a smaller tag than
+ * maximum size is required. This function sets the new tag size that will be
+ * used by sx_aead_produce_tag and sx_aead_verify_tag. Based on this new value,
+ * the tag will be truncated and remaining data, up to the maximum tag size
+ * per algorithm, will be discarded.
+ *
+ * The function will return immediately.
+ *
+ * @param[in,out] c AEAD operation context
+ * @param[in] tagsz new size for the tag
+ * @return ::SX_OK
+ * @return ::SX_ERR_UNINITIALIZED_OBJ
+ * @return ::SX_ERR_INVALID_TAG_SIZE
+ * @return ::SX_ERR_INCOMPATIBLE_HW
+ *
+ * @pre - one of the sx_aead_create_*()functions must be called first
+ *
+ * @remark - AES/SM4 CCM tag size is user provided and it must be between 4 and
+ * 16 bytes, multiple of 2. If this function is called, the new tag size must be
+ * between 4 and the value specified during create, sx_aead_create_*ccm_*().
  */
-void sx_aead_free(struct sxaead *c);
+int sx_aead_truncate_tag(struct sxaead *c, const size_t tagsz);
+
+/** Reserve the hardware for an AEAD operation.
+ *
+ * This function initializes and reserves the hardware for an AEAD
+ * (Authenticated Encryption with Associated Data) operation. In case
+ * of a multithreading application this reservation also includes locking
+ * a mutex.
+ *
+ * @param[in,out] c AEAD operation context
+ *
+ * Return:
+ * @return ::SX_OK
+ * @return ::SX_ERR_UNKNOWN_ERROR
+ * @return ::SX_ERR_DMA_FAILED
+ * @return ::SX_ERR_HW_PROCESSING
+ * @return ::SX_ERR_INVALID_KEYREF
+ * @return ::SX_ERR_PLATFORM_ERROR
+ */
+int sx_aead_hw_reserve(struct sxaead *c);
 
 #ifdef __cplusplus
 }

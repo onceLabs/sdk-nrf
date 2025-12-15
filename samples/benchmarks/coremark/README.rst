@@ -48,7 +48,10 @@ The sample configuration sets up the following board targets for standard loggin
 * ``nrf52833dk/nrf52833``
 * ``nrf52dk/nrf52832``
 * ``nrf5340dk/nrf5340/cpuapp``
+* ``nrf54l15dk/nrf54l05/cpuapp``
+* ``nrf54l15dk/nrf54l10/cpuapp``
 * ``nrf54l15dk/nrf54l15/cpuapp``
+* ``nrf54lm20dk/nrf54lm20a/cpuapp``
 
 Multi-domain logging
 --------------------
@@ -75,33 +78,32 @@ Each target CPU has an assigned button responsible for starting the benchmark an
 
 .. tabs::
 
-   .. group-tab:: nRF52 and nRF53 DKs
+   .. group-tab:: nRF52 DKs
 
-      Button 1:
-         Start the benchmark run on the application core.
+      Application core: **Button 1** and **LED 1**
 
-      Button 2:
-         Start the benchmark run on the network or radio core.
+   .. group-tab:: nRF53 DKs
 
-      LED 1:
-         Indicates ``test in progress`` on the application core.
+      Application core: **Button 1** and **LED 1**
 
-      LED 2:
-         Indicates ``test in progress`` on the network or radio core.
+      Network core: **Button 2** and **LED 2**.
 
-   .. group-tab:: nRF54 DKs
+   .. group-tab:: nRF54L DKs
 
-      Button 0:
-         Start the benchmark run on the application core.
+      Application core: **Button 0** and **LED 0**
 
-      Button 1:
-         Start the benchmark run on the network or radio core.
+      FLPR core: **Button 3** and **LED 3**
 
-      LED 0:
-         Indicates ``test in progress`` on the application core.
+        This UI is currently only supported for the following board targets:
 
-      LED 1:
-         Indicates ``test in progress`` on the network or radio core.
+        * ``nrf54l15dk/nrf54l15/cpuapp``
+        * ``nrf54lm20dk/nrf54lm20a/cpuapp``
+
+   .. group-tab:: nRF54H DKs
+
+      Application core: **Button 0** and **LED 0**
+
+      Radio core: **Button 1** and **LED 1**
 
 .. _coremark_configuration:
 
@@ -169,18 +171,31 @@ CONFIG_APP_MODE_FLASH_AND_RUN - Start CoreMark sample automatically after flashi
    Otherwise, it will wait for the button press.
 
 .. note::
-   The :kconfig:option:`CONFIG_APP_MODE_FLASH_AND_RUN` Kconfig option is always enabled for the PPR core.
-   This core does not use buttons.
+   The :kconfig:option:`CONFIG_APP_MODE_FLASH_AND_RUN` Kconfig option is always enabled for the PPR and FLPR cores on the ``nrf54h20dk/nrf54h20/cpuapp`` board target.
+   These cores on the ``nrf54h20dk/nrf54h20/cpuapp`` board target do not use the on-board buttons and LEDs.
+
+.. _SB_CONFIG_APP_CPUFLPR_RUN:
+
+SB_CONFIG_APP_CPUFLPR_RUN - Enable the benchmark execution also for the FLPR core
+   This option is only available for board targets that support the FLPR core (for example, ``nrf54l15dk/nrf54l15/cpuapp``) in this sample.
+
+.. note::
+   FLPR code is run from RAM.
+
+   This option is not supported for the following board targets that include an SoC with the FLPR core:
+
+     * ``nrf54l15dk/nrf54l05/cpuapp``
+     * ``nrf54l15dk/nrf54l10/cpuapp``
 
 .. _SB_CONFIG_APP_CPUNET_RUN:
 
-SB_CONFIG_APP_CPUNET_RUN - Enable execution for the network core or the radio core
-   Enable the benchmark execution for the network core for targets with the nRF53 Series SoCs, and for the radio core on targets with the nRF54H20 SoCs.
+SB_CONFIG_APP_CPUNET_RUN - Enable the benchmark execution also for the network core or the radio core
+   This option is only available for board targets that support the network core (for example, ``nrf5340dk/nrf5340/cpuapp``) or radio core (for example, ``nrf54h20dk/nrf54h20/cpuapp``) in this sample .
 
 .. _SB_CONFIG_APP_CPUPPR_RUN:
 
-SB_CONFIG_APP_CPUPPR_RUN - Enable execution for the PPR core
-   Enable the benchmark execution also for the PPR core for targets with the nRF54H20 SoCs.
+SB_CONFIG_APP_CPUPPR_RUN - Enable the benchmark execution also for the PPR core
+   This option is only available for board targets that support the PPR core (for example, ``nrf54h20dk/nrf54h20/cpuapp``) in this sample.
 
 .. note::
    PPR code is run from RAM.
@@ -197,9 +212,6 @@ When running the benchmark, an extra build flag (:kconfig:option:`CONFIG_COMPILE
 After flashing, messages describing the benchmark state will appear in the console.
 
 .. include:: /includes/nRF54H20_erase_UICR.txt
-
-.. note::
-   |54H_engb_2_8|
 
 Alternative build configurations
 ================================

@@ -72,9 +72,6 @@ Building and running
 
 .. include:: /includes/build_and_run_ns.txt
 
-.. note::
-   |54H_engb_2_8|
-
 .. _peripheral_ancs_client_testing:
 
 Testing
@@ -124,9 +121,9 @@ Testing with Bluetooth Low Energy app
 #. Click :guilabel:`Apply to device`.
 #. Click the :guilabel:`CONNECTION MAP` tab.
    Click the dongle configuration and select :guilabel:`Security parameters`.
-   Check :guilabel:`Perform Bonding`, and click :guilabel:`Apply`.
+   Check :guilabel:`Perform Bonding` and :guilabel:`Enable LE Secure Connection pairing`, and click :guilabel:`Apply`.
 #. Connect to the device from the app.
-   The device is advertising as "ANCS".
+   The device is advertising as ``Nordic_ANCS``.
 #. Wait until the bond is established. Verify that the UART data is received as follows::
 
       Connected xx:xx:xx:xx:xx:xx (random)
@@ -140,7 +137,7 @@ Testing with Bluetooth Low Energy app
 Send an iOS notification to the application
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The following table shows the format of a notification that you can send to the example application:
+The following table shows the format of a notification that you can send to the sample application:
 
    +------------------+---------------+--------------------------+
    | Field            | Example value | Interpretation           |
@@ -223,7 +220,7 @@ The following table shows the relevant part of a request to retrieve notificatio
    | Length           | 20 00         | 0x0020                      |
    +------------------+---------------+-----------------------------+
 
-Note that the example application will request all existing attribute types, not only a subset.
+Note that the sample application will request all existing attribute types, not only a subset.
 
 The following table shows the format of a response that contains some of the requested notification attributes:
 

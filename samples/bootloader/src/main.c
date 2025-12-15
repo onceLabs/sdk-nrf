@@ -12,7 +12,9 @@
 #if defined(CONFIG_FPROTECT)
 #include <fprotect.h>
 #else
+#ifndef CONFIG_SOC_SERIES_NRF54LX
 #warning "FPROTECT not enabled, the bootloader will be unprotected."
+#endif
 #endif
 #include <bl_storage.h>
 #include <bl_boot.h>
@@ -73,52 +75,44 @@ static void validate_and_boot(const struct fw_info *fw_info, counter_t slot)
 		return;
 	}
 
-	printk("Attempting to boot from address 0x%x.\n\r",
+	printk("Attempting to boot from address 0x%x.\r\n",
 		fw_info->address);
 
 	if (!bl_validate_firmware_local(fw_info->address,
 					fw_info)) {
-		printk("Failed to validate, permanently invalidating!\n\r");
+		printk("Failed to validate, permanently invalidating!\r\n");
 		fw_info_invalidate(fw_info);
 		return;
 	}
 
 	printk("Firmware version %d\r\n", fw_info->version);
 
+#ifdef CONFIG_SB_MONOTONIC_COUNTER_ROLLBACK_PROTECTION
 	counter_t stored_version;
 
 	int err = get_monotonic_version(&stored_version);
 
 	if (err) {
-		printk("Failed to read the monotonic counter!\n\r");
-		printk("We assume this is due to the firmware version not being enabled.\n\r");
-
-		/*
-		 * Errors in reading the firmware version are assumed to be
-		 * due to the firmware version not being enabled. When the
-		 * firmware version is disabled, no version checking should
-		 * be done. The version is then set to 0 as it is not permitted
-		 * in fwinfo and will therefore pass all version checks.
-		 */
-		stored_version = 0;
+		printk("Failed to read the monotonic counter!\r\n");
+		return;
 	}
 
 	if (fw_info->version > stored_version) {
 		int err = set_monotonic_version(fw_info->version, slot);
 
 		if (err) {
-			/*
-			 * Errors in writing the firmware version are assumed to be
-			 * due to the firmware version not being enabled. When the
-			 * firmware version is disabled, no version updates should
-			 * be done and this case can be ignored.
-			 *
-			 * The body of this if-statement is intentionally empty.
-			 * It is left here solely for documentation purposes,
-			 * describing why we ignore the error.
-			 */
+			return;
 		}
 	}
+#endif
+
+	/*
+	 * We can lock the keys and other resources now, as any failures
+	 * in the bl_boot function are considered fatal and would prevent
+	 * the alternate image from booting as well.
+	 * Thus, we meet the criteria for calling bl_validate_housekeeping.
+	 */
+	bl_validate_housekeeping();
 
 	bl_boot(fw_info);
 }
@@ -133,11 +127,11 @@ int main(void)
 	int err = fprotect_area(PM_B0_ADDRESS, PM_B0_SIZE);
 
 	if (err) {
-		printk("Failed to protect B0 flash, cancel startup.\n\r");
+		printk("Failed to protect B0 flash, cancel startup.\r\n");
 		return 0;
 	}
 #else
-	printk("Fprotect disabled. No protection applied.\n\r");
+	printk("Fprotect disabled. No protection applied.\r\n");
 #endif
 
 	uint32_t s0_addr = s0_address_read();
@@ -153,6 +147,7 @@ int main(void)
 		validate_and_boot(s0_info, BOOT_SLOT_0);
 	}
 
-	printk("No bootable image found. Aborting boot.\n\r");
+	printk("No bootable image found. Aborting boot.\r\n");
+	bl_validate_housekeeping();
 	return 0;
 }

@@ -11,10 +11,17 @@
  */
 
 / {
+	aliases {
+		led = &led0;
+		/delete-property/ led1;
+	};
+
 	zephyr,user {
 		test-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
 	};
 };
+
+/delete-node/ &led1;
 
 &gpiote130 {
 	status = "okay";
@@ -55,6 +62,7 @@
 	memory-regions = <&dma_fast_region>;
 	cs-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
 	zephyr,pm-device-runtime-auto;
+
 	dut_spi_dt: test-spi-dev@0 {
 		compatible = "vnd,spi-device";
 		reg = <0>;
@@ -62,6 +70,6 @@
 	};
 };
 
-&exmif {
-	status = "disabled";
+&dma_fast_region {
+	status = "okay";
 };

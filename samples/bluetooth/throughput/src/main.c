@@ -199,7 +199,7 @@ static void connected(struct bt_conn *conn, uint8_t hci_err)
 
 	printk("Connected as %s\n",
 	       info.role == BT_CONN_ROLE_CENTRAL ? "central" : "peripheral");
-	printk("Conn. interval is %u units\n", info.le.interval);
+	printk("Conn. interval is %u us\n", info.le.interval_us);
 
 	if (info.role == BT_CONN_ROLE_PERIPHERAL) {
 		err = bt_conn_set_security(conn, BT_SECURITY_L2);
@@ -281,8 +281,7 @@ static void scan_start(void)
 static void adv_start(void)
 {
 	const struct bt_le_adv_param *adv_param =
-		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE |
-				BT_LE_ADV_OPT_ONE_TIME,
+		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONN,
 				BT_GAP_ADV_FAST_INT_MIN_2,
 				BT_GAP_ADV_FAST_INT_MAX_2,
 				NULL);
@@ -498,7 +497,7 @@ static int connection_configuration_set(const struct shell *shell,
 		return err;
 	}
 
-	if (info.le.interval != conn_param->interval_max) {
+	if (BT_GAP_US_TO_CONN_INTERVAL(info.le.interval_us) != conn_param->interval_max) {
 		err = bt_conn_le_param_update(default_conn, conn_param);
 		if (err) {
 			shell_error(shell,
@@ -548,7 +547,7 @@ int test_run(const struct shell *shell,
 	uint32_t data = 0;
 
 	/* a dummy data buffer */
-	static char dummy[495];
+	static char dummy[CONFIG_BT_L2CAP_TX_MTU - 3];
 
 	if (!default_conn) {
 		shell_error(shell, "Device is disconnected %s",
@@ -586,12 +585,12 @@ int test_run(const struct shell *shell,
 	stamp = k_uptime_get_32();
 
 	while (true) {
-		err = bt_throughput_write(&throughput, dummy, 495);
+		err = bt_throughput_write(&throughput, dummy, sizeof(dummy));
 		if (err) {
 			shell_error(shell, "GATT write failed (err %d)", err);
 			break;
 		}
-		data += 495;
+		data += sizeof(dummy);
 		if (k_uptime_get_32() - stamp > CONFIG_BT_THROUGHPUT_DURATION) {
 			break;
 		}
@@ -631,7 +630,7 @@ int main(void)
 {
 	int err;
 
-	printk("Starting Bluetooth Throughput example\n");
+	printk("Starting Bluetooth Throughput sample\n");
 
 	err = bt_enable(NULL);
 	if (err) {

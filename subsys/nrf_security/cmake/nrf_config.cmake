@@ -79,7 +79,7 @@ kconfig_check_and_set_base(MBEDTLS_X509_LIBRARY)
 kconfig_check_and_set_base(MBEDTLS_MD_C)
 
 # Guard against setting legacy configurations in TF-M image
-if (NOT MBEDTLS_PSA_CRYPTO_SPM)
+if(NOT MBEDTLS_PSA_CRYPTO_SPM)
   # Platform configuration
   kconfig_check_and_set_base(MBEDTLS_ASN1_PARSE_C)
   kconfig_check_and_set_base(MBEDTLS_ASN1_WRITE_C)
@@ -107,6 +107,11 @@ if (NOT MBEDTLS_PSA_CRYPTO_SPM)
   kconfig_check_and_set_base(MBEDTLS_SSL_RENEGOTIATION)
   kconfig_check_and_set_base(MBEDTLS_SSL_MAX_FRAGMENT_LENGTH)
   kconfig_check_and_set_base(MBEDTLS_SSL_PROTO_TLS1_2)
+  kconfig_check_and_set_base(MBEDTLS_SSL_PROTO_TLS1_3)
+  kconfig_check_and_set_base(MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_ENABLED)
+  kconfig_check_and_set_base(MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL_ENABLED)
+  kconfig_check_and_set_base(MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_EPHEMERAL_ENABLED)
+  kconfig_check_and_set_base(MBEDTLS_SSL_TLS1_3_COMPATIBILITY_MODE)
   kconfig_check_and_set_base(MBEDTLS_SSL_PROTO_DTLS)
   kconfig_check_and_set_base(MBEDTLS_SSL_ALPN)
   kconfig_check_and_set_base(MBEDTLS_SSL_DTLS_ANTI_REPLAY)
@@ -141,6 +146,10 @@ if (NOT MBEDTLS_PSA_CRYPTO_SPM)
   kconfig_check_and_set_base(MBEDTLS_X509_CREATE_C)
   kconfig_check_and_set_base(MBEDTLS_X509_CRT_WRITE_C)
   kconfig_check_and_set_base(MBEDTLS_X509_CSR_WRITE_C)
+  kconfig_check_and_set_base(MBEDTLS_PKCS7_C)
+
+  # KRKNWK-20181
+  kconfig_check_and_set_base(MBEDTLS_SSL_CLI_ALLOW_WEAK_CERTIFICATE_VERIFICATION_WITHOUT_HOSTNAME)
 
   # TLS key exchange
   kconfig_check_and_set_base(MBEDTLS_KEY_EXCHANGE_PSK_ENABLED)

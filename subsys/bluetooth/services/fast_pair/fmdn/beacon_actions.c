@@ -16,7 +16,6 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(fp_fmdn_beacon_actions, CONFIG_BT_FAST_PAIR_LOG_LEVEL);
 
-#include "fp_activation.h"
 #include "fp_fmdn_auth.h"
 #include "fp_fmdn_callbacks.h"
 #include "fp_fmdn_clock.h"
@@ -229,7 +228,7 @@ static ssize_t provisioning_state_read_handle(struct bt_conn *conn,
 	struct fp_account_key account_key;
 	uint8_t eid[PROVISIONING_STATE_RSP_EID_LEN];
 	uint8_t provisioning_state_flags;
-	const bool provisioned = fp_fmdn_state_is_provisioned();
+	const bool provisioned = bt_fast_pair_fmdn_is_provisioned();
 	static const uint8_t req_data_len = PROVISIONING_STATE_REQ_PAYLOAD_LEN;
 	uint8_t rsp_data_len;
 	enum provisioning_state_bit_flag {
@@ -332,6 +331,9 @@ static ssize_t provisioning_state_read_handle(struct bt_conn *conn,
 		return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
 	}
 
+	/* Fire the connection authenticated callback for the application if it is registered. */
+	fp_fmdn_callbacks_conn_authenticated_notify(conn);
+
 	return 0;
 }
 
@@ -345,7 +347,7 @@ static ssize_t ephemeral_identity_key_set_handle(struct bt_conn *conn,
 	struct fp_account_key account_key;
 	uint8_t *encrypted_eik;
 	uint8_t new_eik[EPHEMERAL_IDENTITY_KEY_SET_REQ_EIK_LEN];
-	const bool provisioned = fp_fmdn_state_is_provisioned();
+	const bool provisioned = bt_fast_pair_fmdn_is_provisioned();
 	const uint8_t req_data_len = provisioned ?
 		EPHEMERAL_IDENTITY_KEY_SET_REQ_PROVISIONED_PAYLOAD_LEN :
 		EPHEMERAL_IDENTITY_KEY_SET_REQ_UNPROVISIONED_PAYLOAD_LEN;
@@ -480,7 +482,7 @@ static ssize_t ephemeral_identity_key_clear_handle(struct bt_conn *conn,
 	struct fp_account_key account_key;
 	uint8_t *current_eik_hash;
 	uint8_t *random_nonce;
-	const bool provisioned = fp_fmdn_state_is_provisioned();
+	const bool provisioned = bt_fast_pair_fmdn_is_provisioned();
 	static const uint8_t req_data_len = EPHEMERAL_IDENTITY_KEY_CLEAR_REQ_PAYLOAD_LEN;
 	static const uint8_t rsp_data_len = EPHEMERAL_IDENTITY_KEY_CLEAR_RSP_PAYLOAD_LEN;
 
@@ -930,7 +932,7 @@ static ssize_t activate_utp_mode_handle(struct bt_conn *conn,
 		return BT_GATT_ERR(BEACON_ACTIONS_ATT_ERR_INVALID_VALUE);
 	}
 
-	if (!fp_fmdn_state_is_provisioned()) {
+	if (!bt_fast_pair_fmdn_is_provisioned()) {
 		LOG_ERR("Beacon Actions: Activate Unwanted Tracking Protection mode request:"
 			" Device is not provisioned");
 
@@ -1026,7 +1028,7 @@ static ssize_t deactivate_utp_mode_handle(struct bt_conn *conn,
 		return BT_GATT_ERR(BEACON_ACTIONS_ATT_ERR_INVALID_VALUE);
 	}
 
-	if (!fp_fmdn_state_is_provisioned()) {
+	if (!bt_fast_pair_fmdn_is_provisioned()) {
 		LOG_ERR("Beacon Actions: Deactivate Unwanted Tracking Protection mode request:"
 			" Device is not provisioned");
 
@@ -1136,7 +1138,7 @@ int bt_fast_pair_fmdn_ring_state_update(
 	}
 
 	/* Check if connected peers should be notified about the ring state change. */
-	if (!fp_fmdn_state_is_provisioned()) {
+	if (!bt_fast_pair_fmdn_is_provisioned()) {
 		return 0;
 	}
 
@@ -1358,10 +1360,6 @@ static void beacon_actions_disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	uint8_t conn_index;
 
-	if (!bt_fast_pair_is_ready()) {
-		return;
-	}
-
 	conn_index = bt_conn_index(conn);
 
 	memset(&conn_contexts[conn_index], 0, sizeof(conn_contexts[conn_index]));
@@ -1373,23 +1371,3 @@ static void beacon_actions_disconnected(struct bt_conn *conn, uint8_t reason)
 BT_CONN_CB_DEFINE(beacon_actions_conn_callbacks) = {
 	.disconnected = beacon_actions_disconnected,
 };
-
-static int fp_fmdn_beacon_actions_init(void)
-{
-	/* intentionally left empty */
-
-	return 0;
-}
-
-static int fp_fmdn_beacon_actions_uninit(void)
-{
-	memset(conn_contexts, 0, sizeof(conn_contexts));
-	memset(&ring_context, 0, sizeof(ring_context));
-
-	return 0;
-}
-
-FP_ACTIVATION_MODULE_REGISTER(fp_fmdn_beacon_actions,
-			      FP_ACTIVATION_INIT_PRIORITY_DEFAULT,
-			      fp_fmdn_beacon_actions_init,
-			      fp_fmdn_beacon_actions_uninit);

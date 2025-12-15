@@ -7,12 +7,12 @@ from NrfHidDevice import NrfHidDevice
 
 NORDIC_VID = 0x1915
 
-class NrfHidManager():
+class NrfHidManager:
     TYPE2BOARDLIST = {
-        'gaming_mouse' : ['nrf52840gmouse', 'nrf52840dk', 'nrf54l15dk', 'nrf54h20dk'],
-        'dongle' : ['nrf52840dongle', 'nrf52833dongle', 'nrf52820dongle', 'nrf5340dk'],
+        'gaming_mouse' : ['nrf52840gmouse'],
+        'dongle' : ['nrf52840dongle', 'nrf52833dongle', 'nrf52820dongle'],
         'keyboard' : ['nrf52kbd'],
-        'desktop_mouse' : ['nrf52dmouse', 'nrf52810dmouse'],
+        'desktop_mouse' : ['nrf52dmouse'],
     }
 
     def __init__(self, vid=NORDIC_VID):
@@ -27,13 +27,11 @@ class NrfHidManager():
             return res[0]
         else:
             if len(res) > 1:
-                print('{} is assigned to more than one type'.format(board_name))
+                print(f'{board_name} is assigned to more than one type')
             return 'unknown'
 
     def list_devices(self):
-        return ['Type: {} Board: {} (HW ID: {})'.format(NrfHidManager._get_dev_type(v.get_board_name()),
-                                                        v.get_board_name(),
-                                                        k)
+        return [f'Type: {NrfHidManager._get_dev_type(v.get_board_name())} Board: {v.get_board_name()} (HW ID: {k})'
                 for k, v in self.devs.items()]
 
     def find_devices(self, device=None):

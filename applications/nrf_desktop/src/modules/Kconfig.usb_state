@@ -47,8 +47,35 @@ config DESKTOP_USB_PM_ENABLE
 	help
 	  This enables small module that blocks power down if the USB is active.
 
+config DESKTOP_USB_PM_REQ_NO_PM_LATENCY
+	bool "Require zero latency in Power Management while USB is active"
+	default y
+	depends on PM
+	depends on DESKTOP_USB_PM_ENABLE
+	help
+	  The zero latency prevents entering power states that introduce wakeup
+	  latency and ensures high performance. While USB is active, application
+	  power down is blocked anyway.
+
+config DESKTOP_USB_PM_RESTRICT_REMOVE_DELAY_MS
+	int "Delay removing power manager restrictions after USB disconnection [ms]"
+	range 0 60000
+	default 3000
+	depends on DESKTOP_USB_PM_ENABLE
+	help
+	  Delay in milliseconds before removing power manager level restriction
+	  after USB is disconnected. This is used to delay the system off after
+	  USB disconnection. While disconnecting an USB cable, an USB suspended
+	  state might be reported. The USB suspended state triggers force power
+	  down sequence which makes CAF power manager instantly suspend the
+	  application. This option allows user to take actions, like e.g. restart
+	  BLE advertising, after disconnecting the USB cable without going through
+	  reboot.
+
 config DESKTOP_USB_HID_REPORT_SENT_ON_SOF
 	bool "Submit HID report sent event on USB Start of Frame (SOF) [EXPERIMENTAL]"
+	default y if UDC_DRIVER_HAS_HIGH_SPEED_SUPPORT
+	select UDC_ENABLE_SOF if UDC_DRIVER
 	select EXPERIMENTAL
 	help
 	  Delay submitting hid_report_sent_event until subsequent USB Start of
@@ -56,6 +83,13 @@ config DESKTOP_USB_HID_REPORT_SENT_ON_SOF
 	  to USB polls. However, it also increases HID data latency, as a HID
 	  report pipeline with two sequential reports is required to ensure that
 	  the USB peripheral can provide a HID report on every USB poll.
+
+	  If you use an UDC driver with High-Speed support, the feature is enabled
+	  by default, because the negative impact of USB polling jitter is more
+	  visible in case of USB High-Speed.
+
+	  If you use an UDC driver, SoF interrupts must be explicitly enabled for
+	  this Kconfig option to work correctly.
 
 choice DESKTOP_USB_STACK
 	prompt "USB stack"
@@ -167,10 +201,10 @@ config USBD_HID_IN_BUF_COUNT
 
 config DESKTOP_USB_STACK_NEXT_DISABLE_ON_VBUS_REMOVAL
 	bool
-	default y if SOC_SERIES_NRF54HX
+	default y if UDC_DWC2
 	help
 	  Disable the USB stack on VBUS removal and enable it on VBUS ready to
-	  workaround UDC driver limitations of the nRF54HX SoC.
+	  workaround limitations of the UDC DWC2 driver.
 
 	  After the USB cable is removed, the USB driver is powered down and
 	  doesn't call appropriate callbacks to the USB stack. It may lead to
@@ -185,12 +219,12 @@ config DESKTOP_USB_STACK_NEXT_DISABLE_ON_VBUS_REMOVAL
 
 config UDC_DWC2_USBHS_VBUS_READY_TIMEOUT
 	int
-	depends on SOC_SERIES_NRF54HX
+	depends on UDC_DWC2
 	default 100
 	help
-	  For the nRF54HX SoC the timeout must be set to a non-zero value to
-	  prevent the usbd_enable() function from blocking the application
-	  forever when the USB cable is not connected.
+	  If you use the UDC DWC2 driver, the timeout must be set to a non-zero
+	  value to prevent the usbd_enable() function from blocking the
+	  application forever when the USB cable is not connected.
 
 choice USBD_LOG_LEVEL_CHOICE
 	default USBD_LOG_LEVEL_WRN

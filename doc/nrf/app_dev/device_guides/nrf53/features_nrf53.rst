@@ -51,26 +51,14 @@ Application core
 The application core is a full-featured Arm Cortex-M33 processor including DSP instructions and FPU.
 Use this core for tasks that require high performance and for application-level logic.
 
-The M33 TrustZone, one of Cortex-M Security Extensions (CMSE), divides the application MCU into Secure Processing Environment (SPE) and Non-Secure Processing Environment (NSPE).
-When the MCU boots, it always starts executing from the secure area.
+You can use :ref:`security by separation <ug_tfm_security_by_separation>` with the M33 TrustZone for the application core.
+When security by separation is used, the MCU always starts executing from the secure area at boot.
+When enabled, the secure bootloader chain starts the :ref:`Trusted Firmware-M (TF-M) <ug_tfm>`, which configures a part of memory and peripherals to be non-secure, and then jumps to the user application located in the non-secure area.
 
-In Zephyr, the firmware of the application core is built using one of the following board targets:
+The firmware of the application core is built using one of the following board targets:
 
-* ``nrf5340dk/nrf5340/cpuapp`` for board targets with CMSE disabled.
-* ``nrf5340dk/nrf5340/cpuapp/ns`` for board targets that have CMSE enabled and have the SPE firmware alongside the NSPE firmware.
-
-For information about CMSE and the difference between the two environments, see :ref:`app_boards_spe_nspe`.
-
-Trusted Firmware-M (TF-M)
--------------------------
-
-Trusted Firmware-M provides a configurable set of software components to create a Trusted Execution Environment.
-It has replaced Secure Partition Manager as the solution used by |NCS| applications and samples.
-This means that when you build your application with CMSE enabled, the :ref:`TF-M <ug_tfm>` is automatically included in the build.
-It is a framework for functions and use cases beyond the scope of Secure Partition Manager.
-
-For more information about the TF-M, see :ref:`ug_tfm`.
-See also :ref:`tfm_hello_world` for a sample that demonstrates how to add TF-M to an application.
+* ``nrf5340dk/nrf5340/cpuapp`` for board targets with security by separation disabled.
+* ``nrf5340dk/nrf5340/cpuapp/ns`` for board targets with security by separation enabled.
 
 .. _ug_nrf5340_intro_inter_core:
 
@@ -150,7 +138,6 @@ You can use either the SoftDevice Controller or the Zephyr Bluetooth LE Controll
 See :ref:`ug_ble_controller` for more information.
 
 For the application core, the |NCS| provides a series of :ref:`Bluetooth Low Energy samples <ble_samples>`, in addition to the :zephyr:code-sample-category:`bluetooth` samples.
-|multi_image|
 
 .. note::
    Most of the provided Bluetooth LE samples should run on the nRF5340 DK, but not all have been thoroughly tested.
@@ -198,7 +185,6 @@ This Zephyr sample is designed specifically to enable the nRF IEEE 802.15.4 radi
 The sample implements the RPMsg transport using the `OpenAMP`_ library to communicate with the nRF IEEE 802.15.4 radio driver serialization host that runs on a separate core (in this case, the nRF5340 application core).
 
 For the application core, the |NCS| provides a series of samples for the :ref:`Thread <ug_thread>`, :ref:`Zigbee <ug_zigbee>`, and :ref:`Matter <ug_matter>` protocols.
-|multi_image|
 
 Multiprotocol support
 =====================
@@ -215,7 +201,7 @@ Multiprotocol support for the nRF5340 DK
 
    * - Network core
      - Application core
-   * - :ref:`multiprotocol-rpmsg-sample`
+   * - :ref:`ipc_radio`
      - | :ref:`Thread samples <openthread_samples>`
        | :ref:`Zigbee samples <zigbee_samples>`
 
@@ -227,13 +213,10 @@ When using Thread or Zigbee in parallel with Bluetooth LE, run the low-level rad
 
    Bluetooth LE and IEEE 802.15.4 multiprotocol architecture in multicore SoC
 
-For the network core, the |NCS| provides the :ref:`multiprotocol-rpmsg-sample` sample.
-It is a combination of the :zephyr:code-sample:`bluetooth_hci_ipc` sample (for Bluetooth LE) and the :zephyr:code-sample:`nrf_ieee802154_rpmsg` sample (for IEEE 802.15.4).
-This means that it enables both the Bluetooth LE Controller and the nRF IEEE 802.15.4 radio driver and simultaneously exposes the functionality of both stacks to the application core using the `RPMsg Messaging Protocol`_.
-Separate RPMsg endpoints are used to obtain independent inter-core connections for each stack.
+For the network core, the |NCS| provides the :ref:`ipc_radio`.
+The :ref:`ipc_radio` enables both the Bluetooth LE Controller and the nRF IEEE 802.15.4 radio driver and simultaneously exposes the functionality of both stacks to the application.
 
 For the application core, the |NCS| provides a series of samples for the :ref:`Thread <ug_thread>` and :ref:`Zigbee <ug_zigbee>` protocols.
-|multi_image|
 See the :ref:`ug_multiprotocol_support` user guide for instructions on how to enable multiprotocol support for Thread or Zigbee in combination with Bluetooth.
 
 
@@ -256,13 +239,12 @@ Direct use of the radio peripheral
 Samples that directly use the radio peripheral can run on the network core of the nRF5340.
 They do not require any functionality from the application core.
 
-However, on nRF5340, the application core is responsible for starting the network core and connecting its GPIO pins (see :kconfig:option:`CONFIG_SOC_NRF53_CPUNET_ENABLE` and the code in :file:`zephyr/boards/nordic/nrf5340dk/nrf5340_cpunet_reset.c`).
+However, on nRF5340, the application core is responsible for starting the network core and connecting its GPIO pins (see :kconfig:option:`CONFIG_SOC_NRF53_CPUNET_ENABLE` and the code in :file:`zephyr/soc/nordic/nrf53/nrf53_cpunet_mgmt.c`).
 Therefore, you must always program the application core, even if the firmware is supposed to run only on the network core.
 
 You can use the :ref:`nrf5340_empty_app_core` sample for this purpose.
-Configure the network core application to automatically include this sample as a child image.
+Configure the network core application to automatically include this sample as the application core image.
 This is the default configuration for the listed network core samples.
-For more information, see :kconfig:option:`CONFIG_NCS_SAMPLE_EMPTY_APP_CORE_CHILD_IMAGE` and :ref:`ug_nrf5340_multi_image`.
 
 
 No radio communication

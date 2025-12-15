@@ -11,13 +11,9 @@
 #include "app/matter_init.h"
 #include "app/task_executor.h"
 #include "board/board.h"
+#include "clusters/identify.h"
 
-#ifdef CONFIG_CHIP_OTA_REQUESTOR
-#include "dfu/ota/ota_util.h"
-#endif
-
-#include <app/clusters/identify-server/identify-server.h>
-#include <app/server/OnboardingCodesUtil.h>
+#include <setup_payload/OnboardingCodesUtil.h>
 
 #include <zephyr/logging/log.h>
 
@@ -37,8 +33,8 @@ constexpr EndpointId kLightEndpointId = 1;
 k_timer sDimmerPressKeyTimer;
 k_timer sDimmerTimer;
 
-Identify sIdentify = { kLightEndpointId, AppTask::IdentifyStartHandler, AppTask::IdentifyStopHandler,
-		       Clusters::Identify::IdentifyTypeEnum::kVisibleIndicator };
+Nrf::Matter::IdentifyCluster sIdentifyCluster(kLightEndpointId);
+
 bool sWasDimmerTriggered = false;
 
 #define APPLICATION_BUTTON_MASK DK_BTN2_MSK
@@ -75,17 +71,6 @@ void AppTask::TimerEventHandler(const Timer &timerType)
 	default:
 		break;
 	}
-}
-
-void AppTask::IdentifyStartHandler(Identify *)
-{
-	Nrf::PostTask(
-		[] { Nrf::GetBoard().GetLED(Nrf::DeviceLeds::LED2).Blink(Nrf::LedConsts::kIdentifyBlinkRate_ms); });
-}
-
-void AppTask::IdentifyStopHandler(Identify *)
-{
-	Nrf::PostTask([] { Nrf::GetBoard().GetLED(Nrf::DeviceLeds::LED2).Set(false); });
 }
 
 void AppTask::ButtonEventHandler(Nrf::ButtonState state, Nrf::ButtonMask hasChanged)
@@ -169,6 +154,8 @@ CHIP_ERROR AppTask::Init()
 	/* Register Matter event handler that controls the connectivity status LED based on the captured Matter network
 	 * state. */
 	ReturnErrorOnFailure(Nrf::Matter::RegisterEventHandler(Nrf::Board::DefaultMatterEventHandler, 0));
+
+	ReturnErrorOnFailure(sIdentifyCluster.Init());
 
 	return Nrf::Matter::StartServer();
 }

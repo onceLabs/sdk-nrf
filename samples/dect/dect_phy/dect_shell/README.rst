@@ -38,7 +38,10 @@ Main command structure:
   .. code-block:: console
 
      dect
+       activate
+       deactivate
        sett
+       radio_mode
        rssi_scan
        ping
        perf
@@ -148,7 +151,7 @@ The ``ping`` command uses its own proprietary PDU format and protocol.
 At end of a ping session, it prints out the statistics of the session.
 On the client side, also server side statistics are printed out if the client side ``PING_RESULT_REQ`` is responded with ``PING_RESULT_RESP`` by the server.
 
-Example 1: basic usage
+Example 1: Basic usage
 ----------------------
 
 * On both client and server side - scan for a free channel:
@@ -185,7 +188,7 @@ Example 1: basic usage
   .. note::
      You can use this command also on the client side to abort pinging.
 
-Example 2: automatic TX power tuning
+Example 2: Automatic TX power tuning
 ------------------------------------
 
 You can use the ``dect ping`` command line option ``--tx_pwr_ctrl_auto`` to enable automatic TX power tuning.
@@ -231,7 +234,7 @@ The ``perf`` command uses its own proprietary PDU format and protocol.
 At end of a session, it prints out the statistics.
 On the client side, also server side statistics are printed out if the client side ``PERF_RESULT_REQ`` is responded with ``PERF_RESULT_RESP`` by the server.
 
-Example 1: basic usage
+Example 1: Basic usage
 ----------------------
 
 * On both client and server side - scan for a free channel:
@@ -286,15 +289,6 @@ Example 2: HARQ
 
      dect perf -c --c_gap_subslots 4 --c_tx_mcs 4 --c_slots 4 --s_tx_id 39 -t 12 --c_harq_feedback_rx_delay_subslots 2 --c_harq_feedback_rx_subslots 3 --c_harq_process_nbr_max 7 -a --channel 1671
 
-* Client side: Decrease default scheduler delay and rerun the previous step:
-
-  .. code-block:: console
-
-     dect sett -d 5000
-
- .. note::
-    Set the delay back to default to avoid scheduler problems on other use cases.
-
 RX/TX testing with RF tool
 ==========================
 
@@ -315,7 +309,7 @@ To configure the frame structure, use the following command options:
 
    rx_frame_start_offset : rx_subslot_count + rx_idle_subslot_count + tx_frame_start_offset + tx_subslot_count + tx_idle_subslot_count
 
-Example 1: bi-directional testing
+Example 1: Bi-directional testing
 ---------------------------------
 
 * On both client and server side - scan for a free channel:
@@ -329,15 +323,15 @@ Example 1: bi-directional testing
   .. code-block:: console
 
      dect sett -t 39
-     dect rf_tool -m rx_tx --rx_find_sync --frame_repeat_count 50 --frame_repeat_count_intervals 10 -c 1677
+     dect rf_tool -m rx_tx --rx_find_sync --frame_repeat_count 15 --frame_repeat_count_intervals 10 -c 1677
 
 * Client side: Trigger to start operation:
 
   .. code-block:: console
 
-     dect rf_tool -m rx_tx --frame_repeat_count 50 --frame_repeat_count_intervals 10 -t 39 -c 1677
+     dect rf_tool -m rx_tx --frame_repeat_count 15 --frame_repeat_count_intervals 10 -t 39 -c 1677
 
-Example 2: unidirectional testing
+Example 2: Unidirectional testing
 ---------------------------------
 
 * On both TX and RX side - scan for a free channel (see previous example).
@@ -346,7 +340,7 @@ Example 2: unidirectional testing
   .. code-block:: console
 
      dect sett -t 39
-     dect rf_tool -m rx --rx_find_sync --frame_repeat_count 50 -c 1677
+     dect rf_tool -m rx --rx_find_sync --frame_repeat_count 15 -c 1677
 
 * RX device option 2: RX device on ``rx_cont`` mode:
 
@@ -360,13 +354,13 @@ Example 2: unidirectional testing
   .. code-block:: console
 
      dect sett -t 39
-     dect rf_tool -m rx_cont --rf_mode_peer tx --frame_repeat_count 50 --rx_find_sync -c 1677
+     dect rf_tool -m rx_cont --rf_mode_peer tx --frame_repeat_count 15 --rx_find_sync -c 1677
 
 * TX device: Trigger to start operation:
 
   .. code-block:: console
 
-     dect rf_tool -m tx --frame_repeat_count 50 -c 1677 -t 39
+     dect rf_tool -m tx --frame_repeat_count 15 -c 1677 -t 39
 
 * RX device with option 2: Stop continuous RX to give a report:
 
@@ -377,7 +371,7 @@ Example 2: unidirectional testing
      RF tool results at transmitter id 39:
      - RX/TX Duty Cycle percentage: ...
 
-Example 3: duty cycle (RX+TX) testing
+Example 3: Duty cycle (RX+TX) testing
 -------------------------------------
 
 * On both TX and RX side - scan for a free channel (see previous examples).
@@ -388,20 +382,20 @@ Example 3: duty cycle (RX+TX) testing
   .. code-block:: console
 
      server:
-     dect rf_tool -m rx_tx --rx_find_sync --rx_subslot_count 9 --rx_idle_subslot_count 3 --tx_subslot_count 8 --tx_idle_subslot_count 3 --frame_repeat_count 50 -c 1677
+     dect rf_tool -m rx_tx --rx_find_sync --rx_subslot_count 9 --rx_idle_subslot_count 3 --tx_subslot_count 8 --tx_idle_subslot_count 3 --frame_repeat_count 15 -c 1677
 
      client:
-     dect rf_tool -m rx_tx --rx_subslot_count 9 --rx_idle_subslot_count 3 --tx_subslot_count 8 --tx_idle_subslot_count 3 --frame_repeat_count 50 -c 1677 -t 39
+     dect rf_tool -m rx_tx --rx_subslot_count 9 --rx_idle_subslot_count 3 --tx_subslot_count 8 --tx_idle_subslot_count 3 --frame_repeat_count 15 -c 1677 -t 39
 
   RX/TX duty cycle percentage 82.50%:
 
   .. code-block:: console
 
      server:
-     dect rf_tool -m rx_tx --rx_find_sync --rx_subslot_count 17 --rx_idle_subslot_count 3 --tx_subslot_count 16 --tx_idle_subslot_count 4 --frame_repeat_count 50 -c 1677
+     dect rf_tool -m rx_tx --rx_find_sync --rx_subslot_count 17 --rx_idle_subslot_count 3 --tx_subslot_count 16 --tx_idle_subslot_count 4 --frame_repeat_count 15 -c 1677
 
      client:
-     dect rf_tool -m rx_tx --rx_subslot_count 17 --rx_idle_subslot_count 3 --tx_subslot_count 16 --tx_idle_subslot_count 4 --frame_repeat_count 50 -c 1677 -t 39
+     dect rf_tool -m rx_tx --rx_subslot_count 17 --rx_idle_subslot_count 3 --tx_subslot_count 16 --tx_idle_subslot_count 4 --frame_repeat_count 15 -c 1677 -t 39
 
 * TX/RX testing on separate devices:
 
@@ -433,10 +427,10 @@ Example 4: Bi-directional testing with more data
   .. code-block:: console
 
      server:
-     dect rf_tool -m rx_tx --rx_find_sync --rx_subslot_count 9 --rx_idle_subslot_count 4 --tx_subslot_count 8 --tx_idle_subslot_count 4 --tx_mcs 4 --frame_repeat_count 50 -c 1677
+     dect rf_tool -m rx_tx --rx_find_sync --rx_subslot_count 9 --rx_idle_subslot_count 4 --tx_subslot_count 8 --tx_idle_subslot_count 4 --tx_mcs 4 --frame_repeat_count 15 -c 1677
 
      client:
-     dect rf_tool -m rx_tx --rx_subslot_count 9 --rx_idle_subslot_count 4 --tx_subslot_count 8 --tx_idle_subslot_count 4 --tx_mcs 4 --frame_repeat_count 50 -c 1677 --tx_pwr 15 -t 39
+     dect rf_tool -m rx_tx --rx_subslot_count 9 --rx_idle_subslot_count 4 --tx_subslot_count 8 --tx_idle_subslot_count 4 --tx_mcs 4 --frame_repeat_count 15 -c 1677 --tx_pwr 15 -t 39
 
 Dect NR+ PHY MAC
 ================
@@ -456,7 +450,7 @@ The following abbreviations from MAC specification are used in the examples:
 * FT: Fixed Termination point
 * PT: Portable Termination point
 
-Example: starting of cluster beacon and sending RA data to it
+Example: Starting of cluster beacon and sending RA data to it
 -------------------------------------------------------------
 
 * FT/Beacon device - Start periodic cluster beacon TX on default band 1 and on the first free channel:
@@ -657,10 +651,10 @@ Example: starting of cluster beacon and sending RA data to it
       total scanning count                  102
       highest RSSI                          -105
       lowest RSSI                           -112
-      PCC received (stf start time 16878096625): status: "valid - PDC can be received", snr 97, RSSI-2 -121 (RSSI -60)
+      PCC received (stf start time 16878096625): status: "valid", snr 24.25 dB, RSSI-2 -60 dBm
       phy header: short nw id 120 (0x78), transmitter id 27462
       len 1, MCS 0, TX pwr: 0 dBm
-      PDC received (stf start time 16878096625): snr 99, RSSI-2 -122 (RSSI -61), len 50
+      PDC received (stf start time 16878096625): snr 24.00 dB, RSSI-2 -61 dBm, len 50
       DECT NR+ MAC PDU:
       MAC header:
          Version: 0
@@ -678,7 +672,7 @@ Example: starting of cluster beacon and sending RA data to it
             Power const:          The RD operating in FT mode does not have power constraints.
             Frame offset:         not included in the beacon
             Next cluster channel: current cluster channel.
-            Time to next next:    not included in the beacon.
+            Time to next:         not included in the beacon.
                                     The next cluster beacon is
                                     transmitted based on Cluster beacon period.
             Network Beacon period 10 ms
@@ -764,11 +758,11 @@ Example: starting of cluster beacon and sending RA data to it
       beacon interval 2000, frame time 24205018225, beacon received 17016336625
       Association request TX started.
       TX for Association Request completed.
-      PCC received (stf start time 24205392665): status: "valid - PDC can be received", snr 94, RSSI-2 -122 (RSSI -61)
+      PCC received (stf start time 24205392665): status: "valid", snr 23.5 dB, RSSI-2 -61 dBm
       phy header: short nw id 120 (0x78), transmitter id 27462
       receiver id: 27761
       len 0, MCS 0, TX pwr: 0 dBm
-      PDC received (stf start time 24205392665): snr 100, RSSI-2 -122 (RSSI -61), len 17
+      PDC received (stf start time 24205392665): snr 25 dB, RSSI-2 -61 dBm, len 17
       DECT NR+ MAC PDU:
       MAC header:
          Version: 0
@@ -837,11 +831,11 @@ Example: starting of cluster beacon and sending RA data to it
 
   .. code-block:: console
 
-      PCC received (stf start time 32017011258): status: "valid - PDC can be received", snr 91, RSSI-2 -123 (RSSI -61)
+      PCC received (stf start time 32017011258): status: "valid", snr 22.75 dB, RSSI-2 -61 dBm
       phy header: short nw id 120 (0x78), transmitter id 27761
       receiver id: 27462
       len 0, MCS 0, TX pwr: 0 dBm
-      PDC received (stf start time 32017011258): snr 98, RSSI-2 -123 (RSSI -61), len 17
+      PDC received (stf start time 32017011258): snr 22.5 dB, RSSI-2 -61 dBm, len 17
       DECT NR+ MAC PDU:
       MAC header:
          Version: 0
@@ -892,11 +886,11 @@ Example: starting of cluster beacon and sending RA data to it
 
   .. code-block:: console
 
-      PCC received (stf start time 37131891398): status: "valid - PDC can be received", snr 93, RSSI-2 -123 (RSSI -61)
+      PCC received (stf start time 37131891398): status: "valid", snr 23.5 dB, RSSI-2 -61 dBm
       phy header: short nw id 120 (0x78), transmitter id 27761
       receiver id: 27462
       len 0, MCS 0, TX pwr: 0 dBm
-      PDC received (stf start time 37131891398): snr 94, RSSI-2 -123 (RSSI -61), len 17
+      PDC received (stf start time 37131891398): snr 23.5 dB, RSSI-2 -61 dBm, len 17
       DECT NR+ MAC PDU:
       MAC header:
          Version: 0
@@ -932,7 +926,7 @@ Example: starting of cluster beacon and sending RA data to it
       Stopping beacon.
       Beacon TX stopped, cause: User Initiated.
 
-Example: two devices sending data to each other
+Example: Two devices sending data to each other
 -----------------------------------------------
 
 * FT/Beacon device 1 - Start periodic cluster beacon TX on default band 1 and on the first free channel:
@@ -1025,7 +1019,7 @@ DeSh command: ``startup_cmd``.
 
 You can use the ``startup_cmd`` command to store shell commands to be run sequentially after bootup.
 
-Example: starting of cluster beacon and sending RA data to it
+Example: Starting of cluster beacon and sending RA data to it
 -------------------------------------------------------------
 
 * FT/Beacon device - Set a command to start a cluster beacon five seconds after bootup:
@@ -1047,7 +1041,7 @@ Example: starting of cluster beacon and sending RA data to it
 Building
 ********
 
-.. |sample path| replace:: :file:`samples/dect/dect_shell`
+.. |sample path| replace:: :file:`samples/dect/dect_phy/dect_shell`
 
 .. include:: /includes/build_and_run_ns.txt
 

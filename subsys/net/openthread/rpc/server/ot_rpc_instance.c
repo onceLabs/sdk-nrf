@@ -7,12 +7,19 @@
 #include <nrf_rpc/nrf_rpc_serialize.h>
 #include <ot_rpc_ids.h>
 #include <ot_rpc_common.h>
+#include <ot_rpc_lock.h>
 
 #include <nrf_rpc_cbor.h>
 
 #include <openthread/instance.h>
+#include <openthread/platform/misc.h>
+#include <openthread/thread.h>
 
+#include <zephyr/fs/nvs.h>
+#include <zephyr/fs/zms.h>
 #include <zephyr/net/openthread.h>
+#include <zephyr/settings/settings.h>
+#include <zephyr/sys/__assert.h>
 
 /* TODO: move to common */
 typedef struct ot_rpc_callback {
@@ -65,15 +72,13 @@ static ot_rpc_callback_t *ot_rpc_callback_del(uint32_t callback, uint32_t contex
 static void ot_rpc_cmd_instance_init_single(const struct nrf_rpc_group *group,
 					    struct nrf_rpc_cbor_ctx *ctx, void *handler_data)
 {
-	otInstance *instance;
-
 	nrf_rpc_cbor_decoding_done(group, ctx);
 
-	openthread_api_mutex_lock(openthread_get_default_context());
-	instance = otInstanceInitSingle();
-	openthread_api_mutex_unlock(openthread_get_default_context());
+	ot_rpc_mutex_lock();
+	(void)otInstanceInitSingle();
+	ot_rpc_mutex_unlock();
 
-	nrf_rpc_rsp_send_uint(group, (uintptr_t)instance);
+	nrf_rpc_rsp_send_void(group);
 }
 
 NRF_RPC_CBOR_CMD_DECODER(ot_group, ot_rpc_cmd_instance_init_single, OT_RPC_CMD_INSTANCE_INIT_SINGLE,
@@ -82,25 +87,13 @@ NRF_RPC_CBOR_CMD_DECODER(ot_group, ot_rpc_cmd_instance_init_single, OT_RPC_CMD_I
 static void ot_rpc_cmd_instance_get_id(const struct nrf_rpc_group *group,
 				       struct nrf_rpc_cbor_ctx *ctx, void *handler_data)
 {
-	otInstance *instance;
 	uint32_t instance_id;
 
-	instance = (otInstance *)nrf_rpc_decode_uint(ctx);
+	nrf_rpc_cbor_decoding_done(group, ctx);
 
-	if (!nrf_rpc_decoding_done_and_check(group, ctx)) {
-		ot_rpc_report_cmd_decoding_error(OT_RPC_CMD_INSTANCE_GET_ID);
-		return;
-	}
-
-	if (instance != openthread_get_default_instance()) {
-		/* The instance is unknown to the OT RPC server. */
-		ot_rpc_report_cmd_decoding_error(OT_RPC_CMD_INSTANCE_GET_ID);
-		return;
-	}
-
-	openthread_api_mutex_lock(openthread_get_default_context());
-	instance_id = otInstanceGetId(instance);
-	openthread_api_mutex_unlock(openthread_get_default_context());
+	ot_rpc_mutex_lock();
+	instance_id = otInstanceGetId(openthread_get_default_instance());
+	ot_rpc_mutex_unlock();
 
 	nrf_rpc_rsp_send_uint(group, instance_id);
 }
@@ -111,25 +104,13 @@ NRF_RPC_CBOR_CMD_DECODER(ot_group, ot_rpc_cmd_instance_get_id, OT_RPC_CMD_INSTAN
 static void ot_rpc_cmd_instance_is_initialized(const struct nrf_rpc_group *group,
 					       struct nrf_rpc_cbor_ctx *ctx, void *handler_data)
 {
-	otInstance *instance;
 	bool initialized;
 
-	instance = (otInstance *)nrf_rpc_decode_uint(ctx);
+	nrf_rpc_cbor_decoding_done(group, ctx);
 
-	if (!nrf_rpc_decoding_done_and_check(group, ctx)) {
-		ot_rpc_report_cmd_decoding_error(OT_RPC_CMD_INSTANCE_GET_ID);
-		return;
-	}
-
-	if (instance != openthread_get_default_instance()) {
-		/* The instance is unknown to the OT RPC server. */
-		ot_rpc_report_cmd_decoding_error(OT_RPC_CMD_INSTANCE_GET_ID);
-		return;
-	}
-
-	openthread_api_mutex_lock(openthread_get_default_context());
-	initialized = otInstanceIsInitialized(instance);
-	openthread_api_mutex_unlock(openthread_get_default_context());
+	ot_rpc_mutex_lock();
+	initialized = otInstanceIsInitialized(openthread_get_default_instance());
+	ot_rpc_mutex_unlock();
 
 	nrf_rpc_rsp_send_bool(group, initialized);
 }
@@ -141,24 +122,11 @@ NRF_RPC_CBOR_CMD_DECODER(ot_group, ot_rpc_cmd_instance_is_initialized,
 static void ot_rpc_cmd_instance_finalize(const struct nrf_rpc_group *group,
 					 struct nrf_rpc_cbor_ctx *ctx, void *handler_data)
 {
-	otInstance *instance;
+	nrf_rpc_cbor_decoding_done(group, ctx);
 
-	instance = (otInstance *)nrf_rpc_decode_uint(ctx);
-
-	if (!nrf_rpc_decoding_done_and_check(group, ctx)) {
-		ot_rpc_report_cmd_decoding_error(OT_RPC_CMD_INSTANCE_GET_ID);
-		return;
-	}
-
-	if (instance != openthread_get_default_instance()) {
-		/* The instance is unknown to the OT RPC server. */
-		ot_rpc_report_cmd_decoding_error(OT_RPC_CMD_INSTANCE_GET_ID);
-		return;
-	}
-
-	openthread_api_mutex_lock(openthread_get_default_context());
-	otInstanceFinalize(instance);
-	openthread_api_mutex_unlock(openthread_get_default_context());
+	ot_rpc_mutex_lock();
+	otInstanceFinalize(openthread_get_default_instance());
+	ot_rpc_mutex_unlock();
 
 	nrf_rpc_rsp_send_void(group);
 }
@@ -170,25 +138,13 @@ static void ot_rpc_cmd_instance_erase_persistent_info(const struct nrf_rpc_group
 						      struct nrf_rpc_cbor_ctx *ctx,
 						      void *handler_data)
 {
-	otInstance *instance;
 	otError error;
 
-	instance = (otInstance *)nrf_rpc_decode_uint(ctx);
+	nrf_rpc_cbor_decoding_done(group, ctx);
 
-	if (!nrf_rpc_decoding_done_and_check(group, ctx)) {
-		ot_rpc_report_cmd_decoding_error(OT_RPC_CMD_INSTANCE_GET_ID);
-		return;
-	}
-
-	if (instance != openthread_get_default_instance()) {
-		/* The instance is unknown to the OT RPC server. */
-		ot_rpc_report_cmd_decoding_error(OT_RPC_CMD_INSTANCE_GET_ID);
-		return;
-	}
-
-	openthread_api_mutex_lock(openthread_get_default_context());
-	error = otInstanceErasePersistentInfo(instance);
-	openthread_api_mutex_unlock(openthread_get_default_context());
+	ot_rpc_mutex_lock();
+	error = otInstanceErasePersistentInfo(openthread_get_default_instance());
+	ot_rpc_mutex_unlock();
 
 	nrf_rpc_rsp_send_uint(group, error);
 }
@@ -196,6 +152,52 @@ static void ot_rpc_cmd_instance_erase_persistent_info(const struct nrf_rpc_group
 NRF_RPC_CBOR_CMD_DECODER(ot_group, ot_rpc_cmd_instance_erase_persistent_info,
 			 OT_RPC_CMD_INSTANCE_ERASE_PERSISTENT_INFO,
 			 ot_rpc_cmd_instance_erase_persistent_info, NULL);
+
+static void ot_rpc_cmd_instance_factory_reset(const struct nrf_rpc_group *group,
+					      struct nrf_rpc_cbor_ctx *ctx, void *handler_data)
+{
+	struct otInstance *inst;
+
+	nrf_rpc_cbor_decoding_done(group, ctx);
+
+	/*
+	 * The factory reset procedure involves rebooting the device, so send the response before it
+	 * begins, until there is still a chance.
+	 */
+	nrf_rpc_rsp_send_void(group);
+
+	inst = openthread_get_default_instance();
+
+	if (IS_ENABLED(CONFIG_OPENTHREAD_RPC_ERASE_SETTINGS)) {
+		int rc;
+		void *storage;
+
+		/*
+		 * Lock the system scheduler to assure that no setting is written after the storage
+		 * has been cleared and before the device is reset.
+		 */
+		k_sched_lock();
+		rc = settings_storage_get(&storage);
+		__ASSERT_NO_MSG(rc == 0);
+
+		if (IS_ENABLED(CONFIG_SETTINGS_NVS)) {
+			nvs_clear(storage);
+		} else {
+			zms_clear(storage);
+		}
+
+		otPlatReset(inst);
+		k_sched_unlock();
+	} else {
+		ot_rpc_mutex_lock();
+		otInstanceFactoryReset(inst);
+		ot_rpc_mutex_unlock();
+	}
+}
+
+NRF_RPC_CBOR_CMD_DECODER(ot_group, ot_rpc_cmd_instance_factory_reset,
+			 OT_RPC_CMD_INSTANCE_FACTORY_RESET, ot_rpc_cmd_instance_factory_reset,
+			 NULL);
 
 static void ot_state_changed_callback(otChangedFlags aFlags, void *aContext)
 {
@@ -207,10 +209,10 @@ static void ot_state_changed_callback(otChangedFlags aFlags, void *aContext)
 	nrf_rpc_encode_uint(&ctx, cb->context);
 	nrf_rpc_encode_uint(&ctx, aFlags);
 
-	openthread_api_mutex_unlock(openthread_get_default_context());
+	ot_rpc_mutex_unlock();
 	nrf_rpc_cbor_cmd_no_err(&ot_group, OT_RPC_CMD_STATE_CHANGED, &ctx, ot_rpc_decode_void,
 				NULL);
-	openthread_api_mutex_lock(openthread_get_default_context());
+	ot_rpc_mutex_lock();
 }
 
 static void ot_rpc_cmd_set_state_changed_callback(const struct nrf_rpc_group *group,
@@ -237,10 +239,10 @@ static void ot_rpc_cmd_set_state_changed_callback(const struct nrf_rpc_group *gr
 		goto out;
 	}
 
-	openthread_api_mutex_lock(openthread_get_default_context());
+	ot_rpc_mutex_lock();
 	error = otSetStateChangedCallback(openthread_get_default_instance(),
 					  ot_state_changed_callback, cb);
-	openthread_api_mutex_unlock(openthread_get_default_context());
+	ot_rpc_mutex_unlock();
 
 out:
 	NRF_RPC_CBOR_ALLOC(group, rsp_ctx, 5);
@@ -275,10 +277,10 @@ static void ot_rpc_cmd_remove_state_changed_callback(const struct nrf_rpc_group 
 		goto out;
 	}
 
-	openthread_api_mutex_lock(openthread_get_default_context());
+	ot_rpc_mutex_lock();
 	otRemoveStateChangeCallback(openthread_get_default_instance(), ot_state_changed_callback,
 				    cb);
-	openthread_api_mutex_unlock(openthread_get_default_context());
+	ot_rpc_mutex_unlock();
 
 out:
 	NRF_RPC_CBOR_ALLOC(group, rsp_ctx, 0);

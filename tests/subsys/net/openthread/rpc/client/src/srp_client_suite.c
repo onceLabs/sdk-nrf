@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+#include "mocks.h"
+
 #include <mock_nrf_rpc_transport.h>
 #include <ot_rpc_ids.h>
 #include <ot_rpc_types.h>
@@ -50,6 +52,36 @@
  * The following service encoding is correct assuming that zcbor encodes arrays and maps
  * with indefinite lengths, which is true unless ZCBOR_CANONICAL Kconfig is not selected.
  */
+
+/* clang-format off */
+#define CBOR_SERVICE_MIN \
+	/* Subtypes num: */ \
+	0x0, \
+	/* TXT entry count: */ \
+	0x0, \
+	/* String buffer size (service + instance): */ \
+	0xb, \
+	/* Subtypes' buffer size: */ \
+	0x0, \
+	/* TXT buffer size: */ \
+	0x0, \
+	/* Service type: */ \
+	0x65, SERVICE_TYPE, \
+	/* Service instance: */ \
+	0x64, SERVICE_INSTANCE, \
+	/* Subtypes: */ \
+	0x9f, \
+	0xff, \
+	/* TXT: */ \
+	0xbf, \
+	0xff, \
+	/* Other fields: */ \
+	CBOR_UINT16(PORT_1), \
+	CBOR_UINT16(SERVICE_PRIORITY), \
+	CBOR_UINT16(SERVICE_WEIGHT), \
+	CBOR_UINT32(SERVICE_LEASE), \
+	CBOR_UINT32(SERVICE_KEY_LEASE)
+/* clang-format on */
 
 /* clang-format off */
 #define CBOR_SERVICE \
@@ -118,6 +150,33 @@ static void tc_after(void *f)
 	mock_nrf_rpc_tr_expect_done();
 }
 
+/* Test serialization of otSrpClientAddService() with the minimal service data */
+ZTEST(ot_rpc_srp_client, test_otSrpClientAddService_min)
+{
+	otError error;
+	otSrpClientService service;
+
+	service.mName = MAKE_CSTR(SERVICE_TYPE);
+	service.mInstanceName = MAKE_CSTR(SERVICE_INSTANCE);
+	service.mSubTypeLabels = NULL;
+	service.mTxtEntries = NULL;
+	service.mPort = PORT_1;
+	service.mPriority = SERVICE_PRIORITY;
+	service.mWeight = SERVICE_WEIGHT;
+	service.mNumTxtEntries = 0;
+	service.mLease = SERVICE_LEASE;
+	service.mKeyLease = SERVICE_KEY_LEASE;
+
+	/* Test serialization of otSrpClientAddService() */
+	mock_nrf_rpc_tr_expect_add(RPC_CMD(OT_RPC_CMD_SRP_CLIENT_ADD_SERVICE,
+					   CBOR_UINT32((uintptr_t)&service), CBOR_SERVICE_MIN),
+				   RPC_RSP(OT_ERROR_NONE));
+	error = otSrpClientAddService(NULL, &service);
+	mock_nrf_rpc_tr_expect_done();
+
+	zassert_equal(error, OT_ERROR_NONE);
+}
+
 /* Test serialization of otSrpClientAddService() followed by otSrpClientClearService() */
 ZTEST(ot_rpc_srp_client, test_otSrpClientAddService_otSrpClientClearService)
 {
@@ -179,6 +238,19 @@ ZTEST(ot_rpc_srp_client, test_otSrpClientAddService_otSrpClientClearService)
 	zassert_equal(error, OT_ERROR_NOT_FOUND);
 }
 
+static void verify_ot_srp_client_cb_locked(otError error, const otSrpClientHostInfo *host,
+					   const otSrpClientService *services,
+					   const otSrpClientService *removed, void *context)
+{
+	ARG_UNUSED(error);
+	ARG_UNUSED(host);
+	ARG_UNUSED(services);
+	ARG_UNUSED(removed);
+	ARG_UNUSED(context);
+
+	zassert_true(ot_rpc_is_mutex_locked());
+}
+
 /* Test serialization of otSrpClientAddService() and SRP client callback */
 ZTEST(ot_rpc_srp_client, test_otSrpClientAddService_callback)
 {
@@ -232,6 +304,7 @@ ZTEST(ot_rpc_srp_client, test_otSrpClientAddService_callback)
 
 	/* Test remote call of the client callback that reports registered host & service */
 	RESET_FAKE(ot_srp_client_cb);
+	ot_srp_client_cb_fake.custom_fake = verify_ot_srp_client_cb_locked;
 
 	mock_nrf_rpc_tr_expect_add(RPC_RSP(), NO_RSP);
 	mock_nrf_rpc_tr_receive(RPC_CMD(
@@ -250,6 +323,7 @@ ZTEST(ot_rpc_srp_client, test_otSrpClientAddService_callback)
 
 	/* Test remote call of the client callback that reports removed service */
 	RESET_FAKE(ot_srp_client_cb);
+	ot_srp_client_cb_fake.custom_fake = verify_ot_srp_client_cb_locked;
 
 	mock_nrf_rpc_tr_expect_add(RPC_RSP(), NO_RSP);
 	mock_nrf_rpc_tr_receive(RPC_CMD(
@@ -306,6 +380,7 @@ ZTEST(ot_rpc_srp_client, test_otSrpClientEnableAutoHostAddress)
 
 static void ot_srp_client_auto_start_cb_custom(const otSockAddr *addr, void *context)
 {
+	zassert_true(ot_rpc_is_mutex_locked());
 	zassert_not_null(addr);
 	zexpect_mem_equal(addr->mAddress.mFields.m8, (uint8_t[]){ADDR_1}, OT_IP6_ADDRESS_SIZE);
 	zexpect_equal(addr->mPort, PORT_1);

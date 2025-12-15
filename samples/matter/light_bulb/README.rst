@@ -9,7 +9,7 @@ Matter: Light bulb
    :depth: 2
 
 This light bulb sample demonstrates the usage of the :ref:`Matter <ug_matter>` application layer to build a white dimmable light bulb device.
-This device works as a Matter accessory device, meaning it can be paired and controlled remotely over a Matter network built on top of a low-power, 802.15.4 Thread network or on top of a Wi-Fi network.
+This device works as a Matter accessory device, meaning it can be paired and controlled remotely over a Matter network built on top of a low-power, 802.15.4 Thread network or on top of a Wi-Fi® network.
 Support for both Thread and Wi-Fi is mutually exclusive and depends on the hardware platform, so only one protocol can be supported for a specific light bulb device.
 You can use this sample as a reference for creating your own application.
 
@@ -39,8 +39,8 @@ IPv6 network support
 
 The development kits for this sample offer the following IPv6 network support for Matter:
 
-* Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, and ``nrf54l15dk/nrf54l15/cpuapp``.
-* Matter over Wi-Fi is supported for ``nrf5340dk/nrf5340/cpuapp`` with the ``nrf7002ek`` shield attached or for ``nrf7002dk/nrf5340/cpuapp``.
+* Matter over Thread is supported for ``nrf52840dk/nrf52840``, ``nrf5340dk/nrf5340/cpuapp``, ``nrf21540dk/nrf52840``, ``nrf54l15dk/nrf54l15/cpuapp``, and ``nrf54lm20dk/nrf54lm20a/cpuapp``.
+* Matter over Wi-Fi is supported for ``nrf5340dk/nrf5340/cpuapp`` with the ``nrf7002ek`` shield attached, ``nrf7002dk/nrf5340/cpuapp``, or ``nrf54lm20dk/nrf54lm20a/cpuapp`` with the ``nrf7002eb2`` shield attached.
 
 Overview
 ********
@@ -54,15 +54,25 @@ You can test it in the following ways:
 The remote control testing requires a Matter controller that you can configure either on a PC or a mobile device (for remote testing in a network).
 You can enable both methods after :ref:`building and running the sample <matter_light_bulb_sample_remote_control>`.
 
+Testing with the Matter Quick Start app
+=======================================
+
+.. |sample_type| replace:: sample
+
+.. include:: /includes/matter_quick_start.txt
+
 .. _matter_light_bulb_network_mode:
 
 Remote testing in a network
 ===========================
 
+.. |Bluetoothsc| replace:: Bluetooth®
+.. |WiFi| replace:: Wi-Fi
+
 .. matter_light_bulb_sample_remote_testing_start
 
 By default, the Matter accessory device has no IPv6 network configured.
-You must pair it with the Matter controller over Bluetooth® LE to get the configuration from the controller to use the device within a Thread or Wi-Fi network.
+You must pair it with the Matter controller over |Bluetoothsc| LE to get the configuration from the controller to use the device within a Thread or |WiFi| network.
 The controller must get the `Onboarding information`_ from the Matter accessory device and provision the device into the network.
 For details, see the `Commissioning the device`_ section.
 
@@ -117,24 +127,9 @@ Matter light bulb with Trusted Firmware-M
     :start-after: matter_template_build_with_tfm_start
     :end-before: matter_template_build_with_tfm_end
 
-Device Firmware Upgrade support
-===============================
+.. |Bluetooth| replace:: Bluetooth
 
-.. include:: ../lock/README.rst
-    :start-after: matter_door_lock_sample_build_with_dfu_start
-    :end-before: matter_door_lock_sample_build_with_dfu_end
-
-FEM support
-===========
-
-.. include:: /includes/sample_fem_support.txt
-
-Factory data support
-====================
-
-.. include:: ../lock/README.rst
-    :start-after: matter_door_lock_sample_factory_data_start
-    :end-before: matter_door_lock_sample_factory_data_end
+.. include:: /includes/advanced_conf_matter.txt
 
 .. _matter_light_bulb_aws_iot:
 
@@ -199,10 +194,6 @@ To set up an AWS IoT instance and configure the sample, complete the following s
 #. Observe that the light bulb changes state.
    The local changes to the attributes always take precedence over what is set in the shadow's desired state.
 
-.. note::
-   The integration layer has built-in reconnection logic and tries to maintain the connection as long as the device is connected to the internet.
-   The reconnection interval can be configured using the :kconfig:option:`CONFIG_AWS_IOT_RECONNECTION_INTERVAL_SECONDS` option.
-
 User interface
 **************
 
@@ -264,7 +255,27 @@ Building and running
 
 .. include:: /includes/build_and_run.txt
 
+.. |sample_or_app| replace:: sample
+.. |ipc_radio_dir| replace:: :file:`sysbuild/ipc_radio`
+
+.. include:: /includes/ipc_radio_conf.txt
+
 See `Configuration`_ for information about building the sample with the DFU support.
+
+Building the Matter over Wi-Fi sample variant on nRF5340 DK with nRF7002 EK shield
+==================================================================================
+
+.. include:: /includes/matter_building_nrf5340dk_70ek
+
+Building the Matter over Wi-Fi sample variant on nRF54LM20 DK with nRF7002-EB II shield
+=======================================================================================
+
+.. include:: /includes/matter_building_nrf54lm20dk_7002eb2
+
+Flashing the Matter over Wi-Fi sample variant
+=============================================
+
+.. include:: /includes/matter_sample_wifi_flash.txt
 
 Selecting a custom configuration
 ================================
@@ -367,6 +378,9 @@ Enabling remote control
 =======================
 
 Remote control allows you to control the Matter light bulb device from an IPv6 network.
+
+.. note::
+   |matter_unique_discriminator_note|
 
 .. include:: ../lock/README.rst
     :start-after: matter_door_lock_sample_remote_control_start

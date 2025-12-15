@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
-#include <nrf9160/nrf9160dk_nrf52840_reset_on_if5.dtsi>
+#include <nrf9160/nrf9160dk_nrf52840_reset_on_if9.dtsi>
 
 / {
 	chosen {
-		zephyr,bt-uart=&lpuart;
+		zephyr,bt-hci = &bt_hci_uart;
 	};
 };
 
@@ -19,8 +19,6 @@
 &uart2 {
 	current-speed = <1000000>;
 	status = "okay";
-	/delete-property/ rts-pin;
-	/delete-property/ cts-pin;
 	/delete-property/ hw-flow-control;
 
 	pinctrl-0 = <&uart2_default_alt>;
@@ -30,6 +28,10 @@
 		status = "okay";
 		req-pin = <21>; /* <&interface_to_nrf52840 3 0>; */
 		rdy-pin = <19>; /* <&interface_to_nrf52840 2 0>; */
+		bt_hci_uart: bt_hci_uart {
+			compatible = "zephyr,bt-hci-uart";
+			status = "okay";
+		};
 	};
 };
 &uart1 {

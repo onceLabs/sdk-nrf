@@ -10,6 +10,8 @@ config CARRIER
 	help
 	   The availability of the channels and the exact regulation to use them varies in different countries.
 	   See ETSI TS 103 636-2 5.4.2 for the calculation.
+	   Band index 1 is set when the carrier is within the range of 525 to 551.
+	   This is the only range allowed for band index 1 as other carriers will interfere with other radio devices, including LTE devices.
 
 config NETWORK_ID
 	int "Network ID"
@@ -46,7 +48,7 @@ config RX_PERIOD_S
 
 module = DECT_PHY_HELLO
 module-str = DECT NR+ PHY Hello
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+source "$(ZEPHYR_BASE)/subsys/logging/Kconfig.template.log_config"
 
 menu "Zephyr Kernel"
 source "Kconfig.zephyr"

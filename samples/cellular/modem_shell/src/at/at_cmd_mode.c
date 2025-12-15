@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 
+
+#ifdef _POSIX_C_SOURCE
+#undef _POSIX_C_SOURCE
+#endif
+/* Define _POSIX_C_SOURCE before including <string.h> in order to use `strtok_r`. */
+#define _POSIX_C_SOURCE 200809L
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -16,6 +23,7 @@
 extern struct k_work_q mosh_common_work_q;
 
 bool at_cmd_mode_dont_print;
+bool at_cmd_mode_echo_on = true;
 
 static enum line_termination term_mode = CONFIG_MOSH_AT_CMD_MODE_TERMINATION;
 
@@ -49,7 +57,7 @@ K_MUTEX_DEFINE(at_buf_mutex);
 
 static void at_cmd_mode_event_handler(const char *response)
 {
-	if (writing) {
+	if (writing && at_cmd_mode_echo_on) {
 		/* 1st we need to clear current writings */
 		printk("\r");
 		for (int i = 0; i < at_cmd_len; i++) {
@@ -120,17 +128,23 @@ static void at_cmd_mode_cmd_rx_handler(uint8_t character)
 	case 0x08: /* Backspace. */
 		/* Fall through. */
 	case 0x7F: /* DEL character */
-		if (at_cmd_len > 0) {
-			/* Reprint with DEL/Backspace  */
-			k_mutex_lock(&at_buf_mutex, K_FOREVER);
-			at_buf[at_cmd_len] = '\0';
-			at_cmd_len--;
-			at_buf[at_cmd_len] = ' ';
-			printk("\r%s", at_buf);
-			at_buf[at_cmd_len] = '\0';
-			printk("\r%s", at_buf);
-			k_mutex_unlock(&at_buf_mutex);
+		if (at_cmd_len == 0) {
+			return;
 		}
+
+		/* Reprint with DEL/Backspace  */
+		k_mutex_lock(&at_buf_mutex, K_FOREVER);
+		at_buf[at_cmd_len] = '\0';
+		at_cmd_len--;
+		/* If the removed character was a quote, need to toggle the flag. */
+		if (at_buf[at_cmd_len] == '"') {
+			inside_quotes = !inside_quotes;
+		}
+		at_buf[at_cmd_len] = ' ';
+		printk("\r%s", at_buf);
+		at_buf[at_cmd_len] = '\0';
+		printk("\r%s", at_buf);
+		k_mutex_unlock(&at_buf_mutex);
 		return;
 	}
 
@@ -177,8 +191,11 @@ static void at_cmd_mode_cmd_rx_handler(uint8_t character)
 		inside_quotes = !inside_quotes;
 	}
 
-	/* Echo */
-	printk("%c", character);
+	if (at_cmd_mode_echo_on) {
+		/* Echo */
+		printk("%c", character);
+	}
+
 	return;
 send:
 
@@ -193,12 +210,12 @@ send:
 
 	if (strchr(at_buf, '|')) {
 		struct at_cmd_mode_pipelining_info *pipes = at_cmd_mode_work.pipe_infos;
-		char *next_char;
+		char *next_char, *save_next_char;
 		char *tmp;
 		int pipelined_at_cmd_len;
 
 		next_char = at_buf;
-		tmp = strtok(next_char, "|");
+		tmp = strtok_r(next_char, "|", &save_next_char);
 
 		while (tmp != NULL) {
 			if (at_cmd_mode_work.pipe_cnt >= AT_MAX_CMD_PIPELINED) {
@@ -218,12 +235,14 @@ send:
 					at_cmd_mode_work.pipe_cnt++;
 				}
 			}
-			tmp = strtok(NULL, "|");
+			tmp = strtok_r(NULL, "|", &save_next_char);
 		}
 	}
 
-	/* Echo a line feed */
-	printk("\n");
+	if (at_cmd_mode_echo_on) {
+		/* Echo a line feed */
+		printk("\n");
+	}
 
 	writing = false;
 
@@ -293,6 +312,7 @@ int at_cmd_mode_start(const struct shell *sh)
 
 	printk("MoSh AT command mode started, press ctrl-x ctrl-q to escape\n");
 	printk("MoSh specific AT commands:\n");
+	printk("  Echo off/on: ATE0 and ATE1\n");
 #if defined(CONFIG_MOSH_PING)
 	printk("  ICMP Ping: ");
 	printk("AT+NPING=<addr>[,<payload_length>,<timeout_msecs>,<count>"

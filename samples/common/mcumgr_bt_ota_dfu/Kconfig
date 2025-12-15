@@ -4,23 +4,18 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-DT_CHOSEN_EXT_FLASH:= nordic,pm-ext-flash
-
 config NCS_SAMPLE_MCUMGR_BT_OTA_DFU
 	bool "MCUmgr OTA DFU over Bluetooth"
+	select CRC
+	select FLASH
+	select FLASH_MAP
 	select MCUMGR
+	select MCUMGR_TRANSPORT_BT
 	select NET_BUF
 	select ZCBOR
-	select CRC
-	select MCUMGR_TRANSPORT_BT
-	imply MCUMGR_TRANSPORT_BT_CONN_PARAM_CONTROL
-	imply IMG_MANAGER
-	imply STREAM_FLASH
-	imply FLASH_MAP
-	imply FLASH
-	imply MCUMGR_GRP_IMG
 	imply MCUMGR_GRP_OS
 	imply MCUMGR_GRP_OS_BOOTLOADER_INFO
+	imply MCUMGR_TRANSPORT_BT_CONN_PARAM_CONTROL
 	imply MCUMGR_TRANSPORT_BT_REASSEMBLY
 	imply NCS_SAMPLE_MCUMGR_BT_OTA_DFU_SPEEDUP
 	depends on BT_PERIPHERAL
@@ -32,11 +27,17 @@ config NCS_SAMPLE_MCUMGR_BT_OTA_DFU
 
 if NCS_SAMPLE_MCUMGR_BT_OTA_DFU
 
-config NCS_SAMPLE_MCUMGR_BT_OTA_DFU_MCUBOOT_DIRECT_XIP_SUPPORT
+config NCS_SAMPLE_MCUMGR_BT_OTA_DFU_BACKEND_MCUBOOT
 	bool
-	default y if MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP
-	default y if MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP_WITH_REVERT
-	imply MCUMGR_GRP_IMG_REJECT_DIRECT_XIP_MISMATCHED_SLOT
+	default y
+	select IMG_MANAGER
+	select MCUMGR_GRP_IMG
+	select STREAM_FLASH
+	imply MCUMGR_GRP_IMG_REJECT_DIRECT_XIP_MISMATCHED_SLOT if \
+	      MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP || MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP_WITH_REVERT
+	depends on BOOTLOADER_MCUBOOT
+	help
+	  This option enables the necessary configuration for the MCUboot-based DFU.
 
 choice MCUMGR_TRANSPORT_BT_PERM
 	default MCUMGR_TRANSPORT_BT_PERM_RW
@@ -48,17 +49,14 @@ config IMG_ERASE_PROGRESSIVELY
 if MCUMGR_TRANSPORT_BT_REASSEMBLY
 
 config MCUMGR_TRANSPORT_NETBUF_SIZE
-	default 2475
+	default 1230
 
 config MCUMGR_GRP_OS_MCUMGR_PARAMS
 	default y
 
 endif # MCUMGR_TRANSPORT_BT_REASSEMBLY
 
-if (SETTINGS_FCB || SETTINGS_NVS)
-
-# Enable support for the storage erase operation only when the storage
-# partition is created by the Partition Manager.
+if (SETTINGS_FCB || SETTINGS_NVS || SETTINGS_ZMS || SETTINGS_ZMS_LEGACY)
 
 config MCUMGR_GRP_ZBASIC
 	default y
@@ -66,7 +64,7 @@ config MCUMGR_GRP_ZBASIC
 config MCUMGR_GRP_ZBASIC_STORAGE_ERASE
 	default y
 
-endif # (SETTINGS_FCB || SETTINGS_NVS)
+endif # (SETTINGS_FCB || SETTINGS_NVS || SETTINGS_ZMS || SETTINGS_ZMS_LEGACY)
 
 if NORDIC_QSPI_NOR
 
@@ -106,30 +104,26 @@ endif # NCS_SAMPLE_MCUMGR_BT_OTA_DFU
 
 config NCS_SAMPLE_MCUMGR_BT_OTA_DFU_SPEEDUP
 	bool "MCUmgr OTA DFU speedup"
-	depends on BT_CTLR || BT_HCI_HOST
+	depends on HAS_BT_CTLR || BT_HCI_HOST
 	help
 	  Enable this option to speed up the OTA DFU transfer over Bluetooth.
 	  This option extends the Bluetooth buffers to extend Bluetooth MTU
 	  size. The buffer configuration should be the same in the Network Core
 	  and Application Core image.
 
-	  This configuration option is automatically applied for the Network
-	  Core child image if the NCS_SAMPLE_MCUMGR_BT_OTA_DFU_SPEEDUP option is
-	  enabled in the main image.
-
 if NCS_SAMPLE_MCUMGR_BT_OTA_DFU_SPEEDUP
 
 config BT_L2CAP_TX_MTU
-	default 498 if BT_HCI_HOST
+	default 247 if BT_HCI_HOST
 
 config BT_BUF_ACL_TX_SIZE
 	default 251
 
 config BT_BUF_ACL_RX_SIZE
-	default 502
+	default 251
 
 config BT_CTLR_DATA_LENGTH_MAX
-	default 251 if BT_CTLR
+	default 251 if HAS_BT_CTLR
 
 endif # NCS_SAMPLE_MCUMGR_BT_OTA_DFU_SPEEDUP
 

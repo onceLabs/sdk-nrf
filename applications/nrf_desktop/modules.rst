@@ -3,11 +3,6 @@
 nRF Desktop: Application internal modules
 #########################################
 
-.. contents::
-   :local:
-   :depth: 2
-
-
 The nRF Desktop application uses its own set of internal modules.
 See :ref:`nrf_desktop_module_component` for more information.
 More information about each application module and its configuration details is available on the subpages.
@@ -24,6 +19,7 @@ These are valid for events that have many listeners or sources, and are gathered
    doc/battery_charger.rst
    doc/battery_meas.rst
    doc/ble_adv.rst
+   doc/ble_adv_ctrl.rst
    doc/ble_bond.rst
    doc/ble_conn_params.rst
    doc/ble_discovery.rst
@@ -37,12 +33,10 @@ These are valid for events that have many listeners or sources, and are gathered
    doc/buttons.rst
    doc/buttons_sim.rst
    doc/click_detector.rst
-   doc/config_channel.rst
    doc/cpu_meas.rst
    doc/dev_descr.rst
    doc/dfu.rst
    doc/dfu_mcumgr.rst
-   doc/dfu_lock.rst
    doc/dvfs.rst
    doc/factory_reset.rst
    doc/failsafe.rst
@@ -50,7 +44,10 @@ These are valid for events that have many listeners or sources, and are gathered
    doc/fn_keys.rst
    doc/bas.rst
    doc/hid_forward.rst
-   doc/hid_reportq.rst
+   doc/hid_provider_consumer_ctrl.rst
+   doc/hid_provider_keyboard.rst
+   doc/hid_provider_mouse.rst
+   doc/hid_provider_system_ctrl.rst
    doc/hid_state.rst
    doc/hid_state_pm.rst
    doc/hids.rst

@@ -14,7 +14,7 @@
 
 /* Set IPC thread priority to the highest value to not collide with other threads. */
 &ipc0 {
-    zephyr,priority = <0 PRIO_COOP>;
+	zephyr,priority = <0 PRIO_COOP>;
 };
 
 /* Disable unused peripherals to reduce power consumption */
@@ -22,6 +22,9 @@
 	status = "disabled";
 };
 &i2c1 {
+	status = "disabled";
+};
+&pwm0 {
 	status = "disabled";
 };
 &spi2 {

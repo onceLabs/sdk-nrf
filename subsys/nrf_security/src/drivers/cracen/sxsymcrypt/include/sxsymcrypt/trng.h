@@ -82,7 +82,10 @@ struct sx_trng_config {
 	/** Clock divider for the frequency at which the outputs of the rings
 	 * are sampled.
 	 *
-	 * Set to 0 to sample at APB interface clock frequency.
+	 * Set to 0 to use the default value. This value must be big enough to
+	 * ensure good entropy but not too big to keep it fast enough.
+	 * See the TRNG application note for more details on how to select the
+	 * right value.
 	 */
 	unsigned int sample_clock_div;
 
@@ -93,6 +96,18 @@ struct sx_trng_config {
 	 * and SX_TRNG_AIS31_TEST_BYPASS.
 	 */
 	uint32_t control_bitmask;
+};
+
+/** State of the TRNG
+ *
+ * This structure is used with sx_trng_save_state() and sx_trng_restore_state().
+ *
+ * All members should be considered INTERNAL and may not be accessed
+ * directly.
+ */
+struct sx_trng_state {
+	int conditioning_key_set;
+	uint32_t cond_key[4];
 };
 
 /** TRNG initialization
@@ -125,11 +140,13 @@ int sx_trng_open(struct sx_trng *ctx, const struct sx_trng_config *config);
  * For more reliable operation, it's recommended to not request more than
  * 32 bytes of data with the default 'sx_trng_config::wakeup_level'.
  *
- * If ::SX_ERR_RESET_NEEDED error is returned, the previous context will have
- * to be closed with sx_trng_close() before sx_trng_open() is called
- * to obtain a new context.
+ * If ::SX_ERR_RESET_NEEDED error is returned, an error in the hardware
+ * entropy has been detected. Depending on the application environment and
+ * security constraints, the error could be minor or not. The application
+ * can consider the error as fatal (for example if not acceptable at all
+ * or too frequent) or call sx_trng_restart() in order to reset the hardware.
  *
- * @param[in,out] ctx TRNG context to be used in other operations
+ * @param[in,out] ctx TRNG operation context
  * @param[out] dst Destination in memory to copy \p size bytes to
  * @param[in] size length in bytes
  *
@@ -141,7 +158,7 @@ int sx_trng_open(struct sx_trng *ctx, const struct sx_trng_config *config);
  *
  * @pre - the sx_trng_open() must be called first.
  */
-int sx_trng_get(struct sx_trng *ctx, char *dst, size_t size);
+int sx_trng_get(struct sx_trng *ctx, uint8_t *dst, size_t size);
 
 /**
  * @brief End TRNG context. Will power off Cracen.
@@ -151,6 +168,60 @@ int sx_trng_get(struct sx_trng *ctx, char *dst, size_t size);
  * @return ::SX_OK
  */
 int sx_trng_close(struct sx_trng *ctx);
+
+/** TRNG save state
+ *
+ * This function extracts the current state of the TRNG.
+ *
+ * @param[in] ctx TRNG operation context
+ * @param[out] state pointer to where to save the state
+ *
+ * @return ::SX_OK
+ * @return ::SX_ERR_UNINITIALIZED_OBJ
+ */
+int sx_trng_save_state(struct sx_trng *ctx, struct sx_trng_state *state);
+
+/** TRNG restore state
+ *
+ * This function restores the configuration set during initialization, and
+ * also restores the state saved using sx_trng_save_config().
+ * The user must use the same \p config as used in sx_trng_init(), or NULL.
+ *
+ * @param[in,out] ctx TRNG context to be used in other operations
+ * @param[in] config pointer to optional configuration. NULL to use default.
+ * @param[in] state pointer to the saved state
+ *
+ * @return ::SX_OK
+ * @return ::SX_ERR_UNINITIALIZED_OBJ
+ */
+int sx_trng_restore_state(struct sx_trng *ctx, const struct sx_trng_config *config,
+			  const struct sx_trng_state *state);
+
+/** Restart TRNG
+ *
+ * During this process the whole entropy collection pipeline is flushed and
+ * restarted and internal buffers are cleared. The entropy source is restarted
+ * by this call.
+ * The configuration from sx_trng_init() is preserved.
+ *
+ * @param[in] ctx TRNG operation context
+ */
+void sx_trng_restart(struct sx_trng *ctx);
+
+#if defined(CONFIG_CRACEN_HW_VERSION_LITE)
+/** Configure CRACEN Lite TRNG test threshold registers
+ *
+ * This function configures the TRNG REPEATTHRESHOLD and PROPTHRESHOLD registers
+ * with values that work around incorrect hardware defaults on CRACEN Lite.
+ *
+ * This must be called after CRACEN is powered on to ensure the IKG's internal
+ * CTR-DRBG can access the TRNG without entropy errors. The registers are lost
+ * when CRACEN powers down and must be reconfigured on every power-up.
+ *
+ * This function is safe to call even when the TRNG is not yet enabled.
+ */
+void sx_trng_configure_cracen_lite_workaround(void);
+#endif
 
 #ifdef __cplusplus
 }

@@ -58,7 +58,7 @@ To disable serial output, you must change the project configuration associated w
 
 .. note::
     If the application consists of multiple images, like applications built for the nRF53 Series, logging must be disabled on both images.
-    See :ref:`ug_nrf5340` and :ref:`ug_multi_image`.
+    See :ref:`ug_nrf5340`.
 
 1. Set the project configuration :kconfig:option:`CONFIG_SERIAL` to ``n`` irrespective of whether you are building the sample for the :ref:`SPE-only <app_boards_spe_nspe_cpuapp>` board targets or board targets with :ref:`NSPE <app_boards_spe_nspe_cpuapp_ns>`.
 #. For the board target with NSPE (for example, ``nrf9160dk/nrf9160/ns``), ensure that serial logging is also disabled in Trusted Firmware-M by setting :kconfig:option:`CONFIG_TFM_LOG_LEVEL_SILENCE` to ``y``.
@@ -176,8 +176,8 @@ Protocol-specific recommendations
 
 Besides applying `General recommendations`_, read the following subsections for more information on how to optimize specific subsystems.
 
-Bluetooth Mesh
-==============
+Bluetooth® Mesh
+===============
 
 The Bluetooth Mesh protocol offers the :ref:`ug_bt_mesh_configuring_lpn` feature for optimizing the power consumption of the Bluetooth Mesh devices.
 
@@ -226,8 +226,8 @@ Sleepy End Devices try to limit their power consumption by sleeping most of the 
 The :ref:`ot_cli_sample` sample can be used to perform power consumption measurements when configured following some of the general recommendations.
 See the :ref:`ot_cli_sample_low_power` section of the sample documentation for more information.
 
-Wi-Fi
-=====
+Wi-Fi®
+======
 
 The Wi-Fi protocol introduces the power save mechanism that allows the Station (STA) device to spend the majority of the time in a sleep state and wake up periodically to check for pending traffic.
 For more information about the Wi-Fi power save mechanism, see the :ref:`Wi-Fi MAC layer <wifi_mac_layer>` documentation.

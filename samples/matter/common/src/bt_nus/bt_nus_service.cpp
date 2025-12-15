@@ -18,7 +18,7 @@ LOG_MODULE_DECLARE(app, CONFIG_MATTER_LOG_LEVEL);
 
 namespace
 {
-constexpr uint32_t kAdvertisingOptions = BT_LE_ADV_OPT_CONNECTABLE;
+constexpr uint32_t kAdvertisingOptions = BT_LE_ADV_OPT_CONN;
 constexpr uint8_t kAdvertisingFlags = BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR;
 constexpr uint8_t kBTUuid[] = { BT_UUID_NUS_VAL };
 } /* namespace */
@@ -31,6 +31,9 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 bt_conn_auth_cb Nrf::NUSService::sConnAuthCallbacks = {
 	.passkey_display = AuthPasskeyDisplay,
 	.cancel = AuthCancel,
+#if defined(CONFIG_BT_APP_PASSKEY)
+	.app_passkey = AuthAppPasskey,
+#endif /* defined(CONFIG_BT_APP_PASSKEY) */
 };
 bt_conn_auth_info_cb Nrf::NUSService::sConnAuthInfoCallbacks = {
 	.pairing_complete = PairingComplete,
@@ -40,7 +43,8 @@ bt_nus_cb Nrf::NUSService::sNusCallbacks = {
 	.received = RxCallback,
 };
 
-namespace Nrf {
+namespace Nrf
+{
 
 NUSService NUSService::sInstance;
 
@@ -233,6 +237,14 @@ void NUSService::AuthPasskeyDisplay(bt_conn *conn, unsigned int passkey)
 {
 	LOG_INF("PROVIDE THE FOLLOWING CODE IN YOUR MOBILE APP: %d", passkey);
 }
+
+#if defined(CONFIG_BT_APP_PASSKEY)
+uint32_t NUSService::AuthAppPasskey(bt_conn *conn)
+{
+	return CONFIG_CHIP_NUS_FIXED_PASSKEY;
+}
+#endif /* defined(CONFIG_BT_APP_PASSKEY) */
+
 
 void NUSService::AuthCancel(bt_conn *conn)
 {

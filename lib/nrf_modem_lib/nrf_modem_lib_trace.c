@@ -261,7 +261,10 @@ static int trace_fragment_write(struct nrf_modem_trace_data *frag)
 		}
 
 		if (ret < 0) {
-			if (ret != -ENOSPC) {
+			if ((ret == -ENOSPC) || (ret == -ENOSR)) {
+				LOG_DBG("trace_backend.write returned with %d", ret);
+				LOG_DBG("Please make sure that the backend is properly connected.");
+			} else {
 				LOG_ERR("trace_backend.write failed with err: %d", ret);
 			}
 
@@ -283,6 +286,13 @@ void trace_thread_handler(void)
 	size_t n_frags;
 
 trace_reset:
+	/* Trace backend is suspended here to keep it suspended until first trace data is received
+	 * and to suspend the trace backend after deinit and reset.
+	 */
+	if (trace_backend.suspend) {
+		k_work_schedule(&backend_suspend_work, K_NO_WAIT);
+	}
+
 	k_sem_take(&trace_sem, K_FOREVER);
 
 	while (true) {
@@ -304,6 +314,9 @@ trace_reset:
 			goto deinit;
 		case -NRF_ENODATA:
 			LOG_INF("No more trace data");
+			goto deinit;
+		case -NRF_ENOTSUP:
+			LOG_INF("Tracing not supported");
 			goto deinit;
 		case -NRF_EINPROGRESS:
 			__ASSERT(0, "Error in transport backend");
@@ -508,6 +521,15 @@ int nrf_modem_lib_trace_read(uint8_t *buf, size_t len)
 	}
 
 	return read;
+}
+
+int nrf_modem_lib_trace_peek_at(size_t offset, uint8_t *buf, size_t len)
+{
+	if (!trace_backend.peek_at) {
+		return -ENOTSUP;
+	}
+
+	return trace_backend.peek_at(offset, buf, len);
 }
 
 int nrf_modem_lib_trace_clear(void)

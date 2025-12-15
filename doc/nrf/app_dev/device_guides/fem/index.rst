@@ -7,7 +7,15 @@ Developing with Front-End Modules
 
 .. include:: /includes/guides_complementary_to_app_dev.txt
 
-Zephyr and the |NCS| provides support for developing applications with the following :term:`Front-End Module (FEM)` devices:
+Zephyr and the |NCS| provides support for developing applications with the following :term:`Front-End Module (FEM)` devices according to :ref:`software_maturity`:
+
+.. include:: ../../../releases_and_maturity/software_maturity.rst
+    :start-after: software_maturity_fem_support_table_start
+    :end-before: software_maturity_fem_support_table_end
+
+The FEM support on SoCs that are not listed in the table above might still work, but it is not tested and not guaranteed to work.
+
+The following hardware platforms with :term:`Front-End Module (FEM)` are supported by the |NCS|:
 
 .. list-table::
    :header-rows: 1
@@ -17,7 +25,7 @@ Zephyr and the |NCS| provides support for developing applications with the follo
      - Board targets
      - Documentation
      - Product pages
-   * - :ref:`zephyr:nrf21540dk_nrf52840`
+   * - :zephyr:board:`nrf21540dk`
      - PCA10112
      - ``nrf21540dk/nrf52840``
      - | `Product Specification <nRF21540 Product Specification_>`_
@@ -40,11 +48,6 @@ The following FEM :term:`Shield` is available and defined in the :file:`nrf/boar
      - | `User Guide <nRF21540 EK User Guide_>`_
        | `Front-End Module Feature <nRF21540 Front-End Module_>`_
      - `nRF21540 DB product page`_
-
-Also, various Skyworks front-end modules are supported.
-For example, SKY66112-11EK has a 2-pin PA/LNA interface.
-
-The `Front-End Module Feature <nRF21540 Front-End Module_>`_ is supported on the nRF52 and nRF53 Series devices.
 
 .. toctree::
    :maxdepth: 2

@@ -215,26 +215,46 @@ Programming with the QSPI XIP split image
 *****************************************
 
 Programming of the application is supported using the :ref:`standard procedure <programming>`.
-The standard procedure will program the firmware using the default nrfjprog configuration which, for QSPI, is PP4IO mode.
-
-.. note::
-      |nrfjprog_deprecation_note|
+The standard procedure programs the firmware using the default nRF Util configuration, which, for QSPI, is the PP4IO mode.
 
 Programming using a different SPI mode
 ======================================
 
-If you are using a different SPI mode on the QSPI interface, such as DSPI, you must use a custom :file:`Qspi.ini` file.
+If you are using a different SPI mode on the QSPI interface, such as DSPI, you must use a custom :file:`qspi_nrfutil.json` file.
 The following is an example for the Thingy:53, which supports DSPI and PP:
 
-.. literalinclude:: ../../../../samples/nrf5340/extxip_smp_svr/Qspi_thingy53.ini
+.. code-block:: json
+
+    {
+      "firmware_config": {
+        "peripheral": "QSPI"
+      },
+      "pins": {
+        "sck": 17,
+        "csn": 18,
+        "io0": 13,
+        "io1": 14,
+        "io2": 15,
+        "io3": 16
+      },
+      "flash_size": 8388608,
+      "sck_frequency": 8000000,
+      "address_mode": "MODE24BIT",
+      "readoc": "READ2IO",
+      "writeoc": "PP",
+      "pp_size": "PPSIZE256",
+      "sck_delay": 128,
+      "rx_delay": 2,
+      "page_size": 4096
+    }
 
 To use this file when programming, add the following lines to the application's :file:`CMakeLists.txt` file before the ``find_package()`` line:
 
 .. code-block:: cmake
 
     macro(app_set_runner_args)
-      # Replace with the filename of your ini file
-      board_runner_args(nrfjprog "--qspiini=${CMAKE_CURRENT_SOURCE_DIR}/Qspi_thingy53.ini")
+      # Replace with the filename of your json file
+      board_runner_args(nrfutil "--ext-mem-config-file=${CMAKE_CURRENT_SOURCE_DIR}/qspi_nrfutil.json")
     endmacro()
 
 This will enable programming the target board successfully when using ``west flash``.
@@ -252,42 +272,42 @@ The following table lists the files generated when building a QSPI XIP split-ima
 
 In some file names, ``<application>`` is the name of the application and ``<kernel_name>`` is the value of :kconfig:option:`CONFIG_KERNEL_BIN_NAME`.
 
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-|                         File name and location                         |                                                                    Description                                                                     |
-+========================================================================+====================================================================================================================================================+
-| :file:`<application>/zephyr/<kernel_name>.hex`                         | Initial HEX output file, unsigned, containing internal and external QSPI flash data.                                                               |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`<application>/zephyr/<kernel_name>.internal.hex`                | Initial HEX output file, unsigned, containing internal flash data.                                                                                 |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`<application>/zephyr/<kernel_name>.external.hex`                | Initial HEX output file, unsigned, containing external QSPI flash data.                                                                            |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`<application>/zephyr/<kernel_name>.internal.signed.hex`         | Signed internal flash data HEX file.                                                                                                               |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`<application>/zephyr/<kernel_name>.external.signed.hex`         | Signed external QSPI flash data HEX file.                                                                                                          |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`<application>/zephyr/<kernel_name>.signed.hex`                  | Signed internal and external QSPI flash data HEX file.                                                                                             |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`<application>/zephyr/<kernel_name>.internal.signed.bin`         | Signed internal flash data binary file (for firmware updates).                                                                                     |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`<application>/zephyr/<kernel_name>.external.signed.bin`         | Signed external QSPI flash data binary file (for firmware updates).                                                                                |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.hex`                 | Initial HEX output file, unsigned, containing internal and external QSPI flash data for direct-XIP mode secondary slot image.                      |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.internal.hex`        | Initial HEX output file, unsigned, containing internal flash data for direct-XIP mode secondary slot image.                                        |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.external.hex`        | Initial HEX output file, unsigned, containing external QSPI flash data for direct-XIP mode secondary slot image.                                   |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.internal.signed.hex` | Signed internal flash data HEX file for direct-XIP mode secondary slot image.                                                                      |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.external.signed.hex` | Signed external QSPI flash data HEX file for direct-XIP mode secondary slot image.                                                                 |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.signed.hex`          | Signed internal and external QSPI flash data HEX file for direct-XIP mode secondary slot image.                                                    |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.internal.signed.bin` | Signed internal flash data binary file (for firmware updates) for direct-XIP mode secondary slot image.                                            |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.external.signed.bin` | Signed external QSPI flash data binary file (for firmware updates) for direct-XIP mode secondary slot image.                                       |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`merged.hex`                                                     | Merged HEX file containing all images, includes both internal and external QSPI flash data for all images.                                         |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
-| :file:`dfu_application.zip`                                            | Created if ``SB_CONFIG_DFU_ZIP`` is set, will contain the internal and external QSPI flash FOTA update images if ``SB_CONFIG_DFU_ZIP_APP`` is set. |
-+------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------+
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|                         File name and location                         |                                                                    Description                                                                                                 |
++========================================================================+================================================================================================================================================================================+
+| :file:`<application>/zephyr/<kernel_name>.hex`                         | Initial HEX output file, unsigned, containing internal and external QSPI flash data.                                                                                           |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`<application>/zephyr/<kernel_name>.internal.hex`                | Initial HEX output file, unsigned, containing internal flash data.                                                                                                             |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`<application>/zephyr/<kernel_name>.external.hex`                | Initial HEX output file, unsigned, containing external QSPI flash data.                                                                                                        |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`<application>/zephyr/<kernel_name>.internal.signed.hex`         | Signed internal flash data HEX file.                                                                                                                                           |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`<application>/zephyr/<kernel_name>.external.signed.hex`         | Signed external QSPI flash data HEX file.                                                                                                                                      |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`<application>/zephyr/<kernel_name>.signed.hex`                  | Signed internal and external QSPI flash data HEX file.                                                                                                                         |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`<application>/zephyr/<kernel_name>.internal.signed.bin`         | Signed internal flash data binary file (for firmware updates).                                                                                                                 |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`<application>/zephyr/<kernel_name>.external.signed.bin`         | Signed external QSPI flash data binary file (for firmware updates).                                                                                                            |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.hex`                 | Initial HEX output file, unsigned, containing internal and external QSPI flash data for direct-XIP mode secondary slot image.                                                  |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.internal.hex`        | Initial HEX output file, unsigned, containing internal flash data for direct-XIP mode secondary slot image.                                                                    |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.external.hex`        | Initial HEX output file, unsigned, containing external QSPI flash data for direct-XIP mode secondary slot image.                                                               |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.internal.signed.hex` | Signed internal flash data HEX file for direct-XIP mode secondary slot image.                                                                                                  |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.external.signed.hex` | Signed external QSPI flash data HEX file for direct-XIP mode secondary slot image.                                                                                             |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.signed.hex`          | Signed internal and external QSPI flash data HEX file for direct-XIP mode secondary slot image.                                                                                |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.internal.signed.bin` | Signed internal flash data binary file (for firmware updates) for direct-XIP mode secondary slot image.                                                                        |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`mcuboot_secondary_app/zephyr/<kernel_name>.external.signed.bin` | Signed external QSPI flash data binary file (for firmware updates) for direct-XIP mode secondary slot image.                                                                   |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`merged.hex`                                                     | Merged HEX file containing all images, includes both internal and external QSPI flash data for all images.                                                                     |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| :file:`dfu_application.zip`                                            | Created if :kconfig:option:`SB_CONFIG_DFU_ZIP` is set, will contain the internal and external QSPI flash FOTA update images if :kconfig:option:`SB_CONFIG_DFU_ZIP_APP` is set. |
++------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+

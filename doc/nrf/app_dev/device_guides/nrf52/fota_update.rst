@@ -14,7 +14,7 @@ You can also use FOTA updates to replace the application.
 See the :ref:`app_dfu` page for general Device Firmware Update (DFU) information, such as supported methods for sending and receiving updates on the device.
 
 .. note::
-   For the possibility of introducing an upgradable bootloader, refer to :ref:`ug_bootloader_adding`.
+   To implement an upgradable bootloader, refer to :ref:`ug_bootloader_adding_sysbuild`.
 
 .. fota_upgrades_intro_end
 
@@ -51,8 +51,8 @@ To enable support for FOTA updates, do the following:
 
 .. fota_upgrades_over_ble_mandatory_mcuboot_start
 
-* Use MCUboot as the upgradable bootloader (``SB_CONFIG_BOOTLOADER_MCUBOOT`` must be enabled).
-  For more information, go to the :ref:`ug_bootloader_adding` page.
+* Use MCUboot as the upgradable bootloader (:kconfig:option:`SB_CONFIG_BOOTLOADER_MCUBOOT` must be enabled).
+  For more information, see the :ref:`ug_bootloader_adding_sysbuild` page.
 
 .. fota_upgrades_over_ble_mandatory_mcuboot_end
 
@@ -87,7 +87,7 @@ For more information about the direct-xip mode and the revert mechanism support,
 
 To use MCUboot in the direct-xip mode together with FOTA updates, do the following:
 
-* Enable the ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP`` Kconfig option in sysbuild.
+* Enable the :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP` Kconfig option in sysbuild.
 
 See how to build the :ref:`peripheral_lbs` sample with MCUboot in the direct-xip mode when the revert mechanism support is disabled:
 
@@ -98,7 +98,7 @@ See how to build the :ref:`peripheral_lbs` sample with MCUboot in the direct-xip
 
 Optionally, if you want to enable the revert mechanism support, complete the following:
 
-* Enable the ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT`` Kconfig option in sysbuild instead of ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP``.
+* Enable the :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT` Kconfig option in sysbuild instead of :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP`.
 
 See how to build the :ref:`peripheral_lbs` sample with MCUboot in direct-xip mode when the revert mechanism support is enabled:
 
@@ -109,10 +109,8 @@ See how to build the :ref:`peripheral_lbs` sample with MCUboot in direct-xip mod
 
 .. note::
    When building the application with MCUboot in direct-XIP mode with revert mechanism support, the signed image intended for flashing is automatically marked as confirmed.
-   Without this configuration, the application will fail to boot.
-   It must, however, be disabled when building update images.
 
-Both the ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP`` and ``SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT`` Kconfig options automatically build application update images for both slots.
+Both the :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP` and :kconfig:option:`SB_CONFIG_MCUBOOT_MODE_DIRECT_XIP_WITH_REVERT` Kconfig options automatically build application update images for both slots.
 To read about the files that are built when the option is enabled, refer to the :ref:`app_build_mcuboot_output` page.
 
 .. fota_upgrades_over_ble_mcuboot_direct_xip_nrfcdm_note_start
@@ -184,7 +182,7 @@ FOTA update sample
 
 The :zephyr:code-sample:`smp-svr` demonstrates how to set up your project to support FOTA updates.
 
-The sample documentation is from the Zephyr project and is incompatible with the :ref:`ug_multi_image`.
+The sample documentation is from the Zephyr project.
 When working in the |NCS| environment, ignore the part of the sample documentation that describes the building and programming steps.
 In |NCS|, you can build and program the :zephyr:code-sample:`smp-svr` as any other sample using the following commands:
 
@@ -195,7 +193,7 @@ In |NCS|, you can build and program the :zephyr:code-sample:`smp-svr` as any oth
         .. parsed-literal::
            :class: highlight
 
-            west build -b *board_target* -- -DEXTRA_CONF_FILE=overlay-bt.conf -DSB_CONFG_NETCORE_HCI_IPC=y
+            west build -b *board_target* -- -DEXTRA_CONF_FILE=overlay-bt.conf -DSB_CONFIG_NETCORE_HCI_IPC=y
             west flash
 
     .. group-tab:: nRF52 SoCs
@@ -269,7 +267,7 @@ FOTA over Zigbee
 
 .. fota_upgrades_zigbee_start
 
-You can enable support for FOTA over the Zigbee network using the :ref:`lib_zigbee_fota` library.
-For detailed information about how to configure the Zigbee FOTA library for your application, see :ref:`ug_zigbee_configuring_components_ota`.
+You can enable support for FOTA over the Zigbee network using the Zigbee FOTA library.
+For more information, see the :ref:`ug_zigbee` page.
 
 .. fota_upgrades_zigbee_end

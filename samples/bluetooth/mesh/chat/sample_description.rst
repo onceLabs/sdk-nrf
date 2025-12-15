@@ -140,7 +140,8 @@ Interacting with the sample
 ---------------------------
 
 1. Connect the development kit to the computer using a USB cable.
-   The development kit is assigned a COM port (Windows), ttyACM device (Linux) or tty.usbmodem (MacOS).
+   The development kit is assigned a serial port.
+   |serial_port_number_list|
 #. |connect_terminal_specific_ANSI|
 #. Enable local echo in the terminal to see the text you are typing.
 
@@ -198,6 +199,11 @@ When the reply is received, you will see the following:
    <0x0004> received the message
 
 Note that private messages are only seen by those the messages are addressed to.
+
+External flash for settings partition
+=====================================
+
+.. include:: /includes/mesh_ext_flash_settings.txt
 
 Dependencies
 ************

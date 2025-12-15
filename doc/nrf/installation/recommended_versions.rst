@@ -30,10 +30,10 @@ For OS support for additional software tools from Nordic Semiconductor, see :ref
   * - Operating System
     - x64
     - ARM64
-  * - `Windows 10`_
+  * - `Windows 11`_
     - Built and tested with :ref:`Twister <running_unit_tests>`.
     - Not supported.
-  * - `Linux - Ubuntu 22.04 LTS`_
+  * - `Linux - Ubuntu 24.04 LTS`_
     - Built and tested with :ref:`Twister <running_unit_tests>`. Comprehensive testing with Nordic Semiconductor hardware.
     - Not supported.
   * - `macOS 14`_
@@ -72,7 +72,7 @@ Required tools
 
 The following table shows the tools that are required for working with |NCS| v\ |version|.
 
-The table lists the versions that are used for testing and are installed when using the :ref:`nRF Connect for VS Code extension or nRF Util <install_ncs>`.
+The table lists the versions that are used for testing and are installed with the toolchain bundle when using the :ref:`nRF Connect for VS Code extension or command line <install_ncs>`.
 Other versions might also work, but are not verified.
 
 .. _req_tools_table:
@@ -102,6 +102,10 @@ Other versions might also work, but are not verified.
            - :ncs-tool-version:`PYTHON_VERSION_WIN10`
          * - :ref:`west <ncs_west_intro>`
            - :ncs-tool-version:`WEST_VERSION_WIN10`
+         * - nRF Util
+           - :ncs-tool-version:`NRFUTIL_VERSION_WIN10`
+         * - nRF Util's `device command <Device command overview_>`_
+           - :ncs-tool-version:`NRFUTIL_DEVICE_VERSION_WIN10`
 
    .. group-tab:: Linux
 
@@ -114,7 +118,7 @@ Other versions might also work, but are not verified.
            - :ncs-tool-version:`ZEPHYR_SDK_VERSION_LINUX`
          * - CMake
            - :ncs-tool-version:`CMAKE_VERSION_LINUX`
-         * - dtc
+         * - Devicetree compiler (dtc)
            - :ncs-tool-version:`DTC_VERSION_LINUX`
          * - :ref:`Git <ncs_git_intro>`
            - :ncs-tool-version:`GIT_VERSION_LINUX`
@@ -126,6 +130,10 @@ Other versions might also work, but are not verified.
            - :ncs-tool-version:`PYTHON_VERSION_LINUX`
          * - :ref:`west <ncs_west_intro>`
            - :ncs-tool-version:`WEST_VERSION_LINUX`
+         * - nRF Util
+           - :ncs-tool-version:`NRFUTIL_VERSION_LINUX`
+         * - nRF Util's `device command <Device command overview_>`_
+           - :ncs-tool-version:`NRFUTIL_DEVICE_VERSION_LINUX`
 
       Additionally, you need to install `nrf-udev`_ rules for accessing USB ports on Nordic Semiconductor devices and programming the firmware.
 
@@ -140,7 +148,7 @@ Other versions might also work, but are not verified.
            - :ncs-tool-version:`ZEPHYR_SDK_VERSION_DARWIN`
          * - CMake
            - :ncs-tool-version:`CMAKE_VERSION_DARWIN`
-         * - dtc
+         * - Devicetree compiler (dtc)
            - :ncs-tool-version:`DTC_VERSION_DARWIN`
          * - :ref:`Git <ncs_git_intro>`
            - :ncs-tool-version:`GIT_VERSION_DARWIN`
@@ -152,6 +160,10 @@ Other versions might also work, but are not verified.
            - :ncs-tool-version:`PYTHON_VERSION_DARWIN`
          * - :ref:`west <ncs_west_intro>`
            - :ncs-tool-version:`WEST_VERSION_DARWIN`
+         * - nRF Util
+           - :ncs-tool-version:`NRFUTIL_VERSION_DARWIN`
+         * - nRF Util's `device command <Device command overview_>`_
+           - :ncs-tool-version:`NRFUTIL_DEVICE_VERSION_DARWIN`
 
 Checking tool versions
   .. toggle::
@@ -221,7 +233,7 @@ Building and running applications, samples, and tests
    * - packaging
      - :ncs-tool-version:`PACKAGING_VERSION`
    * - progress
-     - :ncs-tool-version:`PROGRESS_VERSION`
+     - :ncs-tool-version:`TQDM_VERSION`
    * - pyelftools
      - :ncs-tool-version:`PYELFTOOLS_VERSION`
    * - pylint
@@ -285,7 +297,10 @@ J-Link Software and Documentation Pack
 SEGGER's `J-Link Software and Documentation Pack`_ is a package of tools that is required for SEGGER J-Link to work correctly with both Intel and ARM assemblies.
 Among others, this package includes the J-Link RTT Viewer, which can be used for :ref:`test_and_optimize`.
 
-It is recommended to use the |jlink_ver| of the package when you :ref:`installing_vsc`.
+Use the J-Link |jlink_ver| when working with the |NCS|, as also listed in the :ref:`installing_vsc` section on the |NCS| installation page.
+
+On Windows, you also need to install SEGGER USB Driver for J-Link, which is required for support of older Nordic Semiconductor devices in :ref:`requirements_nrf_util`.
+For information on how to install the USB Driver, see the `nRF Util prerequisites`_ documentation.
 
 .. _toolchain_management_tools:
 .. _additional_nordic_sw_tools:
@@ -312,12 +327,12 @@ For firmware OS support, see :ref:`the table at the top of the page <supported_O
     - x64
     - ARM64
   * - `Windows 11`_
-    - Tier 3
-    - Tier 3
+    - n/a
+    - Tier 1
     - Not supported
   * - `Windows 10`_
     - Tier 3
-    - Tier 1
+    - Tier 3
     - Not supported
   * - `Linux - Ubuntu 24.04 LTS`_
     - Not supported
@@ -329,20 +344,24 @@ For firmware OS support, see :ref:`the table at the top of the page <supported_O
     - Not supported
   * - `Linux - Ubuntu 20.04 LTS`_
     - Not supported
-    - Tier 2
     - Not supported
-  * - `macOS 15`_
+    - Not supported
+  * - `macOS 26`_
     - n/a
     - Tier 3
     - Tier 3
+  * - `macOS 15`_
+    - n/a
+    - Tier 1
+    - Tier 1
   * - `macOS 14`_
     - n/a
     - Tier 3
     - Tier 3
   * - `macOS 13`_
     - n/a
-    - Tier 1
-    - Tier 1
+    - Tier 3
+    - Tier 3
 
 Tier definitions
   .. toggle:: Support levels
@@ -366,33 +385,34 @@ Tier definitions
      Not applicable
        The specified architecture is not supported for the respective operating system.
 
-.. _requirements_clt:
+.. _requirements_nrfvsc:
 
-nRF Command Line Tools
-======================
-
-`nRF Command Line Tools`_ is a package of tools used for development, programming, and debugging of Nordic Semiconductor's nRF51, nRF52, nRF53, nRF54H, and nRF91 Series devices.
-Among others, this package includes the nrfjprog executable and library, which the west command uses by default to program the development kits.
-For more information on nrfjprog, see `Programming SoCs with nrfjprog`_.
-
-.. note::
-    |nrf_CLT_deprecation_note|
-
-It is recommended to use the latest version of the package when you :ref:`installing_vsc`.
-
-|nRFVSC|
-========
+nRF Connect for Visual Studio Code
+==================================
 
 |vsc_extension_description|
 
-In addition, the |nRFVSC| provides the following configuration tools for the :ref:`build system components <configuration_system_overview>`:
+In addition, |nRFVSC| provides the following configuration tools for the :ref:`build system components <configuration_system_overview>`:
 
 * For CMake, the `build configuration management <How to work with build configurations_>`_.
 * For Devicetree, the `Devicetree Visual Editor <How to work with Devicetree Visual Editor_>`_.
 * For Kconfig, the `Kconfig GUI <Configuring with nRF Kconfig_>`_.
+* For Zephyr's :ref:`zephyr:optimization_tools`, the interactive `Memory report`_ feature.
 
-The extension follows its own `release cycle <latest release notes for nRF Connect for Visual Studio Code_>`_.
+The extensions that make up |nRFVSC| are nRF Connect for VS Code, nRF Kconfig, nRF DeviceTree, and nRF Terminal.
+While you can install each extension separately, some of them will not work without others and you need all four to use all of the features.
+
+The extensions follow their own `release cycle <latest release notes for nRF Connect for Visual Studio Code_>`_.
 Use the latest available release for development.
+
+The extensions are available for download from the following websites:
+
+* |VSC| Marketplace, where the extensions are bundled as the `nRF Connect for VS Code Extension Pack`_.
+* `Open VSX Registry`_, from where you can install the extensions separately to editors based on |VSC| and compatible with the VSIX format.
+
+  .. note::
+     Nordic Semiconductor does not test editors other than |VSC| for compatibility with |nRFVSC|.
+     While you are encouraged to report any issues you encounter on `DevZone`_, issues discovered in editors other than |VSC| and not reproducible in |VSC| will not be prioritized.
 
 See the :ref:`install_ncs` page for information about how to use the extension to manage |NCS| toolchain installations.
 For more information about the extension and what it offers, visit the `nRF Connect for Visual Studio Code`_ documentation.
@@ -406,18 +426,17 @@ The `nRF Util development tool`_ is a unified command line utility for Nordic pr
 Its functionality is provided through installable and upgradeable commands that are served on a central package registry on the Internet.
 
 The utility follows its own release cycle and has its own `operating system requirements <nRF Util_>`_.
-Use the latest available release for development.
 
-nRF Util provides |NCS| toolchain packages for each |NCS| release through the ``toolchain-manager`` command.
-See the :ref:`install_ncs` page for information about how to use this command.
-
-.. _requirements_ncd:
-
-nRF Connect for Desktop's Toolchain Manager
-===========================================
-
-`nRF Connect for Desktop`_ is a cross-platform tool that provides different applications that simplify working the |NCS| and Nordic Semiconductor products.
-One of those tools is the :ref:`Toolchain Manager <auto_installation_tcm_setup>`, which allows you to install the toolchain and the SDK.
+The |NCS| toolchain bundle includes the nRF Util version :ncs-tool-version:`NRFUTIL_VERSION_WIN10` and the device command version :ncs-tool-version:`NRFUTIL_DEVICE_VERSION_WIN10`, as listed in :ref:`requirements_toolchain_tools`.
+When you :ref:`gs_installing_toolchain`, you get both these versions `locked <Locking nRF Util home directory_>`_ to prevent unwanted changes to the toolchain bundle.
 
 .. note::
-    |toolchain_management_ncs_versions|
+
+   When you :ref:`install the nRF Connect SDK <install_ncs>`:
+
+   * If you plan to work with command line, you also need to download nRF Util and install the following command in order to get the toolchain bundle:
+
+     * `sdk-manager command`_ - The latest version is required for working with |NCS| toolchain packages.
+       See `Installing and upgrading nRF Util commands`_ for information about how to install this command.
+
+   * If you plan to work with the :ref:`nRF Connect for VS Code extension <requirements_nrfvsc>`, you do not need a separate nRF Util installation to get the toolchain bundle.

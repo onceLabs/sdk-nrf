@@ -16,7 +16,7 @@ Overview
 Gazell Pairing determines the channel set used by Gazell.
 See the :ref:`ug_gzp` user guide for more information, such as the features of this library.
 
-This library is used in the :ref:`gzp_dynamic_pairing_host` and :ref:`gzp_dynamic_pairing_device` samples.'
+This library is used in the :ref:`gzp_dynamic_pairing_host` and :ref:`gzp_dynamic_pairing_device` samples.
 
 Requirements
 ************
@@ -42,11 +42,11 @@ Since Gazell Pairing requires exclusive access to pipes 0 and :c:macro:`GZP_DATA
 
 Do not access the following:
 
-* :c:func:`nrf_gzll_set_base_address_0()`
-* :c:func:`nrf_gzll_set_base_address_1()`
-* :c:func:`nrf_gzll_set_address_prefix_byte()` (not for pipes 0 and 1)
-* :c:func:`nrf_gzll_set_rx_pipes_enabled()` (can be used but the enabled status of pipes 0 and 1 should not be modified)
-* :c:func:`nrf_gzll_set_channel_table()`
+* :c:func:`nrf_gzll_set_base_address_0`
+* :c:func:`nrf_gzll_set_base_address_1`
+* :c:func:`nrf_gzll_set_address_prefix_byte` (not for pipes 0 and 1)
+* :c:func:`nrf_gzll_set_rx_pipes_enabled` (can be used but the enabled status of pipes 0 and 1 should not be modified)
+* :c:func:`nrf_gzll_set_channel_table`
 
 Configuration
 *************

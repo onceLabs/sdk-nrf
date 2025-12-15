@@ -30,7 +30,7 @@ static uint32_t conn_interval_us_get(const struct bt_conn *conn)
 		return 0;
 	}
 
-	return BT_CONN_INTERVAL_TO_US(info.le.interval);
+	return info.le.interval_us;
 }
 
 static ssize_t time_sync_data_received(struct bt_conn *conn,
@@ -68,7 +68,7 @@ static void adv_start(void)
 {
 	int err;
 
-	err = bt_le_adv_start(BT_LE_ADV_CONN_ONE_TIME, ad, ARRAY_SIZE(ad), NULL, 0);
+	err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_2, ad, ARRAY_SIZE(ad), NULL, 0);
 	if (err) {
 		printk("Advertising failed to start (err %d)\n", err);
 		return;

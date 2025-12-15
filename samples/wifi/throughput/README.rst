@@ -103,6 +103,8 @@ To build for the nRF7002 DK with different profiles for Station mode, use the fo
 
          west build -p -b nrf7002dk/nrf5340/cpuapp -- -DEXTRA_CONF_FILE=overlay-rx-prio.conf
 
+.. include:: /includes/wifi_refer_sample_yaml_file.txt
+
 Supported CLI commands
 ======================
 
@@ -162,7 +164,7 @@ Testing
 
    .. code-block:: console
 
-      wifi connect <SSID> <passphrase>
+      wifi connect -s <SSID> -k <key_management> -p <passphrase>
 
    ``<SSID>`` is the SSID of the network you want to connect to, and ``<passphrase>`` is its passphrase.
 

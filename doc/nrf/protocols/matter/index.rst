@@ -11,11 +11,11 @@ Matter
 .. matter_intro_start
 
 `Matter`_ (formerly Project Connected Home over IP or Project CHIP) is an open-source application layer that aims at creating a unified communication standard across smart home devices, mobile applications, and cloud services.
-It supports a wide range of existing technologies, including Wi-Fi, Thread, and Bluetooth® LE, and uses IPv6-based transport protocols like TCP and UDP to ensure connectivity between different kinds of networks.
+It supports a wide range of existing technologies, including Wi-Fi®, Thread, and Bluetooth® LE, and uses IPv6-based transport protocols like TCP and UDP to ensure connectivity between different kinds of networks.
 
 .. matter_intro_end
 
-|NCS| |release| allows you to develop applications with Matter specification version 1.3.0 and `Matter SDK version`_ 1.3.0.0.
+|NCS| |release| allows you to develop applications with Matter specification version 1.5.0 and `Matter SDK version`_ 1.5.0.0.
 For a full list of |NCS| and Matter versions, view the following table:
 
 .. toggle:: nRF Connect SDK, Matter specification, and Matter SDK versions
@@ -23,13 +23,37 @@ For a full list of |NCS| and Matter versions, view the following table:
    +--------------------------+-----------------------------------------------------+------------------------+
    | nRF Connect SDK version  | Matter specification version                        | Matter SDK version     |
    +==========================+=====================================================+========================+
-   | v2.8.99 (latest)         | :ref:`1.4.0 <ug_matter_overview_dev_model_support>` | 1.4.0.0                |
+   | v3.2.99 (latest)         | :ref:`1.5.0 <ug_matter_overview_dev_model_support>` | 1.5.0.0                |
+   +--------------------------+                                                     |                        |
+   | |release|                |                                                     |                        |
    +--------------------------+-----------------------------------------------------+------------------------+
-   | |release|                | :ref:`1.3.0 <ug_matter_overview_dev_model_support>` | 1.3.0.0                |
+   | v3.1.1                   | :ref:`1.4.2 <ug_matter_overview_dev_model_support>` | 1.4.2.0                |
+   +--------------------------+                                                     |                        |
+   | 3.1.0                    |                                                     |                        |
+   +--------------------------+-----------------------------------------------------+------------------------+
+   | v3.0.2                   | :ref:`1.4.1 <ug_matter_overview_dev_model_support>` | 1.4.1.0                |
+   +--------------------------+                                                     |                        |
+   | v3.0.1                   |                                                     |                        |
+   +--------------------------+                                                     |                        |
+   | v3.0.0                   |                                                     |                        |
+   +--------------------------+-----------------------------------------------------+------------------------+
+   | v2.9.2                   | :ref:`1.4.0 <ug_matter_overview_dev_model_support>` | 1.4.0.0                |
+   +--------------------------+                                                     |                        |
+   | v2.9.1                   |                                                     |                        |
+   +--------------------------+                                                     |                        |
+   | v2.9.0-nRF54H20-1        |                                                     |                        |
+   +--------------------------+                                                     |                        |
+   | v2.9.0                   |                                                     |                        |
+   +--------------------------+-----------------------------------------------------+------------------------+
+   | v2.8.0                   | :ref:`1.3.0 <ug_matter_overview_dev_model_support>` | 1.3.0.0                |
    +--------------------------+                                                     |                        |
    | v2.7.0                   |                                                     |                        |
    +--------------------------+-----------------------------------------------------+------------------------+
-   | v2.6.2                   | :ref:`1.2.0 <ug_matter_overview_dev_model_support>` | 1.2.0.1                |
+   | v2.6.4                   | :ref:`1.2.0 <ug_matter_overview_dev_model_support>` | 1.2.0.1                |
+   +--------------------------+                                                     |                        |
+   | v2.6.3                   |                                                     |                        |
+   +--------------------------+                                                     |                        |
+   | v2.6.2                   |                                                     |                        |
    +--------------------------+                                                     |                        |
    | v2.6.1                   |                                                     |                        |
    +--------------------------+                                                     |                        |

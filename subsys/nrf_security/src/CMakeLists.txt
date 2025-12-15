@@ -54,10 +54,12 @@ target_include_directories(psa_crypto_library_config
   INTERFACE
     ${PSA_CRYPTO_CONFIG_LIBRARY_PATH}
     ${NRF_SECURITY_ROOT}/include
+    # This is needed for the oberon_check_unsupported.h
+    ${OBERON_PSA_CORE_PATH}/oberon/drivers
 )
 
 if(CONFIG_MBEDTLS_ENABLE_HEAP)
-  if (CONFIG_BUILD_WITH_TFM)
+  if(CONFIG_BUILD_WITH_TFM)
     # Add replacement for memory_buffer_alloc.c for NS build
     list(APPEND src_crypto ${NRF_SECURITY_ROOT}/src/legacy/memory_buffer_alloc.c)
   else()
@@ -78,11 +80,15 @@ if(NOT CONFIG_MBEDTLS_PSA_CRYPTO_SPM AND NOT BUILD_INSIDE_TFM)
     cipher.c
     cipher_wrap.c
     md.c
-    pk.c
     pk_ecc.c
     pk_wrap.c
     pkwrite.c
     psa_util.c
+  )
+
+  # Oberon copied this file to avoid double definition of PSA_EXPORT_KEY_PAIR_OR_PUBLIC_MAX_SIZE
+  append_with_prefix(src_crypto ${OBERON_PSA_CORE_PATH}/programs/ssl/library
+    pk.c
   )
 endif()
 
@@ -111,7 +117,6 @@ append_with_prefix(src_crypto_base ${ARM_MBEDTLS_PATH}/library
   base64.c
   bignum.c
   bignum_core.c
-  block_cipher.c
   nist_kw.c
   oid.c
   padlock.c
@@ -183,17 +188,6 @@ target_link_libraries(${mbedcrypto_target}
     mbedcrypto_base
 )
 
-# Disable compile warnings for Mbed TLS sources for files that are
-# added to the build for legacy APIs but are not enabled due to
-# configurations not being set.
-#
-# These can be removed when NCSDK-28901 is addressed.
-target_compile_options(${mbedcrypto_target}
-  PRIVATE
-    -Wno-unused-function
-    -Wno-unused-variable
-)
-
 # Add PSA core
 if(CONFIG_MBEDTLS_PSA_CRYPTO_C)
   add_subdirectory(core)
@@ -215,13 +209,14 @@ set_property(TARGET ${mbedcrypto_target}
 )
 
 # NEWLIB requires linking with the C library
-if (CONFIG_NEWLIB_LIBC)
+if(CONFIG_NEWLIB_LIBC)
   target_link_libraries(${mbedcrypto_target} PRIVATE -lc)
   target_link_libraries(mbedcrypto_base PRIVATE -lc)
 endif()
 
-if (CONFIG_MBEDTLS_X509_LIBRARY)
+if(CONFIG_MBEDTLS_X509_LIBRARY)
   append_with_prefix(src_x509 ${ARM_MBEDTLS_PATH}/library
+    pkcs7.c
     x509.c
     x509_create.c
     x509_crl.c
@@ -249,7 +244,7 @@ if (CONFIG_MBEDTLS_X509_LIBRARY)
 endif()
 
 # Library for TLS protocol support
-if (CONFIG_MBEDTLS_TLS_LIBRARY)
+if(CONFIG_MBEDTLS_TLS_LIBRARY)
   # TLS files
   append_with_prefix(src_tls ${ARM_MBEDTLS_PATH}/library
     debug.c
@@ -269,7 +264,7 @@ if (CONFIG_MBEDTLS_TLS_LIBRARY)
     ssl_tls13_generic.c
   )
 
-  if (CONFIG_MBEDTLS_DEBUG)
+  if(CONFIG_MBEDTLS_DEBUG)
     list(APPEND src_tls
       ${ARM_MBEDTLS_PATH}/library/ssl_debug_helpers_generated.c
     )
@@ -290,7 +285,7 @@ if (CONFIG_MBEDTLS_TLS_LIBRARY)
   nrf_security_add_zephyr_options(mbedtls)
 endif()
 
-if (NOT CONFIG_MBEDTLS_PSA_CRYPTO_SPM)
+if(NOT CONFIG_MBEDTLS_PSA_CRYPTO_SPM)
   # Add zephyr-specific code
   add_subdirectory(zephyr)
 endif()

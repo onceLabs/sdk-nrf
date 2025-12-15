@@ -10,6 +10,7 @@
 #include <zephyr/drivers/flash.h>
 #include <zephyr/toolchain.h>
 #include <zephyr/net/socket.h>
+#include <zephyr/net/tls_credentials.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/shell/shell.h>
 
@@ -35,7 +36,7 @@
 #ifdef CONFIG_USE_HTTPS
 #define SEC_TAG (TLS_SEC_TAG)
 #else
-#define SEC_TAG (-1)
+#define SEC_TAG (SEC_TAG_TLS_INVALID)
 #endif
 
 enum fota_state { IDLE, CONNECTED, UPDATE_DOWNLOAD, UPDATE_PENDING, UPDATE_APPLY };
@@ -367,7 +368,6 @@ static int update_download(void)
 	file = CONFIG_DOWNLOAD_FILE_V2;
 #endif
 
-	/* Functions for getting the host and file */
 	err = fota_download_start(CONFIG_DOWNLOAD_HOST, file, SEC_TAG, 0, 0);
 	if (err) {
 		app_dfu_btn_irq_enable();
@@ -396,11 +396,9 @@ static void print_err(const lwm2m_carrier_event_t *evt)
 		[LWM2M_CARRIER_ERROR_FOTA_FAIL] =
 			"Modem firmware update failed",
 		[LWM2M_CARRIER_ERROR_CONFIGURATION] =
-			"Illegal object configuration detected",
+			"Configuration failure",
 		[LWM2M_CARRIER_ERROR_INIT] =
 			"Initialization failure",
-		[LWM2M_CARRIER_ERROR_RUN] =
-			"Configuration failure",
 		[LWM2M_CARRIER_ERROR_CONNECT] =
 			"Connection failure",
 	};

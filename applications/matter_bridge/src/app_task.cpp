@@ -15,21 +15,18 @@
 #include "app/matter_init.h"
 #include "app/task_executor.h"
 #include "board/board.h"
-#include "bridge/bridge_manager.h"
-#include "bridge/bridge_storage_manager.h"
+#include "bridge_manager.h"
+#include "bridge_storage_manager.h"
+#include "clusters/identify.h"
 
 #ifdef CONFIG_BRIDGED_DEVICE_BT
-#include "bridge/ble_connectivity_manager.h"
+#include "ble_connectivity_manager.h"
 #endif
-
-#ifdef CONFIG_CHIP_OTA_REQUESTOR
-#include "dfu/ota/ota_util.h"
-#endif /* CONFIG_BRIDGED_DEVICE_BT */
 
 #include <app-common/zap-generated/attributes/Accessors.h>
 #include <app-common/zap-generated/ids/Attributes.h>
 #include <app-common/zap-generated/ids/Clusters.h>
-#include <app/server/OnboardingCodesUtil.h>
+#include <setup_payload/OnboardingCodesUtil.h>
 
 #ifdef CONFIG_BRIDGED_DEVICE_BT
 #include <bluetooth/services/lbs.h>
@@ -45,21 +42,31 @@ LOG_MODULE_DECLARE(app, CONFIG_CHIP_APP_LOG_LEVEL);
 using namespace ::chip;
 using namespace ::chip::app;
 using namespace ::chip::DeviceLayer;
+
 namespace
 {
 
+constexpr EndpointId kBridgeEndpointId = 1;
+
+#ifndef CONFIG_BRIDGE_SMART_PLUG_SUPPORT
+/* Trigger effect is enabled for the bridge device */
+Nrf::Matter::IdentifyCluster sIdentifyCluster(kBridgeEndpointId, true);
+#else
+Nrf::Matter::IdentifyCluster sIdentifyCluster(kBridgeEndpointId);
+#endif
+
 #ifdef CONFIG_BRIDGED_DEVICE_BT
-static const bt_uuid *sUuidLbs = BT_UUID_LBS;
-static const bt_uuid *sUuidEs = BT_UUID_ESS;
-static const bt_uuid *sUuidServices[] = { sUuidLbs, sUuidEs };
-static constexpr uint8_t kUuidServicesNumber = ARRAY_SIZE(sUuidServices);
+const bt_uuid *sUuidLbs = BT_UUID_LBS;
+const bt_uuid *sUuidEs = BT_UUID_ESS;
+const bt_uuid *sUuidServices[] = { sUuidLbs, sUuidEs };
+constexpr uint8_t kUuidServicesNumber = ARRAY_SIZE(sUuidServices);
 /**
  * @brief Blink rates for indication the BLE Connectivity Manager state.
  *
  */
-constexpr static uint32_t kPairingBlinkRate{ 100 };
-constexpr static uint32_t kScanningBlinkRate_ms{ 300 };
-constexpr static uint32_t kLostBlinkRate_ms{ 1000 };
+constexpr uint32_t kPairingBlinkRate{ 100 };
+constexpr uint32_t kScanningBlinkRate_ms{ 300 };
+constexpr uint32_t kLostBlinkRate_ms{ 1000 };
 #ifndef CONFIG_BRIDGE_SMART_PLUG_SUPPORT
 void BLEStateChangeCallback(Nrf::BLEConnectivityManager::State state)
 {
@@ -91,6 +98,19 @@ void BLEStateChangeCallback(Nrf::BLEConnectivityManager::State state)
 #endif /* CONFIG_BRIDGE_SMART_PLUG_SUPPORT */
 
 #endif /* CONFIG_BRIDGED_DEVICE_BT */
+
+#ifndef CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS
+void AppFactoryResetHandler(const ChipDeviceEvent *event, intptr_t /* unused */)
+{
+	switch (event->Type) {
+	case DeviceEventType::kFactoryReset:
+		Nrf::BridgeStorageManager::Instance().FactoryReset();
+		break;
+	default:
+		break;
+	}
+}
+#endif
 
 } /* namespace */
 
@@ -198,6 +218,16 @@ CHIP_ERROR AppTask::Init()
 	/* Register Matter event handler that controls the connectivity status LED based on the captured Matter
 	 * network state. */
 	ReturnErrorOnFailure(Nrf::Matter::RegisterEventHandler(Nrf::Board::DefaultMatterEventHandler, 0));
+
+#ifndef CONFIG_CHIP_FACTORY_RESET_ERASE_SETTINGS
+	/* Register factory reset event handler.
+	 * With this configuration we have to manually clean up the storage,
+	 * as whole settings partition won't be erased.
+	 * */
+	ReturnErrorOnFailure(Nrf::Matter::RegisterEventHandler(AppFactoryResetHandler, 0));
+#endif
+
+	ReturnErrorOnFailure(sIdentifyCluster.Init());
 
 	return Nrf::Matter::StartServer();
 }

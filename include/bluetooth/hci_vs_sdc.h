@@ -114,17 +114,6 @@ int hci_vs_sdc_zephyr_read_tx_power(
 	const sdc_hci_cmd_vs_zephyr_read_tx_power_t *params,
 	sdc_hci_cmd_vs_zephyr_read_tx_power_return_t *return_params);
 
-/** @brief Read Supported Vendor Specific Commands.
- *
- * For the complete API description, see sdc_hci_cmd_vs_read_supported_vs_commands().
- *
- * @param[out] return_params Return parameters.
- *
- * @return 0 on success or negative error value on failure.
- */
-int hci_vs_sdc_read_supported_vs_commands(
-	sdc_hci_cmd_vs_read_supported_vs_commands_return_t *return_params);
-
 /** @brief Set Low Latency Packet Mode.
  *
  * For the complete API description, see sdc_hci_cmd_vs_llpm_mode_set().
@@ -403,6 +392,18 @@ int hci_vs_sdc_set_event_start_task(const sdc_hci_cmd_vs_set_event_start_task_t 
  */
 int hci_vs_sdc_conn_anchor_point_update_event_report_enable(
 	const sdc_hci_cmd_vs_conn_anchor_point_update_event_report_enable_t *params);
+
+/** @brief Enable Periodic Adv Event Counter Reports.
+ *
+ * For the complete API description,
+ * see sdc_hci_cmd_vs_enable_periodic_adv_event_counter_reports().
+ *
+ * @param[in] params Input parameters
+ *
+ * @return 0 on success or negative error value on failure.
+ */
+int hci_vs_sdc_enable_periodic_adv_event_counter_reports(
+	const sdc_hci_cmd_vs_enable_periodic_adv_event_counter_reports_t *params);
 
 #ifdef __cplusplus
 }

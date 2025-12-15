@@ -48,7 +48,7 @@ Following are some of the requirements and limitations of the application while 
   * For example, setting :kconfig:option:`CONFIG_LWM2M_CARRIER_SERVER_SEC_TAG` to 42 uses the security tag range 43 to 46 instead of 25 to 28.
 
 * The CA certificates that are used for out-of-band FOTA must be provided by the application.
-  Out-of-band FOTA updates are done by the :ref:`lib_download_client`.
+  Out-of-band FOTA updates are done by the :ref:`lib_downloader`.
   Although the certificates are updated as part of the |NCS| releases, you must check the requirements from your carrier to know which certificates are applicable.
 
 * The LwM2M carrier library uses the following NVS record key range: ``0xCA00`` to ``0xCAFF``.
@@ -74,7 +74,7 @@ In order for your device to comply with the carrier's specifications, the follow
         * The application must support application FOTA.
         * The device must connect using a non-IP APN.
 
-        The :ref:`serial_lte_modem` application and :ref:`lwm2m_carrier` sample feature an extra config file to enable the :kconfig:option:`CONFIG_LWM2M_CARRIER_SOFTBANK` dependencies.
+        The :ref:`lwm2m_carrier` sample features an extra config file to enable the :kconfig:option:`CONFIG_LWM2M_CARRIER_SOFTBANK` dependencies.
 
         * The device must operate in the NB-IoT system mode.
 
@@ -82,12 +82,10 @@ In order for your device to comply with the carrier's specifications, the follow
 
           * If the :ref:`lte_lc_readme` library is not used, see the `system mode section in the nRF9160 AT Commands Reference Guide`_ or the `system mode section in the nRF91x1 AT Commands Reference Guide`_, depending on the SiP you are using for more information on setting the NB-IoT system mode.
 
-          * If you are using the :ref:`serial_lte_modem` application, set the mode in the :file:`slm_auto_connect.h` file that is included with the :ref:`CONFIG_SLM_AUTO_CONNECT <CONFIG_SLM_AUTO_CONNECT>` Kconfig option.
-
    .. group-tab:: LG U+
 
         * The application must support application FOTA.
-          The :ref:`serial_lte_modem` application and :ref:`lwm2m_carrier` sample contain extra config files to enable the :kconfig:option:`CONFIG_LWM2M_CARRIER_LG_UPLUS` dependencies.
+          The :ref:`lwm2m_carrier` sample contains extra config files to enable the :kconfig:option:`CONFIG_LWM2M_CARRIER_LG_UPLUS` dependencies.
         * The application must set the LG U+ configurations listed in the :c:struct:`lwm2m_carrier_lg_uplus_config_t` structure.
           If you are unsure about which values to supply during certification, reach out to your carrier or your local Nordic Semiconductor sales representative.
 
@@ -110,5 +108,3 @@ The following library sizes are reported in the :ref:`liblwm2m_carrier_changelog
 
    Enabling the LwM2M carrier library into the :ref:`lwm2m_carrier` sample serves only as a reference.
    The increase in memory size due to the inclusion of the LwM2M carrier library depends on the application that it is being integrated into.
-   For example, an application such as the :ref:`asset_tracker_v2` already uses several libraries which the LwM2M carrier library depends on.
-   This makes the added memory requirement considerably smaller.

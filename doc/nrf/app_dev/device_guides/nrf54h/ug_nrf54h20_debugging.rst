@@ -30,11 +30,11 @@ Debug configurations
 Some applications and samples provide a specific configuration that enables additional debug functionalities.
 You can select custom configurations when you are :ref:`configuring the build settings <cmake_options>`.
 
-
 Debugging single-core applications
 **********************************
 
 To debug single-core applications, you can use the ``west debug`` command to start a single debug session with GDB.
+You can also attach the debug session to a running core using the ``west attach`` command.
 
 Debugging multi-core applications
 *********************************
@@ -42,7 +42,22 @@ Debugging multi-core applications
 To debug the firmware running also on cores other than the application core, you need to set up a separate debug session for each one of the cores you want to debug.
 When debugging another core, the application core debug session runs in the background and you can debug both cores if needed.
 
-If you want to reset the other cores while debugging, make sure to first reset the application core and execute the code.
+Debugging early-boot and reset issues
+*************************************
+
+A local domain reset triggers a global reset, which resets the debugging state.
+As a result, a new debugging connection is required.
+To debug early boot issues, you can trigger a reset while keeping the cores in a halted state.
+This approach allows time to attach the debugger.
+The cores can then be started individually.
+
+The following example demonstrates how to debug the early boot phase on the application core:
+
+.. code-block:: shell
+
+  nrfutil device reset --reset-kind RESET_VIA_SECDOM
+  nrfutil device go --core Network
+  west attach
 
 Using GDB as an external debugger
 *********************************
@@ -74,13 +89,11 @@ To debug a specific core using ``JLinkExe`` do the following:
    You can find the ``SEGGER-ID`` as follows:
 
    * Check the ``SEGGER ID`` printed on the label on the bottom side of the DK.
-   * Run the ``nrfjprog --ids`` command.
+   * Run the ``nrfutil device list`` command.
 
-      .. note::
-         |nrfjprog_deprecation_note|
+   If you connect just one DK to the machine, defining ``SEGGER-ID`` is not necessary.
 
-   If just one DK is connected to the machine, defining ``SEGGER-ID`` is not necessary.
-   If more than one DK is connected to the machine and ``SEGGER-ID`` is undefined, a pop up window will appear where you can manually select the ID of the DK you want to run J-Link on.
+   If you connect multiple DKs to the machine and have not defined ``SEGGER-ID``, a pop-up window appears where you can manually select the ID of the DK to run J-Link on.
 
    .. note::
       PPR core debugging is not functional in the initial limited sampling.
@@ -112,7 +125,7 @@ Debug logging
 *************
 
 You can use the logging system to get more information about the state of your application.
-Logs are integrated into various modules and subsystems in the |NCS| and Zephyr.
+Various modules and subsystems in the |NCS| and Zephyr integrate logs.
 These logs are visible once you configure the logger for your application.
 
 You can also configure log level per logger module to, for example, get more information about a given subsystem.
@@ -125,87 +138,3 @@ One of the potential root causes of fatal errors in an application are stack ove
 Read the Stack Overflows section on the :ref:`zephyr:fatal` page in the Zephyr documentation to learn about stack overflows and how to debug them.
 
 You can also use a separate module, such as Zephyr's :ref:`zephyr:thread_analyzer`, to make sure that the stack sizes used by your application are big enough to avoid stack overflows.
-
-Debugging errors reported by SDFW
-*********************************
-
-The Secure Domain Firmware (SDFW) report errors through the ``CTRL-AP.BOOTSTATUS`` register.
-You can read this value using the ``nrfutil device x-boot-status-get`` command:
-
-.. parsed-literal::
-   :class: highlight
-
-    nrfutil device x-boot-status-get --help
-
-SDFW errors
-===========
-
-A value of ``0`` indicates *no error*, while any other value signifies that an error has occurred.
-
-.. note::
-   ``0`` is the reset value of this register.
-   Therefore, a device experiencing erratic behavior might still report ``0`` incorrectly.
-   For example, this may occur if the device is in a boot loop.
-
-
-Several components report errors through this register.
-The first 4 bits of the first byte is reserved for future use and must be ``0``, the second 4 bits of the bootstatus indicate which component reported an error:
-
- * System Controller ROM -> ``0x01``
- * Secure Domain ROM -> ``0x02``
- * System Controller Firmware -> ``0x0A``
- * Secure Domain Firmware -> ``0x0B``
-
-.. note::
-      Each one of these values has a different handling of the remaining bits.
-      This chapter only describes the semantics for Secure Domain Firmware errors (``0x0B******``).
-
-
-The second byte describes the boot step within the SDFW booting process that reported the failure.
-For more information, see `SDFW Boot Steps`_
-The last two bytes contain the lower 16 bits of the error code.
-
-For example, ``0x0BA1FF62`` indicates that the SDFW reported an error in the BICR validate step (``0xA1``) with error message ``0xFF62``, or ``-158``.
-
-SDFW Boot Steps
----------------
-
-The boot steps are defined as follows:
-
-.. parsed-literal::
-   :class: highlight
-
-    #define BOOTSTATUS_STEP_START_GRTC 0x06
-    #define BOOTSTATUS_STEP_SDFW_UPDATE 0x30
-    #define BOOTSTATUS_STEP_BELLBOARD_CONFIG 0x4F
-    #define BOOTSTATUS_STEP_SUIT_INIT 0x6F
-    #define BOOTSTATUS_STEP_DOMAIN_ALLOCATE 0x8F
-    #define BOOTSTATUS_STEP_MEMORY_FINALIZE 0x91
-    #define BOOTSTATUS_STEP_TRACEHOST_INIT 0x93
-    #define BOOTSTATUS_STEP_CURRENT_LIMITED 0xA0
-    #define BOOTSTATUS_STEP_BICR_VALIDATE 0xA1
-    #define BOOTSTATUS_STEP_DOMAIN_BOOT 0xAF
-    #define BOOTSTATUS_STEP_ADAC 0xC0
-    #define BOOTSTATUS_STEP_SERVICES 0xCF
-
-Errors are not accumulated, as only one error is reported even if multiple boot steps fail.
-The SDFW chooses which error to report if multiple errors occur.
-The types of errors that can overwrite other errors are the following:
-
- * An update of SDFW has failed.
- * The SDFW is unable to initialize the ADAC over CTRL-AP communication.
-
-The following is a short description of the failures related to the boot steps:
-
- * ``BOOTSTATUS_STEP_START_GRTC``  - SDFW was unable to initialize the driver used for the GRTC.
- * ``BOOTSTATUS_STEP_SDFW_UPDATE`` - SDROM was instructed to install an update before last reset, and is indicating that an error occurred while performing the update.
- * ``BOOTSTATUS_STEP_BELLBOARD_CONFIG`` - SDFW was unable to apply the static bellboard configuration.
- * ``BOOTSTATUS_STEP_SUIT_INIT`` - A SUIT related error occurred.
- * ``BOOTSTATUS_STEP_DOMAIN_ALLOCATE`` - An error occurred while allocating global resources.
- * ``BOOTSTATUS_STEP_MEMORY_FINALIZE`` - SDFW was unable to apply the required memory protection configuration.
- * ``BOOTSTATUS_STEP_TRACEHOST_INIT`` - An error occurred when initializing the trace host.
- * ``BOOTSTATUS_STEP_CURRENT_LIMITED`` - System Controller ROM booted the system in current limited mode due to an issue in the BICR.
- * ``BOOTSTATUS_STEP_BICR_VALIDATE`` - SDFW discovered an invalid BICR. Note that not seeing this issue does not imply that there are no issues in the BICR.
- * ``BOOTSTATUS_STEP_DOMAIN_BOOT`` - An error occurred while booting the local domains.
- * ``BOOTSTATUS_STEP_ADAC`` - An error occurred while initializing the ADAC transport.
- * ``BOOTSTATUS_STEP_SERVICES`` - An error occurred while initializing the SSF server.

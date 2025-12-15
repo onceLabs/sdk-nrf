@@ -142,7 +142,7 @@ Tables
 | body row 2             | ...        | ...      |          |
 +------------------------+------------+----------+----------+
 
-We can create more complex tables as ASCII art:
+You can create more complex tables as ASCII art:
 
 +------------------------+------------+----------+----------+
 | Header row, column 1   | Header 2   | Header 3 | Header 4 |
@@ -177,7 +177,7 @@ We can create more complex tables as ASCII art:
      - On a stick!
    * - Crunchy Frog
      - 1.49
-     - If we took the bones out, it wouldn't be
+     - If you took the bones out, it wouldn't be
        crunchy, now would it?
    * - Gannet Ripple
      - 1.99
@@ -192,7 +192,7 @@ We can create more complex tables as ASCII art:
    :widths: 15, 10, 30
 
    "Albatross", 2.99, "On a stick!"
-   "Crunchy Frog", 1.49, "If we took the bones out, it wouldn't be
+   "Crunchy Frog", 1.49, "If you took the bones out, it wouldn't be
    crunchy, now would it?"
    "Gannet Ripple", 1.99, "On a stick!"
 
@@ -575,7 +575,7 @@ Kconfig:
    id = 0xBEEF
    flags = 0
    ver = 1
-   source "${ZEPHYR_BASE}/../nrf/subsys/fw_info/Kconfig.template.fw_info_ext_api"
+   source "$(ZEPHYR_NRF_MODULE_DIR)/subsys/fw_info/Kconfig.template.fw_info_ext_api"
 
 cmake:
 
@@ -618,7 +618,7 @@ Read out an objects.inv file::
 Doxygen
 =======
 
-We usually include doxygen groups::
+Doxygen groups are included in the API documents::
 
    .. doxygengroup:: group_name
 
@@ -627,7 +627,7 @@ To link to doxygen macros, enums or functions use:
 * :c:macro:`BT_HIDS_INFORMATION_LEN`
 * :c:func:`bt_hids_init`
 * :c:struct:`bt_gatt_dm`
-* :c:type:`slm_data_handler_t`
+* :c:type:`lte_lc_evt_handler_t`
 * :c:enum:`at_param_type` (for the whole list)
 * :c:enumerator:`PEER_STATE_CONN_FAILED` (for a list item)
 * :c:member:`ble_peer_event.state`

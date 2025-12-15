@@ -5,7 +5,6 @@
  */
 
 #include <zephyr/ztest.h>
-#include <pm_config.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <string.h>
@@ -215,7 +214,7 @@ int ikg_key_derivation_test(void)
 	return status;
 }
 
-ZTEST(test_suite_ikg, ikg_key_derivation_test)
+ZTEST(test_suite_ikg, test_ikg_key_derivation)
 {
 	ikg_key_derivation_test();
 }

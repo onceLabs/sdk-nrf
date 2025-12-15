@@ -35,7 +35,7 @@ extern "C" {
 #endif
 
 /** Length of the Boot Mouse Input Report. */
-#define BT_HIDS_BOOT_MOUSE_REP_LEN     8
+#define BT_HIDS_BOOT_MOUSE_REP_LEN     3
 /** Length of the Boot Keyboard Input Report. */
 #define BT_HIDS_BOOT_KB_INPUT_REP_LEN  8
 /** Length of the Boot Keyboard Output Report. */
@@ -154,6 +154,9 @@ enum bt_hids_notify_evt {
 /** @brief Report data.
  */
 struct bt_hids_rep {
+	/** Report ID defined in the HIDS Report Map. Not valid for boot reports. */
+	uint8_t id;
+
 	/** Pointer to the report data. */
 	uint8_t *data;
 
@@ -166,6 +169,13 @@ struct bt_hids_rep {
  *  @param evt Notification event.
  */
 typedef void (*bt_hids_notify_handler_t) (enum bt_hids_notify_evt evt);
+
+/** @brief HID notification event handler, with report identification.
+ *
+ * @param report_id Report ID defined in the HIDS Report Map.
+ * @param evt Notification event.
+ */
+typedef void (*bt_hids_notify_ext_handler_t) (uint8_t report_id, enum bt_hids_notify_evt evt);
 
 /** @brief HID Report event handler.
  *
@@ -181,7 +191,7 @@ typedef void (*bt_hids_rep_handler_t) (struct bt_hids_rep *rep,
  */
 struct bt_hids_inp_rep {
 	/** CCC descriptor. */
-	struct _bt_gatt_ccc ccc;
+	struct bt_gatt_ccc_managed_user_data ccc;
 
 	/** Report ID defined in the HIDS Report Map. */
 	uint8_t id;
@@ -225,8 +235,15 @@ struct bt_hids_inp_rep {
 	 */
 	const uint8_t *rep_mask;
 
-	/** Callback with the notification event. */
+	/** Callback with the notification event.
+	 * Used if set and extended callback is not set.
+	 */
 	bt_hids_notify_handler_t handler;
+
+	/** Extended callback with the notification event.
+	 * Has preference over the normal callback.
+	 */
+	bt_hids_notify_ext_handler_t handler_ext;
 };
 
 
@@ -271,7 +288,7 @@ struct bt_hids_outp_feat_rep {
  */
 struct bt_hids_boot_mouse_inp_rep {
 	/** CCC descriptor. */
-	struct _bt_gatt_ccc ccc;
+	struct bt_gatt_ccc_managed_user_data ccc;
 
 	/** Index in the service attribute array. */
 	uint8_t att_ind;
@@ -284,7 +301,7 @@ struct bt_hids_boot_mouse_inp_rep {
  */
 struct bt_hids_boot_kb_inp_rep {
 	/** CCC descriptor. */
-	struct _bt_gatt_ccc ccc;
+	struct bt_gatt_ccc_managed_user_data ccc;
 
 	/** Index in the service attribute array. */
 	uint8_t att_ind;
@@ -532,6 +549,26 @@ int bt_hids_connected(struct bt_hids *hids_obj, struct bt_conn *conn);
  */
 int bt_hids_disconnected(struct bt_hids *hids_obj, struct bt_conn *conn);
 
+/** @brief Send Input Report, operation complete callback has user data as argument.
+ *
+ *  @note The function is not thread safe.
+ *	     It cannot be called from multiple threads at the same time.
+ *
+ *  @param hids_obj Pointer to HIDS instance.
+ *  @param conn Pointer to Connection Object.
+ *  @param rep_index Index of report descriptor.
+ *  @param rep Pointer to the report data.
+ *  @param len Length of report data.
+ *  @param cb Notification complete callback (can be NULL).
+ *  @param userdata Argument passed to notificaion complete callback.
+ *
+ *  @return 0 If the operation was successful. Otherwise, a (negative) error
+ *	      code is returned.
+ */
+int bt_hids_inp_rep_send_userdata(struct bt_hids *hids_obj, struct bt_conn *conn,
+				  uint8_t rep_index, uint8_t const *rep, uint8_t len,
+				  bt_gatt_complete_func_t cb, void *userdata);
+
 /** @brief Send Input Report.
  *
  *  @note The function is not thread safe.
@@ -547,9 +584,12 @@ int bt_hids_disconnected(struct bt_hids *hids_obj, struct bt_conn *conn);
  *  @return 0 If the operation was successful. Otherwise, a (negative) error
  *	      code is returned.
  */
-int bt_hids_inp_rep_send(struct bt_hids *hids_obj, struct bt_conn *conn,
-			 uint8_t rep_index, uint8_t const *rep, uint8_t len,
-			 bt_gatt_complete_func_t cb);
+static inline int bt_hids_inp_rep_send(struct bt_hids *hids_obj, struct bt_conn *conn,
+				       uint8_t rep_index, uint8_t const *rep, uint8_t len,
+				       bt_gatt_complete_func_t cb)
+{
+	return bt_hids_inp_rep_send_userdata(hids_obj, conn, rep_index, rep, len, cb, NULL);
+}
 
 /** @brief Send Boot Mouse Input Report.
  *

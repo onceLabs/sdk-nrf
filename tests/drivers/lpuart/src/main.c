@@ -7,13 +7,7 @@
 #include <zephyr/ztest.h>
 #include <zephyr/busy_sim.h>
 #include <zephyr/drivers/uart.h>
-#include <zephyr/drivers/counter.h>
-#include <zephyr/random/random.h>
-#include <hal/nrf_gpio.h>
-#include <hal/nrf_uarte.h>
-#include <nrfx_gpiote.h>
-
-#define DT_DRV_COMPAT nordic_nrf_sw_lpuart
+#include "common.h"
 
 static uint32_t tx_req_cnt;
 static uint32_t tx_done_cnt;
@@ -24,6 +18,14 @@ static volatile bool test_err;
 static uint8_t rx_buf[5];
 static bool buf_released;
 static int test_time;
+
+/* Timeout should be more than a millisecond as transfer setup with enabling
+ * of HFXO can take more than a millisecond so if timeout is too short it can
+ * expire before first byte is transferred.
+ */
+#define TX_TIMEOUT_US 10000
+
+static K_SEM_DEFINE(uart_rx_buf_possession_sem, 1, 1);
 
 static void kill_timer_handler(struct k_timer *timer)
 {
@@ -85,7 +87,7 @@ static void next_tx(const struct device *dev)
 	}
 
 	tx_req_cnt++;
-	int err = uart_tx(dev, tx_buf, tx_len, 100000);
+	int err = uart_tx(dev, tx_buf, tx_len, TX_TIMEOUT_US);
 
 	if (err != 0) {
 		TC_PRINT("uart_tx returned err:%d\n", err);
@@ -178,11 +180,13 @@ static void uart_callback(const struct device *dev, struct uart_event *evt, void
 		break;
 
 	case UART_RX_BUF_REQUEST:
+		zassert_equal(k_sem_take(&uart_rx_buf_possession_sem, K_NO_WAIT), 0);
 		on_rx_buf_req(dev);
 		break;
 
 	case UART_RX_BUF_RELEASED:
 		buf_released = true;
+		k_sem_give(&uart_rx_buf_possession_sem);
 		break;
 
 	case UART_RX_DISABLED:
@@ -240,6 +244,11 @@ ZTEST(test_lpuart_stress, test_stress)
 
 	err = uart_rx_disable(lpuart);
 	zassert_equal(err, 0, NULL);
+	TC_PRINT("UART RX disabled\n");
+
+	TC_PRINT("Waiting for UART RX buffer release\n");
+	zassert_equal(k_sem_take(&uart_rx_buf_possession_sem, K_MSEC(100)), 0);
+	TC_PRINT("UART RX BUFFER released\n");
 
 	if (IS_ENABLED(CONFIG_TEST_BUSY_SIM)) {
 		busy_sim_stop();
@@ -323,108 +332,13 @@ static void validate_lpuart(const struct device *lpuart)
 
 	k_timer_start(&wdt_timer, K_MSEC(200), K_NO_WAIT);
 
-	err = uart_tx(lpuart, tx_buf, sizeof(tx_buf), 10000);
+	err = uart_tx(lpuart, tx_buf, sizeof(tx_buf), TX_TIMEOUT_US);
 	zassert_equal(err, 0, NULL);
 
 	k_msleep(10);
 
 	k_timer_stop(&wdt_timer);
 	zassert_false(test_err, NULL);
-}
-
-static const struct device *counter =
-	DEVICE_DT_GET(DT_PHANDLE(DT_COMPAT_GET_ANY_STATUS_OKAY(vnd_busy_sim), counter));
-
-static void next_alarm(const struct device *counter, struct counter_alarm_cfg *alarm_cfg)
-{
-	int err;
-	int mul = IS_ENABLED(CONFIG_NO_OPTIMIZATIONS) ? 10 : 1;
-
-	alarm_cfg->ticks = (50 + sys_rand32_get() % 300) * mul;
-
-	err = counter_set_channel_alarm(counter, 0, alarm_cfg);
-	__ASSERT_NO_MSG(err == 0);
-}
-
-static nrf_gpio_pin_pull_t pin_toggle(uint32_t pin, nrf_gpio_pin_pull_t pull)
-{
-	nrf_gpio_cfg(pin, NRF_GPIO_PIN_DIR_INPUT, NRF_GPIO_PIN_INPUT_DISCONNECT, pull,
-		     NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
-	return (pull == NRF_GPIO_PIN_PULLUP) ? NRF_GPIO_PIN_PULLDOWN : NRF_GPIO_PIN_PULLUP;
-}
-
-static void pins_toggle(int32_t tx_pin)
-{
-	static nrf_gpio_pin_pull_t pull = NRF_GPIO_PIN_PULLUP;
-	static nrf_gpio_pin_pull_t tx_pull = NRF_GPIO_PIN_PULLUP;
-	nrfx_gpiote_pin_t req_pin = DT_INST_PROP(0, req_pin);
-	bool req_pin_toggle;
-	bool tx_pin_toggle;
-
-	if (tx_pin > 0) {
-		uint32_t rnd = sys_rand32_get();
-
-		req_pin_toggle = (rnd & 0x6) == 0;
-		tx_pin_toggle = rnd & 0x1;
-	} else {
-		req_pin_toggle = true;
-		tx_pin_toggle = false;
-	}
-
-	if (req_pin_toggle) {
-		pull = pin_toggle(req_pin, pull);
-	}
-
-	if (tx_pin_toggle) {
-		tx_pull = pin_toggle(tx_pin, tx_pull);
-	}
-}
-
-static void pins_to_default(int32_t tx_pin)
-{
-	nrfx_gpiote_pin_t req_pin = DT_INST_PROP(0, req_pin);
-
-	nrf_gpio_cfg(req_pin, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
-		     NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
-
-	if (tx_pin > 0) {
-		nrf_gpio_cfg(tx_pin, NRF_GPIO_PIN_DIR_OUTPUT, NRF_GPIO_PIN_INPUT_DISCONNECT,
-			     NRF_GPIO_PIN_NOPULL, NRF_GPIO_PIN_S0S1, NRF_GPIO_PIN_NOSENSE);
-	}
-}
-
-struct test_data {
-	struct counter_alarm_cfg alarm_cfg;
-	int32_t tx_pin;
-};
-
-static void counter_alarm_callback(const struct device *dev, uint8_t chan_id, uint32_t ticks,
-				   void *user_data)
-{
-	struct test_data *data = (struct test_data *)user_data;
-
-	pins_toggle(data->tx_pin);
-	next_alarm(dev, &data->alarm_cfg);
-}
-
-static void floating_pins_start(int32_t tx_pin)
-{
-	static struct test_data data;
-
-	data.alarm_cfg.callback = counter_alarm_callback;
-	data.alarm_cfg.flags = COUNTER_ALARM_CFG_EXPIRE_WHEN_LATE;
-	data.alarm_cfg.user_data = (void *)&data;
-	data.tx_pin = tx_pin;
-
-	counter_start(counter);
-	next_alarm(counter, &data.alarm_cfg);
-}
-
-static void floating_pins_stop(int32_t tx_pin)
-{
-	counter_cancel_channel_alarm(counter, 0);
-	counter_stop(counter);
-	pins_to_default(tx_pin);
 }
 
 static void test_resilency(bool tx_pin_float)
@@ -447,9 +361,9 @@ static void test_resilency(bool tx_pin_float)
 		err = uart_rx_enable(lpuart, rx_buf, sizeof(rx_buf), 100);
 		zassert_equal(err, 0, "Unexpected err:%d", err);
 
-		floating_pins_start(tx_pin_float ? tx_pin : -1);
+		floating_pins_start(true, tx_pin_float ? tx_pin : -1);
 		k_msleep(100);
-		floating_pins_stop(tx_pin_float ? tx_pin : -1);
+		floating_pins_stop(true, tx_pin_float ? tx_pin : -1);
 		k_msleep(2);
 
 		validate_lpuart(lpuart);
@@ -479,7 +393,7 @@ ZTEST(test_lpuart_resilency, test_tx_abort_rx_not_enabled)
 	zassert_true(device_is_ready(lpuart), NULL);
 	uart_callback_set(lpuart, tx_abort_expected_callback, NULL);
 
-	err = uart_tx(lpuart, tx_buf, sizeof(tx_buf), 1000);
+	err = uart_tx(lpuart, tx_buf, sizeof(tx_buf), TX_TIMEOUT_US);
 	zassert_equal(err, 0, "uart_tx - unexpected err: %d", err);
 	k_msleep(10);
 	zassert_equal(tx_abort_cnt, 1, "tx_abort_cnt != 1: %d", tx_abort_cnt);
@@ -500,9 +414,9 @@ ZTEST(test_lpuart_resilency, test_tx_abort_from_api)
 
 	err = uart_rx_enable(lpuart, rx_buffer, sizeof(rx_buffer), 100);
 	zassert_equal(err, 0, "uart_rx_enable - unexpected err:%d", err);
-	err = uart_tx(lpuart, tx_buffer, sizeof(tx_buffer), 1000);
+	err = uart_tx(lpuart, tx_buffer, sizeof(tx_buffer), TX_TIMEOUT_US);
 	zassert_equal(err, 0, "uart_tx - unexpected err:%d", err);
-	k_msleep(1);
+	k_usleep(100);
 	err = uart_tx_abort(lpuart);
 	zassert_equal(err, 0, "uart_tx_abort - unexpected err:%d", err);
 	k_msleep(10);

@@ -11,7 +11,11 @@
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/conn_mgr_monitor.h>
-#include <net/download_client.h>
+#include <net/downloader.h>
+
+#include <zephyr/logging/log.h>
+LOG_MODULE_REGISTER(download, LOG_LEVEL_INF);
+
 
 #if CONFIG_MODEM_KEY_MGMT
 #include <modem/modem_key_mgmt.h>
@@ -37,6 +41,8 @@ static struct net_if *net_if;
 static K_SEM_DEFINE(network_connected_sem, 0, 1);
 
 #if CONFIG_SAMPLE_SECURE_SOCKET
+static int sec_tag_list[] = { SEC_TAG };
+#if CONFIG_SAMPLE_PROVISION_CERT
 static const char cert[] = {
 	#include SAMPLE_CERT_FILE_INC
 
@@ -45,17 +51,26 @@ static const char cert[] = {
 	 */
 	IF_ENABLED(CONFIG_TLS_CREDENTIALS, (0x00))
 };
-static int sec_tag_list[] = { SEC_TAG };
 BUILD_ASSERT(sizeof(cert) < KB(4), "Certificate too large");
-#endif
+#endif /* CONFIG_SAMPLE_PROVISION_CERT */
+#endif /* CONFIG_SAMPLE_SECURE_SOCKET */
 
-static struct download_client downloader;
-static struct download_client_cfg config = {
+static char dl_buf[2048];
+
+static int callback(const struct downloader_evt *event);
+
+static struct downloader downloader;
+static struct downloader_cfg dl_cfg = {
+	.callback = callback,
+	.buf = dl_buf,
+	.buf_size = sizeof(dl_buf),
+};
+static struct downloader_host_cfg host_dl_cfg = {
 #if CONFIG_SAMPLE_SECURE_SOCKET
 	.sec_tag_list = sec_tag_list,
 	.sec_tag_count = ARRAY_SIZE(sec_tag_list),
-	.set_tls_hostname = true,
 #endif
+	.range_override = 0,
 };
 
 #if CONFIG_SAMPLE_COMPUTE_HASH
@@ -65,7 +80,7 @@ static mbedtls_sha256_context sha256_ctx;
 
 static int64_t ref_time;
 
-#if CONFIG_SAMPLE_SECURE_SOCKET
+#if CONFIG_SAMPLE_PROVISION_CERT
 static int cert_provision(void)
 {
 	int err;
@@ -133,7 +148,7 @@ static void on_net_event_l4_connected(void)
 }
 
 static void l4_event_handler(struct net_mgmt_event_callback *cb,
-			     uint32_t event,
+			     uint64_t event,
 			     struct net_if *iface)
 {
 	switch (event) {
@@ -151,32 +166,50 @@ static void l4_event_handler(struct net_mgmt_event_callback *cb,
 }
 
 static void connectivity_event_handler(struct net_mgmt_event_callback *cb,
-				       uint32_t event,
+				       uint64_t event,
 				       struct net_if *iface)
 {
+	int err;
 	if (event == NET_EVENT_CONN_IF_FATAL_ERROR) {
-		printk("Fatal error received from the connectivity layer, rebooting\n");
+		printk("Fatal error received from the connectivity layer, "
+		       "rebooting network interface\n");
+
+		(void)conn_mgr_if_disconnect(net_if);
+		(void)conn_mgr_all_if_down(true);
+
+		err = conn_mgr_all_if_up(true);
+		if (err) {
+			printk("conn_mgr_all_if_up, error: %d\n", err);
+			return;
+		}
+
+		printk("Reconnecting to network\n");
+
+		err = conn_mgr_all_if_connect(true);
+		if (err) {
+			printk("conn_mgr_all_if_connect, error: %d\n", err);
+			return;
+		}
+
 		return;
 	}
 }
 
 static void progress_print(size_t downloaded, size_t file_size)
 {
+	static int prev_percent;
 	const int percent = (downloaded * 100) / file_size;
-	size_t lpad = (percent * PROGRESS_WIDTH) / 100;
-	size_t rpad = PROGRESS_WIDTH - lpad;
 
-	printk("\r[ %3d%% ] |", percent);
-	for (size_t i = 0; i < lpad; i++) {
-		printk("=");
+	if (percent == prev_percent) {
+		return;
 	}
-	for (size_t i = 0; i < rpad; i++) {
-		printk(" ");
-	}
-	printk("| (%d/%d bytes)", downloaded, file_size);
+
+	prev_percent = percent;
+
+	printk("[ %3d%% ] (%d/%d bytes)\r", percent, downloaded, file_size);
 }
 
-static int callback(const struct download_client_evt *event)
+static int callback(const struct downloader_evt *event)
 {
 	static size_t downloaded;
 	static size_t file_size;
@@ -184,17 +217,17 @@ static int callback(const struct download_client_evt *event)
 	int64_t ms_elapsed;
 
 	if (downloaded == 0) {
-		download_client_file_size_get(&downloader, &file_size);
+		downloader_file_size_get(&downloader, &file_size);
 		downloaded += STARTING_OFFSET;
 	}
 
 	switch (event->id) {
-	case DOWNLOAD_CLIENT_EVT_FRAGMENT:
+	case DOWNLOADER_EVT_FRAGMENT:
 		downloaded += event->fragment.len;
 		if (file_size) {
 			progress_print(downloaded, file_size);
 		} else {
-			printk("\r[ %d bytes ] ", downloaded);
+			printk("\r[ %d bytes ]\n", downloaded);
 		}
 
 #if CONFIG_SAMPLE_COMPUTE_HASH
@@ -203,7 +236,7 @@ static int callback(const struct download_client_evt *event)
 #endif
 		return 0;
 
-	case DOWNLOAD_CLIENT_EVT_DONE:
+	case DOWNLOADER_EVT_DONE:
 		ms_elapsed = k_uptime_delta(&ref_time);
 		speed = ((float)file_size / ms_elapsed) * MSEC_PER_SEC;
 		printk("\nDownload completed in %lld ms @ %d bytes per sec, total %d bytes\n",
@@ -233,19 +266,20 @@ static int callback(const struct download_client_evt *event)
 		printk("Bye\n");
 		return 0;
 
-	case DOWNLOAD_CLIENT_EVT_ERROR:
-		printk("Error %d during download\n", event->error);
+	case DOWNLOADER_EVT_ERROR:
 		if (event->error == -ECONNRESET) {
 			/* With ECONNRESET, allow library to attempt a reconnect by returning 0 */
 		} else {
-			(void)conn_mgr_if_disconnect(net_if);
-			(void)conn_mgr_all_if_down(true);
+			printk("Error %d during download\n", event->error);
 			/* Stop download */
 			return -1;
 		}
 		break;
-	case DOWNLOAD_CLIENT_EVT_CLOSED:
-		printk("Socket closed\n");
+	case DOWNLOADER_EVT_STOPPED:
+		printk("Download canceled\n");
+		break;
+	case DOWNLOADER_EVT_DEINITIALIZED:
+		printk("Client deinitialized\n");
 		break;
 	}
 
@@ -272,7 +306,7 @@ int main(void)
 		return err;
 	}
 
-#if CONFIG_SAMPLE_SECURE_SOCKET
+#if CONFIG_SAMPLE_PROVISION_CERT
 	/* Provision certificates before connecting to the network */
 	err = cert_provision();
 	if (err) {
@@ -302,7 +336,7 @@ int main(void)
 
 	printk("Network connected\n");
 
-	err = download_client_init(&downloader, callback);
+	err = downloader_init(&downloader, &dl_cfg);
 	if (err) {
 		printk("Failed to initialize the client, err %d", err);
 		return 0;
@@ -315,7 +349,7 @@ int main(void)
 
 	ref_time = k_uptime_get();
 
-	err = download_client_get(&downloader, URL, &config, URL, STARTING_OFFSET);
+	err = downloader_get(&downloader, &host_dl_cfg, URL, STARTING_OFFSET);
 	if (err) {
 		printk("Failed to start the downloader, err %d", err);
 		return 0;

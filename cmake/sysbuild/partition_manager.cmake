@@ -22,12 +22,12 @@ macro(add_region)
   list(APPEND ${underscore_domain}region_arguments "--${REGION_NAME}-base-address;${REGION_BASE}")
   list(APPEND ${underscore_domain}region_arguments
     "--${REGION_NAME}-placement-strategy;${REGION_PLACEMENT}")
-  if (REGION_DEVICE)
+  if(REGION_DEVICE)
     list(APPEND ${underscore_domain}region_arguments "--${REGION_NAME}-device;${REGION_DEVICE}")
   list(APPEND ${underscore_domain}region_arguments
        "--${REGION_NAME}-default-driver-kconfig;${REGION_DEFAULT_DRIVER_KCONFIG}")
   endif()
-  if (REGION_DYNAMIC_PARTITION)
+  if(REGION_DYNAMIC_PARTITION)
     list(APPEND ${underscore_domain}region_arguments
       "--${REGION_NAME}-dynamic-partition;${REGION_DYNAMIC_PARTITION}")
   endif()
@@ -39,6 +39,11 @@ function(partition_manager)
   if(DEFINED PM_DOMAIN)
     string(CONFIGURE "${${image_name}_PM_STATIC_YML_FILE}" user_def_pm_static)
     get_property(image_name GLOBAL PROPERTY DOMAIN_APP_${PM_DOMAIN})
+    sysbuild_get(${image_name}_BOARD IMAGE ${image_name} VAR BOARD CACHE)
+
+    if(DEFINED ${image_name}_BOARD)
+      set(ncs_file_board BOARD ${${image_name}_BOARD})
+    endif()
   else()
     string(CONFIGURE "${PM_STATIC_YML_FILE}" user_def_pm_static)
     get_property(image_name GLOBAL PROPERTY DOMAIN_APP_APP)
@@ -52,25 +57,25 @@ function(partition_manager)
 
   ncs_file(CONF_FILES ${${image_name}_APPLICATION_CONFIG_DIR}
            PM conf_dir_pm_static
-           DOMAIN ${DOMAIN}
-           BUILD ${CONF_FILE_BUILD_TYPE}
+           DOMAIN ${PM_DOMAIN}
+           ${ncs_file_board}
   )
 
   ncs_file(CONF_FILES ${BOARD_DIR}
            PM board_dir_pm_static
-           DOMAIN ${DOMAIN}
-           BUILD ${CONF_FILE_BUILD_TYPE}
+           DOMAIN ${PM_DOMAIN}
+           ${ncs_file_board}
   )
 
   if(EXISTS "${user_def_pm_static}" AND NOT IS_DIRECTORY "${user_def_pm_static}")
     set(static_configuration_file ${user_def_pm_static})
-  elseif (EXISTS ${conf_dir_pm_static})
+  elseif(EXISTS ${conf_dir_pm_static})
     set(static_configuration_file ${conf_dir_pm_static})
-  elseif (EXISTS ${board_dir_pm_static})
+  elseif(EXISTS ${board_dir_pm_static})
     set(static_configuration_file ${board_dir_pm_static})
   endif()
 
-  if (EXISTS ${static_configuration_file})
+  if(EXISTS ${static_configuration_file})
     message(STATUS "Found partition manager static configuration ${PM_DOMAIN}: "
                    "${static_configuration_file}"
     )
@@ -80,8 +85,16 @@ function(partition_manager)
     # user with a warning to do a pristine build if it differs to avoid having stale
     # configuration used for MCUboot images
     file(MD5 ${static_configuration_file} static_configuration_checksum)
-    if(NOT DEFINED STATIC_PM_FILE_HASH OR NOT "${STATIC_PM_FILE_HASH}" STREQUAL "${static_configuration_checksum}")
-      if(DEFINED STATIC_PM_FILE_HASH)
+    if(DEFINED PM_DOMAIN)
+      set(static_configuration_checksum_var STATIC_PM_FILE_HASH_${PM_DOMAIN})
+      set(static_configuration_extra_text for domain ${PM_DOMAIN})
+    else()
+      set(static_configuration_checksum_var STATIC_PM_FILE_HASH)
+      set(static_configuration_extra_text)
+    endif()
+
+    if(NOT DEFINED ${static_configuration_checksum_var} OR NOT "${${static_configuration_checksum_var}}" STREQUAL "${static_configuration_checksum}")
+      if(DEFINED ${static_configuration_checksum_var})
         message(WARNING "Static partition manager file has changed since this project was last configured, "
                         "this may cause images to use the original static partition manager file "
                         "configuration data, which is incorrect. It is recommended that a pristine build be "
@@ -89,8 +102,8 @@ function(partition_manager)
         )
       endif()
 
-      set(STATIC_PM_FILE_HASH "${static_configuration_checksum}" CACHE INTERNAL
-          "nRF Connect SDK static partition manager file hash" FORCE
+      set(${static_configuration_checksum_var} "${static_configuration_checksum}" CACHE INTERNAL
+          "nRF Connect SDK static partition manager file hash ${static_configuration_extra_text}" FORCE
       )
     endif()
 
@@ -123,10 +136,9 @@ function(partition_manager)
       dynamic_partition_argument
       "--flash_primary-dynamic-partition;${dynamic_partition}"
       )
-    set(static_configuration)
   endif()
 
-  if (DEFINED PM_DOMAIN)
+  if(DEFINED PM_DOMAIN)
     set(underscore _)
   else()
     set(underscore)
@@ -222,6 +234,10 @@ function(partition_manager)
       else()
         set(part "app_${part}")
       endif()
+    elseif(${part} STREQUAL "firmware_loader" AND SB_CONFIG_MCUBOOT_MODE_FIRMWARE_UPDATER)
+      if(NOT "${PM_DOMAIN}" STREQUAL "CPUNET")
+        set(part ${SB_CONFIG_FIRMWARE_LOADER_IMAGE_NAME})
+      endif()
     endif()
     string(TOUPPER ${part} PART)
     get_property(${part}_PM_HEX_FILE GLOBAL PROPERTY ${part}_PM_HEX_FILE)
@@ -240,7 +256,10 @@ function(partition_manager)
       # So for each domain we should just include the generated hex file.
       # Those are available thorugh sysbuild_get, but not locally as there is no parent image.
       list(APPEND explicitly_assigned ${part})
-      sysbuild_get(${part}_PM_HEX_FILE IMAGE ${part} VAR BYPRODUCT_KERNEL_SIGNED_HEX_NAME CACHE)
+      sysbuild_get(${part}_PM_HEX_FILE IMAGE ${part} VAR BYPRODUCT_KERNEL_SIGNED_CONFIRMED_HEX_NAME CACHE)
+      if(NOT ${part}_PM_HEX_FILE)
+        sysbuild_get(${part}_PM_HEX_FILE IMAGE ${part} VAR BYPRODUCT_KERNEL_SIGNED_HEX_NAME CACHE)
+      endif()
       if(NOT ${part}_PM_HEX_FILE)
         sysbuild_get(${part}_PM_HEX_FILE IMAGE ${part} VAR BYPRODUCT_KERNEL_HEX_NAME CACHE)
       endif()
@@ -254,7 +273,7 @@ function(partition_manager)
     endif()
   endforeach()
 
-  if (DEFINED PM_DOMAIN)
+  if(DEFINED PM_DOMAIN)
     set(merged_suffix _${PM_DOMAIN})
     string(TOUPPER ${merged_suffix} MERGED_SUFFIX)
   endif()
@@ -311,12 +330,12 @@ function(partition_manager)
       ${CMAKE_BINARY_DIR}/${container}.hex
       )
 
-    if (DEFINED PM_DOMAIN)
+    if(DEFINED PM_DOMAIN)
       get_property(image_name GLOBAL PROPERTY DOMAIN_APP_${PM_DOMAIN})
       update_runner(IMAGE ${image_name} HEX ${CMAKE_BINARY_DIR}/${container}.hex)
     endif()
 
-    if ("${container}" STREQUAL "merged")
+    if("${container}" STREQUAL "merged")
       update_runner(IMAGE ${DEFAULT_IMAGE} HEX ${CMAKE_BINARY_DIR}/${container}.hex)
     endif()
   endforeach()
@@ -366,23 +385,10 @@ function(update_runner)
   sysbuild_cache(CREATE APPLICATION ${RUNNER_IMAGE})
 endfunction()
 
-
 # APP is a special domain which is handled differently.
 # Remove it from the list.
 get_property(PM_DOMAINS GLOBAL PROPERTY PM_DOMAINS)
 list(REMOVE_ITEM PM_DOMAINS APP)
-
-## Check if current image is the dynamic partition in its domain.
-## I.E. it is the only partition without a statically configured size in this
-## domain. This is equivalent to the 'app' partition in the root domain.
-##
-## The dynamic partition is specified by the parent domain (i.e. the domain
-## which creates the current domain through 'create_domain_image()'.
-#if(DEFINED ${DOMAIN}_PM_DOMAIN_DYNAMIC_PARTITION
-#   AND "${IMAGE_NAME}" STREQUAL "${${DOMAIN}_PM_DOMAIN_DYNAMIC_PARTITION}"
-#)
-#  set(is_dynamic_partition_in_domain TRUE)
-#endif()
 
 get_property(PM_IMAGES GLOBAL PROPERTY PM_IMAGES)
 get_property(PM_SUBSYS_PREPROCESSED GLOBAL PROPERTY PM_SUBSYS_PREPROCESSED)
@@ -391,29 +397,17 @@ get_property(PM_SUBSYS_PREPROCESSED GLOBAL PROPERTY PM_SUBSYS_PREPROCESSED)
 #
 # It will be executed if one of the following criteria is true for the
 # current image:
-# - It's a child image, and is the dynamic partition in the domain
+# - It's a secondary image, and is the dynamic partition in the domain
 # - It's the root image, and a static configuration has been provided
 # - It's the root image, and PM_IMAGES is populated.
 # - It's the root image, and other domains exist.
-# - A subsys has defined a partition and CONFIG_PM_SINGLE_IMAGE is set.
-# Otherwise, return here
-#if (NOT (
-#  (IMAGE_NAME AND is_dynamic_partition_in_domain) OR
-#  (NOT IMAGE_NAME AND static_configuration) OR
-#  (NOT IMAGE_NAME AND PM_IMAGES) OR
-#  (NOT IMAGE_NAME AND PM_DOMAINS) OR
-#  (PM_SUBSYS_PREPROCESSED AND CONFIG_PM_SINGLE_IMAGE)
-#  ))
-#  return()
-#endif()
 
 # Set the dynamic partition. This is the only partition which does not
 # have a statically defined size. There is only one dynamic partition per
 # domain. For the "root domain" (ie the domain of the root image) this is
 # always "app".
-if (NOT is_dynamic_partition_in_domain)
-  set(dynamic_partition "app")  # Should this be renamed to main image name, or does it matter at all ?
-#  set(dynamic_partition "${DEFAULT_IMAGE}")  # Should this be renamed to main image name, or does it matter at all ?
+if(NOT is_dynamic_partition_in_domain)
+  set(dynamic_partition "app")
 else()
   set(dynamic_partition ${${DOMAIN}_PM_DOMAIN_DYNAMIC_PARTITION})
   set(
@@ -422,24 +416,8 @@ else()
     )
 endif()
 
-# Image files, those should be queried from actual image.
-# Add the dynamic partition as an image partition.
-#set_property(GLOBAL PROPERTY
-#  ${dynamic_partition}_PM_HEX_FILE
-#  ${PROJECT_BINARY_DIR}/${KERNEL_HEX_NAME}
-#  )
-#
-#set_property(GLOBAL PROPERTY
-#  ${dynamic_partition}_PM_TARGET
-#  ${logical_target_for_zephyr_elf}
-#  )
-
 # Prepare the input_files, header_files, and images lists
 set(generated_path include/generated)
-# ToDo: In child image, this happens to each domain parent.
-# In parent image, it only happen to direct children, not children of children.
-# This must be adjusted into:
-# Explicitly add the main dynamic partition image
 sysbuild_get(${DEFAULT_IMAGE}_input_files IMAGE ${DEFAULT_IMAGE} VAR PM_YML_FILES CACHE)
 sysbuild_get(${DEFAULT_IMAGE}_binary_dir  IMAGE ${DEFAULT_IMAGE} VAR ZEPHYR_BINARY_DIR CACHE)
 list(APPEND prefixed_images ":${dynamic_partition}")
@@ -450,6 +428,12 @@ if(SB_CONFIG_SECURE_BOOT_BUILD_S1_VARIANT_IMAGE)
   sysbuild_get(s1_image_binary_dir  IMAGE s1_image VAR ZEPHYR_BINARY_DIR CACHE)
   list(APPEND prefixed_images ":s1_image")
   list(APPEND header_files ${s1_image_binary_dir}/${generated_path}/pm_config.h)
+endif()
+
+if(SB_CONFIG_MCUBOOT_MODE_FIRMWARE_UPDATER)
+  sysbuild_get(firmware_loader_binary_dir IMAGE ${SB_CONFIG_FIRMWARE_LOADER_IMAGE_NAME} VAR ZEPHYR_BINARY_DIR CACHE)
+  list(APPEND prefixed_images ":firmware_loader")
+  list(APPEND header_files ${firmware_loader_binary_dir}/${generated_path}/pm_config.h)
 endif()
 
 foreach (image ${IMAGES})
@@ -464,7 +448,7 @@ foreach (image ${IMAGES})
     endif()
   endforeach()
 
-  if(NOT "${DEFAULT_IMAGE}" STREQUAL "${image}" AND NOT "s1_image" STREQUAL "${image}")
+  if(NOT "${DEFAULT_IMAGE}" STREQUAL "${image}" AND NOT "s1_image" STREQUAL "${image}" AND NOT "${SB_CONFIG_FIRMWARE_LOADER_IMAGE_NAME}" STREQUAL "${image}")
     sysbuild_get(${image}_input_files IMAGE ${image} VAR PM_YML_FILES CACHE)
     sysbuild_get(${image}_binary_dir  IMAGE ${image} VAR ZEPHYR_BINARY_DIR CACHE)
 
@@ -525,25 +509,40 @@ foreach(d APP ${PM_DOMAINS})
 
   sysbuild_get(${image_name}_CONFIG_SOC_SERIES_NRF91X IMAGE ${image_name} VAR CONFIG_SOC_SERIES_NRF91X KCONFIG)
   sysbuild_get(${image_name}_CONFIG_SOC_NRF5340_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF5340_CPUAPP KCONFIG)
+  sysbuild_get(${image_name}_CONFIG_SOC_SERIES_NRF54LX IMAGE ${image_name} VAR CONFIG_SOC_SERIES_NRF54LX KCONFIG)
   sysbuild_get(${image_name}_CONFIG_SOC_NRF54L15_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54L15_CPUAPP KCONFIG)
+  sysbuild_get(${image_name}_CONFIG_SOC_NRF54L05_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54L05_CPUAPP KCONFIG)
+  sysbuild_get(${image_name}_CONFIG_SOC_NRF54L10_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54L10_CPUAPP KCONFIG)
+  sysbuild_get(${image_name}_CONFIG_SOC_NRF54LM20A_ENGA_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54LM20A_ENGA_CPUAPP KCONFIG)
+  sysbuild_get(${image_name}_CONFIG_SOC_NRF54LV10A_ENGA_CPUAPP IMAGE ${image_name} VAR CONFIG_SOC_NRF54LV10A_ENGA_CPUAPP KCONFIG)
 
-  if (${image_name}_CONFIG_SOC_SERIES_NRF91X)
+  if(${image_name}_CONFIG_SOC_SERIES_NRF91X)
     # See nRF9160 Product Specification, chapter "UICR"
     set(otp_start_addr "0xff8108")
     set(otp_size 756) # 189 * 4
-  elseif (${image_name}_CONFIG_SOC_NRF5340_CPUAPP)
+  elseif(${image_name}_CONFIG_SOC_NRF5340_CPUAPP)
     # See nRF5340 Product Specification, chapter Application Core -> ... "UICR"
     set(otp_start_addr "0xff8100")
     set(otp_size 764)  # 191 * 4
-  elseif (DEFINED ${image_name}_CONFIG_SOC_NRF54L15_CPUAPP)
-    set(otp_start_addr "0xffd500")
-    set(otp_size 1276)  # 319 * 4
+  elseif(${image_name}_CONFIG_SOC_SERIES_NRF54LX)
+    set(bootconf_start_addr "0xffd080")
+    set(bootconf_size 4)
+
+    if(DEFINED ${image_name}_CONFIG_SOC_SERIES_NRF54LX)
+      set(otp_start_addr "0xffd500")
+      # 320 UICR words, minus 32 user-reserved words
+      set(otp_size 1148)  # (319 - 32) * 4
+    endif()
   endif()
 
   sysbuild_get(${image_name}_CONFIG_SOC_SERIES_NRF54LX IMAGE ${image_name} VAR CONFIG_SOC_SERIES_NRF54LX KCONFIG)
+  sysbuild_get(${image_name}_CONFIG_SOC_SERIES_NRF71X IMAGE ${image_name} VAR CONFIG_SOC_SERIES_NRF71X KCONFIG)
   if(${image_name}_CONFIG_SOC_SERIES_NRF54LX)
     set(soc_nvs_controller rram_controller)
     set(soc_nvs_controller_driver_kc CONFIG_SOC_FLASH_NRF_RRAM)
+  elseif(${image_name}_CONFIG_SOC_SERIES_NRF71X)
+    set(soc_nvs_controller mram_controller)
+    set(soc_nvs_controller_driver_kc CONFIG_SOC_FLASH_NRF_MRAMC)
   else()
     set(soc_nvs_controller flash_controller)
     set(soc_nvs_controller_driver_kc CONFIG_SOC_FLASH_NRF)
@@ -561,11 +560,20 @@ foreach(d APP ${PM_DOMAINS})
   sysbuild_get(${image_name}_CONFIG_FLASH_SIZE IMAGE ${image_name} VAR CONFIG_FLASH_SIZE KCONFIG)
   math(EXPR flash_size "${${image_name}_CONFIG_FLASH_SIZE} * 1024" OUTPUT_FORMAT HEXADECIMAL)
 
-  if (${image_name}_CONFIG_SOC_SERIES_NRF91X OR ${image_name}_CONFIG_SOC_NRF5340_CPUAPP OR ${image_name}_CONFIG_SOC_NRF54L15_CPUAPP)
+  if(${image_name}_CONFIG_SOC_SERIES_NRF91X OR ${image_name}_CONFIG_SOC_NRF5340_CPUAPP OR ${image_name}_CONFIG_SOC_SERIES_NRF54LX)
     add_region(
       NAME otp
       SIZE ${otp_size}
       BASE ${otp_start_addr}
+      PLACEMENT start_to_end
+      DOMAIN ${d}
+      )
+  endif()
+  if(${image_name}_CONFIG_SOC_SERIES_NRF54LX)
+    add_region(
+      NAME bootconf
+      SIZE ${bootconf_size}
+      BASE ${bootconf_start_addr}
       PLACEMENT start_to_end
       DOMAIN ${d}
       )
@@ -580,8 +588,6 @@ foreach(d APP ${PM_DOMAINS})
     DEFAULT_DRIVER_KCONFIG ${soc_nvs_controller_driver_kc}
     DOMAIN ${d}
     )
-
-
 endforeach()
 
 sysbuild_get(ext_flash_enabled IMAGE ${DEFAULT_IMAGE} VAR CONFIG_PM_EXTERNAL_FLASH_ENABLED KCONFIG)
@@ -591,12 +597,7 @@ sysbuild_get(num_bits IMAGE ${DEFAULT_IMAGE} VAR CONFIG_PM_EXTERNAL_FLASH_SIZE_B
 if(ext_flash_enabled)
   math(EXPR num_bytes "${num_bits} / 8")
 
-  sysbuild_get(custom_driver IMAGE ${DEFAULT_IMAGE} VAR CONFIG_PM_OVERRIDE_EXTERNAL_DRIVER_CHECK KCONFIG)
-  if (custom_driver)
-    set(external_flash_driver_kconfig CONFIG_PM_OVERRIDE_EXTERNAL_DRIVER_CHECK)
-  else()
-    set(external_flash_driver_kconfig CONFIG_NORDIC_QSPI_NOR)
-  endif()
+  set(external_flash_driver_kconfig CONFIG_PM_EXTERNAL_FLASH_HAS_DRIVER)
 
   sysbuild_get(external_flash_base IMAGE ${DEFAULT_IMAGE} VAR CONFIG_PM_EXTERNAL_FLASH_BASE KCONFIG)
   add_region(
@@ -609,25 +610,29 @@ if(ext_flash_enabled)
     )
 endif()
 
-# If simultaneous updates of the network core and application core is supported
-# we add a region which is used to emulate flash. In reality this data is being
-# placed in RAM. This is used to bank the network core update in RAM while
-# the application core update is banked in flash. This works since the nRF53
-# application core has 512kB of RAM and the network core only has 256kB of flash
-if(SB_CONFIG_NETCORE_APP_UPDATE)
-  # This region will contain the 'mcuboot_secondary' partition, and the banked
-  # updates for the network core will be stored here.
-  sysbuild_get(ram_flash_addr IMAGE mcuboot VAR RAM_FLASH_ADDR CACHE)
-  sysbuild_get(ram_flash_size IMAGE mcuboot VAR RAM_FLASH_SIZE CACHE)
+if(SB_CONFIG_BOOTLOADER_MCUBOOT)
+  sysbuild_get(ram_flash_enabled IMAGE mcuboot VAR CONFIG_FLASH_SIMULATOR KCONFIG)
 
-  add_region(
-    NAME ram_flash
-    SIZE ${ram_flash_size}
-    BASE ${ram_flash_addr}
-    PLACEMENT start_to_end
-    DEVICE nordic_ram_flash_controller
-    DEFAULT_DRIVER_KCONFIG CONFIG_FLASH_SIMULATOR
-    )
+  # If simultaneous updates of the network core and application core is supported
+  # we add a region which is used to emulate flash. In reality this data is being
+  # placed in RAM. This is used to bank the network core update in RAM while
+  # the application core update is banked in flash. This works since the nRF53
+  # application core has 512kB of RAM and the network core only has 256kB of flash
+  if(SB_CONFIG_NETCORE_APP_UPDATE AND ram_flash_enabled)
+    # This region will contain the 'mcuboot_secondary' partition, and the banked
+    # updates for the network core will be stored here.
+    sysbuild_get(ram_flash_addr IMAGE mcuboot VAR RAM_FLASH_ADDR CACHE)
+    sysbuild_get(ram_flash_size IMAGE mcuboot VAR RAM_FLASH_SIZE CACHE)
+
+    add_region(
+      NAME ram_flash
+      SIZE ${ram_flash_size}
+      BASE ${ram_flash_addr}
+      PLACEMENT start_to_end
+      DEVICE nordic_ram_flash_controller
+      DEFAULT_DRIVER_KCONFIG CONFIG_FLASH_SIMULATOR
+      )
+  endif()
 endif()
 
 # Do per domain, end with main app domain.
@@ -635,43 +640,13 @@ partition_manager(IN_FILES ${input_files} REGIONS ${regions})
 foreach(d ${PM_DOMAINS})
   get_property(image_name GLOBAL PROPERTY DOMAIN_APP_${d})
   partition_manager(DOMAIN ${d} IN_FILES ${${d}_input_files} REGIONS ${${d}_regions})
-
-#  foreach(d ${PM_DOMAINS})
-#    # Should list be adjust to domain image list ?
-#    # In files must be adjust according to image being built/
-#    partition_manager(DOMAIN ${d} IN_FILES ${${d}_input_files} REGIONS ${domain_regions})
-#  endforeach()
 endforeach()
-
-# Start - Code related to network core update. Multi image updates are part of NCSDK-17807
-#if (CONFIG_SECURE_BOOT AND CONFIG_BOOTLOADER_MCUBOOT)
-#  # Create symbols for the offsets required for moving test update hex files
-#  # to MCUBoots secondary slot. This is needed because objcopy does not
-#  # support arithmetic expressions as argument (e.g. '0x100+0x200'), and all
-#  # of the symbols used to generate the offset is only available as a
-#  # generator expression when MCUBoots cmake code exectues. This because
-#  # partition manager is performed as the last step in the configuration stage.
-#  math(EXPR s0_offset "${PM_MCUBOOT_SECONDARY_ADDRESS} - ${PM_S0_ADDRESS}")
-#  math(EXPR s1_offset "${PM_MCUBOOT_SECONDARY_ADDRESS} - ${PM_S1_ADDRESS}")
-#
-#  set_property(
-#    TARGET partition_manager
-#    PROPERTY s0_TO_SECONDARY
-#    ${s0_offset}
-#    )
-#  set_property(
-#    TARGET partition_manager
-#    PROPERTY s1_TO_SECONDARY
-#    ${s1_offset}
-#    )
-#endif()
-# End - Code related to network core update. Multi image updates are part of NCSDK-17807
 
 # Always add main partition file to list.
 list(APPEND pm_out_partition_file ${APPLICATION_BINARY_DIR}/partitions.yml)
 list(APPEND pm_out_region_file    ${APPLICATION_BINARY_DIR}/regions.yml)
 
-if (is_dynamic_partition_in_domain)
+if(is_dynamic_partition_in_domain)
   # Nothing is built as child.
   # We have all required info available, just need to use them.
   # We are being built as sub image.
@@ -694,7 +669,7 @@ else()
   list(REMOVE_DUPLICATES PM_DOMAINS)
   foreach (d ${PM_DOMAINS})
     # Don't include shared vars from own domain.
-    if (NOT ("${DOMAIN}" STREQUAL "${d}"))
+    if(NOT ("${DOMAIN}" STREQUAL "${d}"))
       get_shared(shared_header_files          IMAGE ${d} PROPERTY PM_DOMAIN_HEADER_FILES)
       get_shared(shared_prefixed_images       IMAGE ${d} PROPERTY PM_DOMAIN_IMAGES)
       get_shared(shared_pm_out_partition_file IMAGE ${d} PROPERTY PM_DOMAIN_PARTITIONS)
@@ -730,78 +705,6 @@ else()
       endforeach()
     endif()
   endforeach()
-
-# Start - Code related to network core update. Multi image updates are part of NCSDK-17807
-#  if (CONFIG_BOOTLOADER_MCUBOOT)
-#    # Create symbols for the offset required for moving the signed network
-#    # core application to MCUBoots secondary slot. This is needed
-#    # because  objcopy does not support arithmetic expressions as argument
-#    # (e.g. '0x100+0x200'), and all of the symbols used to generate the
-#    # offset are only available as a generator expression when MCUBoots
-#    # cmake code executes.
-#
-#    # Check if a signed version of the network core application is defined.
-#    # If so, this indicates that we need to support firmware updates on the
-#    # network core. This again means that we should generate the required
-#    # hex files.
-#    get_shared(cpunet_signed_app_hex IMAGE CPUNET PROPERTY PM_SIGNED_APP_HEX)
-#
-#    if (CONFIG_NRF53_UPGRADE_NETWORK_CORE
-#        AND DEFINED cpunet_signed_app_hex)
-#      # The address coming from other domains are not available in this scope
-#      # since it is imported by a different domain. Hence, it must be fetched
-#      # through the 'partition_manager' target.
-#      get_target_property(net_app_addr partition_manager CPUNET_PM_APP_ADDRESS)
-#
-#      get_shared(
-#        mcuboot_NRF53_MULTI_IMAGE_UPDATE
-#        IMAGE mcuboot
-#        PROPERTY NRF53_MULTI_IMAGE_UPDATE
-#        )
-#
-#      # Check if multi image updates are enabled, in which case we need
-#      # to use the "_1" variant of the secondary partition for the network core.
-#      if(DEFINED mcuboot_NRF53_MULTI_IMAGE_UPDATE)
-#        set(sec_slot_idx "_1")
-#      endif()
-#
-#      # Calculate the offset from the address which the net/app core app is linked
-#      # against to the secondary slot. We need these values to generate hex files
-#      # which targets the secondary slot.
-#      math(EXPR net_app_to_secondary
-#        "${xip_addr} \
-#        + ${PM_MCUBOOT_SECONDARY${sec_slot_idx}_ADDRESS} \
-#        - ${net_app_addr} \
-#        + ${PM_MCUBOOT_PAD_SIZE}"
-#        )
-#
-#      set_property(
-#        TARGET partition_manager
-#        PROPERTY net_app_TO_SECONDARY
-#        ${net_app_to_secondary}
-#        )
-#
-#      # This value is needed by `imgtool.py` which is used to sign the images.
-#      set_property(
-#        TARGET partition_manager
-#        PROPERTY net_app_slot_size
-#        ${PM_MCUBOOT_SECONDARY${sec_slot_idx}_SIZE}
-#        )
-#    endif()
-#
-#    math(EXPR app_to_secondary
-#      "${xip_addr} \
-#      + ${PM_MCUBOOT_SECONDARY_ADDRESS} \
-#      - ${PM_MCUBOOT_PRIMARY_ADDRESS}"
-#      )
-#
-#    set_property(
-#      TARGET partition_manager
-#      PROPERTY app_TO_SECONDARY
-#      ${app_to_secondary}
-#      )
-#  endif()
-# End - Code related to network core update. Multi image updates are part of NCSDK-17807
 
   # Explicitly add the root image domain hex file to the list
   list(APPEND domain_hex_files ${CMAKE_BINARY_DIR}/${merged}.hex)
@@ -850,30 +753,6 @@ else()
     COMMAND_EXPAND_LISTS
     )
 
-# ToDo: do we still want to merge hex files for all the domains ?
-#  if (PM_DOMAINS)
-#    # For convenience, generate global hex file containing all domains' hex
-#    # files.
-#    set(final_merged ${PROJECT_BINARY_DIR}/merged_domains.hex)
-#
-#    # Add command to merge files.
-#    add_custom_command(
-#      OUTPUT ${final_merged}
-#      COMMAND
-#      ${PYTHON_EXECUTABLE}
-#      ${ZEPHYR_BASE}/scripts/build/mergehex.py
-#      -o ${final_merged}
-#      ${domain_hex_files}
-#      DEPENDS
-#      ${domain_hex_files}
-#      ${global_hex_depends}
-#      )
-#
-#    # Wrapper target for the merge command.
-#    add_custom_target(merged_domains_hex ALL DEPENDS ${final_merged})
-#  endif()
-
   set(ZEPHYR_RUNNER_CONFIG_KERNEL_HEX "${final_merged}"
     CACHE STRING "Path to merged image in Intel Hex format" FORCE)
-
 endif()

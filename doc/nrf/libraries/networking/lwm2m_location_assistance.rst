@@ -20,7 +20,7 @@ To know more about the AVSystem integration with |NCS|, see :ref:`ug_avsystem`.
 The library adds support for four objects related to location assistance:
 
 * GNSS Assistance object (ID 33625) for requesting and handling A-GNSS and P-GPS assistance data.
-* Ground Fix Location object (ID 33626) for requesting and storing estimated cell and Wi-Fi based location.
+* Ground Fix Location object (ID 33626) for requesting and storing estimated cell and Wi-Fi®-based location.
 * Visible Wi-Fi Access Point object (ID 33627) for storing nearby Wi-Fi Access Point information.
 * ECID-Signal Measurement Information object (ID 10256) for storing the cell neighborhood information.
 
@@ -101,7 +101,7 @@ Filtered A-GNSS
 
 With filtered A-GNSS, the satellites below the given angle above the ground are filtered out.
 You can set the angle to a degree `[0 - 90]` using the :c:func:`location_assist_agnss_set_elevation_mask` function.
-Setting the degree to `-1` disables filtering, which is the default setting.
+Setting the degree to `–1` disables filtering, which is the default setting.
 
 .. _location_assistance_pgps_lwm2m:
 
@@ -150,7 +150,7 @@ In such case, the device must resend the request after the previous request has 
 Configuration
 *************
 
-To enable location assistance, configure either or both of the following Kconfig options:
+To enable location assistance, set the :kconfig:option:`CONFIG_NRF_CLOUD` Kconfig option and configure one or both of the following Kconfig options:
 
 * :kconfig:option:`CONFIG_LWM2M_CLIENT_UTILS_GNSS_ASSIST_OBJ_SUPPORT`
 * :kconfig:option:`CONFIG_LWM2M_CLIENT_UTILS_GROUND_FIX_OBJ_SUPPORT`

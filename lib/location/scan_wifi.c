@@ -15,7 +15,7 @@
 
 #include "location_core.h"
 #include "location_utils.h"
-#include "cloud_service/cloud_service.h"
+#include "cloud_service.h"
 
 LOG_MODULE_DECLARE(location, CONFIG_LOCATION_LOG_LEVEL);
 
@@ -112,6 +112,8 @@ void scan_wifi_execute(int32_t timeout, struct k_sem *wifi_scan_ready)
 #if defined(CONFIG_LOCATION_METHOD_WIFI_NET_IF_UPDOWN)
 	ret = scan_wifi_startup_interface(wifi_iface);
 	if (ret) {
+		k_sem_give(scan_wifi_ready);
+		scan_wifi_ready = NULL;
 		return;
 	}
 #endif /* defined(CONFIG_LOCATION_METHOD_WIFI_NET_IF_UPDOWN) */
@@ -172,7 +174,7 @@ static void scan_wifi_done_handle(struct net_mgmt_event_callback *cb)
 
 void scan_wifi_net_mgmt_event_handler(
 	struct net_mgmt_event_callback *cb,
-	uint32_t mgmt_event,
+	uint64_t mgmt_event,
 	struct net_if *iface)
 {
 	ARG_UNUSED(iface);
@@ -203,7 +205,7 @@ void scan_wifi_net_mgmt_event_handler(
 int scan_wifi_cancel(void)
 {
 	if (scan_wifi_ready != NULL) {
-		k_sem_reset(scan_wifi_ready);
+		k_sem_give(scan_wifi_ready);
 		scan_wifi_ready = NULL;
 	}
 	return 0;

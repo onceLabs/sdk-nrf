@@ -213,7 +213,7 @@ Documentation
     * nRF9160: Secure Services
     * Secure Partition Manager
     * nRF9160: AWS FOTA
-    * :ref:`lte_sensor_gateway`
+    * LTE Sensor Gateway
 
   * Bluetooth Low Energy:
 
@@ -232,7 +232,7 @@ Documentation
 
     * Secure Partition Manager (SPM)
     * ``at_cmd`` library
-    * :ref:`lib_download_client`
+    * Download client
     * :ref:`lib_aws_fota`
     * :ref:`lib_fota_download`
     * Secure Services
@@ -249,7 +249,7 @@ Documentation
 * Added or updated the following documentation:
 
   * nRF BLE Controller (experimental)
-  * :ref:`ug_multi_image`
+  * Multi-image build
   * :ref:`partition_manager`
   * :ref:`nrf_desktop`
   * :ref:`shell_bt_nus_readme`

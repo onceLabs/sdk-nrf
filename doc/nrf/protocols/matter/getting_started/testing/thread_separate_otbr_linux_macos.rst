@@ -11,7 +11,7 @@ Matter over Thread: Configuring Border Router and Linux/macOS controller on sepa
 
 The recommended approach for Matter over Thread is to run the Thread Border Router and the Matter controller on separate devices.
 With the Thread Border Router installed on Raspberry Pi, this approach provides support for most functionalities.
-For example, it allows using a mobile controller by providing connectivity between a Wi-Fi network and a Thread network.
+For example, it allows using a mobile controller by providing connectivity between a Wi-Fi® network and a Thread network.
 
 In such setup, Raspberry Pi runs the Thread Border Router, which provides communication between the Thread nodes and the Matter controller.
 The controller can be installed on a PC.
@@ -48,7 +48,7 @@ Program the sample
 ==================
 
 Program the development kit for the Matter accessory device with one of available :ref:`matter_samples`.
-We recommend using :ref:`Matter light bulb <matter_light_bulb_sample>`.
+It is recommended to use the :ref:`Matter light bulb <matter_light_bulb_sample>` sample.
 
 .. rst-class:: numbered-step
 
@@ -77,8 +77,8 @@ Complete the following steps:
 #. Configure the CHIP Tool controller.
    Complete the following actions by following the steps in the :doc:`matter:chip_tool_guide` user guide in the Matter documentation:
 
-   * Build and run the CHIP Tool by completing the steps listed in "Building and running CHIP Tool".
-   * Prepare the environment for testing by completing the steps listed in "Using CHIP Tool for Matter device testing".
+   * Build and run the CHIP Tool by completing the steps listed in "Building and running CHIP Tool."
+   * Prepare the environment for testing by completing the steps listed in "Using CHIP Tool for Matter device testing."
 
 .. rst-class:: numbered-step
 

@@ -13,7 +13,9 @@ following pattern:
 
 For tool-versions-{os} files:
     {TOOL_NAME}_VERSION_{OS}
+    {TOOL_NAME}_{SUBCOMMAND}_VERSION_{OS}
 where OS is one of WIN10, LINUX or DARWIN
+where SUBCOMMAND is one of nRF Util subcommands, like DEVICE, SDK-MANAGER, etc.
 
 For pip requirement files:
     {TOOL_NAME}_VERSION
@@ -22,15 +24,17 @@ Examples of use:
 - :ncs-tool-version:`CMAKE_VERSION_LINUX`
 - :ncs-tool-version:`SPHINX_VERSION`
 - :ncs-tool-version:`SPHINX_NCS_THEME_VERSION`
+- :ncs-tool-version:`NRFUTIL_DEVICE_VERSION_LINUX`
 
 """
 
+import re
+from collections.abc import Callable
+
+import yaml
 from docutils import nodes
 from sphinx.application import Sphinx
-from typing import List, Dict, Callable
 from sphinx.util import logging
-import yaml
-import re
 
 __version__ = "0.1.0"
 
@@ -42,7 +46,7 @@ def remove_prefix(s: str, prefix: str) -> str:
     return s[len(prefix) :] if s.startswith(prefix) else s
 
 
-def parse_pip_requirements(lines: List[str]) -> Dict[str, str]:
+def parse_pip_requirements(lines: list[str]) -> dict[str, str]:
     """Create a mapping from a pip requirements file.
     The listed dependencies are mapped to their required versions.
     Exact versions will only have their version displayed, and dependencies
@@ -92,6 +96,13 @@ def tool_version_replace(app: Sphinx) -> Callable:
                 entry = f"{tool_upper}_VERSION_{os}"
                 versions[entry] = yaml_object[tool]["version"]
 
+                # Handle subcommands if they exist
+                if "subcommands" in yaml_object[tool]:
+                    for subcommand, subcommand_version in yaml_object[tool]["subcommands"].items():
+                        subcommand_upper = subcommand.upper()
+                        subcommand_entry = f"{tool_upper}_{subcommand_upper}_VERSION_{os}"
+                        versions[subcommand_entry] = subcommand_version
+
         elif path.suffix == ".txt":
             for line in path.read_text().strip().split("\n"):
                 tool, version = line.split("=")
@@ -104,7 +115,11 @@ def tool_version_replace(app: Sphinx) -> Callable:
         pip_versions = parse_pip_requirements(requirement_lines)
         versions.update(pip_versions)
 
-    def tool_version_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
+    def tool_version_role(name, rawtext, text, lineno, inliner, options=None, content=None):
+        if content is None:
+            content = []
+        if options is None:
+            options = {}
         if text in versions:
             node = nodes.Text(versions[text])
         else:

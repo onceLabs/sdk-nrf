@@ -9,7 +9,7 @@ menuconfig NRF_CLOUD_FOTA
 	select FOTA_DOWNLOAD
 	select FOTA_DOWNLOAD_PROGRESS_EVT
 	select DFU_TARGET
-	select DOWNLOAD_CLIENT
+	select DOWNLOADER
 	select REBOOT
 	select CJSON_LIB
 	select SETTINGS
@@ -33,7 +33,7 @@ config NRF_CLOUD_FOTA_PROGRESS_PCT_INCREMENT
 	  0 disables progress report.
 
 config NRF_CLOUD_FOTA_BLE_DEVICES
-	bool "Enable API for FOTA of BLE devices"
+	bool "API for FOTA of BLE devices"
 	depends on BT
 
 endif # NRF_CLOUD_FOTA
@@ -50,7 +50,7 @@ config NRF_CLOUD_FOTA_POLL
 	bool "FOTA job polling helpers (REST/CoAP)"
 	depends on !NRF_CLOUD_FOTA
 	depends on FOTA_DOWNLOAD
-	select FOTA_DOWNLOAD_EXTERNAL_DL if NRF_CLOUD_COAP_DOWNLOADS
+	select FOTA_DOWNLOAD_PROGRESS_EVT
 	help
 	  When enabled, nRF Cloud FOTA job polling helpers will be built.  These
 	  functions make it easy to request, download, and handle modem, boot,
@@ -105,7 +105,7 @@ endif # NRF_CLOUD_REST
 
 menuconfig NRF_CLOUD_FOTA_FULL_MODEM_UPDATE
 	bool "Full modem FOTA updates"
-	select NRF_MODEM_LIB
+	depends on NRF_MODEM_LIB
 	select ZCBOR
 	select DFU_TARGET
 	select DFU_TARGET_FULL_MODEM
@@ -117,7 +117,6 @@ menuconfig NRF_CLOUD_FOTA_FULL_MODEM_UPDATE
 	select FMFU_FDEV
 	select OBERON_BACKEND
 	select NORDIC_SECURITY_BACKEND
-	default n
 	help
 	  Requires flash device of at least 4MB.
 
@@ -149,7 +148,7 @@ config NRF_CLOUD_FOTA_TYPE_APP_SUPPORTED
 
 config NRF_CLOUD_FOTA_TYPE_BOOT_SUPPORTED
 	bool
-	default y if (BOOTLOADER_MCUBOOT && BUILD_S1_VARIANT && SECURE_BOOT && \
+	default y if (BOOTLOADER_MCUBOOT && MCUBOOT_MCUBOOT_IMAGE_NUMBER != -1 && \
 		      NRF_CLOUD_FOTA_TRANSPORT_ENABLED)
 	help
 	  This symbol is y when bootloader FOTA is supported by the configuration.

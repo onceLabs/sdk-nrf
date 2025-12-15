@@ -23,6 +23,8 @@ The sample can perform all Wi-Fi operations in the 2.4GHz and 5GHz bands dependi
 
 Using this sample, the development kit can associate with, and ping to, any Wi-Fi capable access point in :abbr:`STA (Station)` mode.
 
+.. _wifi_shell_sample_building_and_running:
+
 Building and running
 ********************
 
@@ -60,6 +62,15 @@ The following is an example of the CLI command:
 
 .. tabs::
 
+   .. group-tab:: nRF9151 DK
+
+      To build for the nRF9151 DK, use the ``nrf9151dk/nrf9151/ns`` board target with the ``SHIELD`` CMake option set to ``nrf7002ek`` and a scan-only overlay configuration.
+      The following is an example of the CLI command:
+
+      .. code-block:: console
+
+         west build -p -b nrf9151dk/nrf9151/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek -DSB_CONFIG_WIFI_NRF70_SCAN_ONLY=y
+
    .. group-tab:: nRF9161 DK
 
       To build for the nRF9161 DK, use the ``nrf9161dk/nrf9161/ns`` board target with the ``SHIELD`` CMake option set to ``nrf7002ek`` and a scan-only overlay configuration.
@@ -67,7 +78,7 @@ The following is an example of the CLI command:
 
       .. code-block:: console
 
-         west build -p -b nrf9161dk/nrf9161/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek
+         west build -p -b nrf9161dk/nrf9161/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek -DSB_CONFIG_WIFI_NRF70_SCAN_ONLY=y
 
    .. group-tab:: nRF9160 DK
 
@@ -76,9 +87,13 @@ The following is an example of the CLI command:
 
     .. code-block:: console
 
-       west build -b nrf9160dk/nrf9160/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek
+       west build -b nrf9160dk/nrf9160/ns -- -DEXTRA_CONF_FILE=overlay-scan-only.conf -DSHIELD=nrf7002ek -DSB_CONFIG_WIFI_NRF70_SCAN_ONLY=y
 
-To build for the Thingy:91 X using the nRF5340 as the host chip, use the ``thingy91x/nrf5340/cpuapp`` board target with the ``SB_CONFIG_THINGY91X_STATIC_PARTITIONS_NRF53_EXTERNAL_FLASH=y`` CMake option set.
+.. note::
+   The nRF91 Series supports Wi-Fi through nR70 Series shields but is limited to scan-only operation to enhance location accuracy.
+   However, it does not support full Wi-Fi operations.
+
+To build for the Thingy:91 X using the nRF5340 as the host chip, use the ``thingy91x/nrf5340/cpuapp`` board target with the :kconfig:option:`SB_CONFIG_THINGY91X_STATIC_PARTITIONS_NRF53_EXTERNAL_FLASH` Kconfig option set to ``y``.
 This requires an external debugger since the nRF9151 normally owns the buses.
 This special configuration is not compatible with nRF9151 firmware compiled for the default configuration.
 You need to erase the nRF9151 first to avoid conflicts.
@@ -88,23 +103,17 @@ The following is an example of the CLI commands:
 
    west build -b thingy91x/nrf5340/cpuapp -- -DSB_CONFIG_THINGY91X_STATIC_PARTITIONS_NRF53_EXTERNAL_FLASH=y
    # Set SWD switch to nRF91 and check if you are connected to an nRF91:
-   nrfjprog --deviceversion
-   # If you see NRF9120_xxAA_REV3, proceed with erasing:
-   nrfjprog --recover
+   nrfutil device device-info
+   # If you see deviceVersion as NRF9120_xxAA_REV3 in the above output, proceed with erasing:
+   nrfutil device --recover
    # Flip the SWD switch back to nRF53.
-   nrfjprog --deviceversion
-   # If you see NRF5340_xxAA_REV1, proceed with flashing:
+   nrfutil device device-info
+   # If you see deviceVersion as NRF5340_xxAA_REV1 in the above output, proceed with flashing:
    west flash --erase
-
-.. note::
-    |nrfjprog_deprecation_note|
 
 See also :ref:`cmake_options` for instructions on how to provide CMake options.
 
-
-.. note::
-   |54H_engb_2_8|
-
+.. include:: /includes/wifi_refer_sample_yaml_file.txt
 
 Supported CLI commands
 ======================
@@ -270,8 +279,8 @@ Supported CLI commands
        | Set operation example for interface index 1 (setting channel 5)
        | wifi -i1 -c5
 
-``wifi_cred`` is an extension to the Wi-Fi command line.
-It adds the following subcommands to interact with the :ref:`lib_wifi_credentials` library:
+``wifi cred`` is an extension to the Wi-Fi command line.
+It adds the following subcommands to interact with the :ref:`Wi-Fi credentials <zephyr:lib_wifi_credentials>` library:
 
 .. list-table:: Wi-Fi credentials shell subcommands
    :header-rows: 1

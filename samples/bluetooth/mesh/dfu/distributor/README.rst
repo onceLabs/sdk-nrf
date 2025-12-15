@@ -142,13 +142,13 @@ Performing a Device Firmware Update
 -----------------------------------
 
 The Bluetooth Mesh defines the Firmware update Initiator role to control the firmware distribution.
-This sample supports, but doesn't require an external Initiator to control the DFU procedure.
+This sample supports, but does not require an external Initiator to control the DFU procedure.
 The Bluetooth Mesh DFU subsystem also provides a set of shell commands that can be used instead of the Initiator.
 Follow the description in the :ref:`dfu_over_bt_mesh` guide on how to perform the firmware distribution without the Initiator.
 
 The commands can be executed in two ways:
 
-* Through the shell management subsystem of MCU manager (for example, using the nRF Connect Device Manager mobile application or :ref:`Mcumgr command-line tool <dfu_tools_mcumgr_cli>`).
+* Through the shell management subsystem of MCU manager (for example, using the nRF Connect Device Manager mobile application on Android or :ref:`Mcumgr command-line tool <dfu_tools_mcumgr_cli>`).
 * By accessing the :ref:`zephyr:shell_api` module over RTT.
 
 .. _ble_mesh_dfu_distributor_fw_image_upload:
@@ -183,11 +183,11 @@ Then, in the mobile app, do the following:
 
 * Find and select the :guilabel:`Mesh DFU Distributor` device.
 * Go to the :guilabel:`Image` tab.
-* Press the :guilabel:`ADVANCED` button in the right top corner.
+* Tap the :guilabel:`Advanced` button in the right top corner.
   This will allow uploading the image to slot-1 without swapping the image on the Distributor.
-* Under the :guilabel:`Firmware Upload` area, press the :guilabel:`SELECT FILE` button and select the copied image.
-* Press the :guilabel:`UPLOAD` button.
-* Select :guilabel:`Application Core (0)` and tap :guilabel:`OK`.
+* Under the :guilabel:`Image Upload` area, tap the :guilabel:`Select File` button and select the copied image.
+* Tap the :guilabel:`Start` button.
+* Select :guilabel:`target.signed.bin`.
 
 Once the image upload is done, the :guilabel:`State` field is set to UPLOAD COMPLETE.
 
@@ -211,7 +211,7 @@ When the Distributor updates itself, the DFU transfer will end immediately after
 .. note::
    Do not add other Target nodes but the Distributor when performing a self-update.
    If the Firmware Distribution Server on the Distributor finds itself in the list of Target nodes, it skips the DFU transfer as the image is already stored on the device.
-   Thus, other nodes won't receive the image.
+   Thus, other nodes will not receive the image.
 
 When this sample is used as a Target, it behaves as described in :ref:`ble_mesh_dfu_target_upgrade`.
 
@@ -220,7 +220,7 @@ This sample also provides support for :ref:`dfu_over_ble`, so it is possible to 
 SMP over Bluetooth authentication
 =================================
 
-By default, the SMP characteristics don't require authentication when using SMP over Bluetooth to access the :ref:`management subsystem <zephyr:mcu_mgr>`.
+By default, the SMP characteristics do not require authentication when using SMP over Bluetooth to access the :ref:`management subsystem <zephyr:mcu_mgr>`.
 To prevent an unauthenticated access to the device over SMP, it is strongly recommended to enable the :kconfig:option:`CONFIG_MCUMGR_TRANSPORT_BT_PERM_RW_AUTHEN` option.
 This will enforce a remote device to initiate a pairing request before accessing SMP characteristics.
 See `Zephyr Bluetooth LE Security`_ for more details about securing the Bluetooth LE connection.
@@ -236,6 +236,36 @@ Logging
 In this sample, the UART console is occupied by the shell module.
 Therefore, it uses SEGGER RTT as a logging backend.
 For the convenience, ``printk`` is also duplicated to SEGGER RTT.
+
+External flash support
+======================
+
+This sample supports two types of external flash usage: DFU firmware image storage and settings partition storage.
+
+DFU firmware image storage
+--------------------------
+
+This sample supports external flash memory as secondary storage partition for saving of the firmware images, both as for self update as well as for distribution.
+See :ref:`ug_bootloader_external_flash` for more information on external flash support as a partition in the :ref:`ug_bootloader_mcuboot_nsib`.
+The default configuration does not support external flash memory.
+To enable external flash support, set :makevar:`FILE_SUFFIX` to ``dfu_ext_flash`` when building the sample.
+
+Build the sample using the following command:
+
+.. code-block:: console
+
+   west build -p -b *board_name* -- -DFILE_SUFFIX=dfu_ext_flash
+
+Currently, DFU external flash is supported on the ``nrf52840dk/nrf52840`` and ``nrf54l15dk/nrf54l15/cpuapp`` board targets.
+
+Settings partition storage
+--------------------------
+
+.. include:: /includes/mesh_ext_flash_settings.txt
+
+.. note::
+   You can use only one :makevar:`FILE_SUFFIX` at a time.
+   The sample does not support both DFU firmware image storage and settings partition storage on external flash simultaneously.
 
 Dependencies
 ************

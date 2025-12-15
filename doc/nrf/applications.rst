@@ -12,18 +12,26 @@ You can also run them on different hardware like a generic development kit, but 
 
 If you want to list applications available for one or more specific boards, `use the nRF Connect for Visual Studio Code extension to filter them <Browse samples_>`_.
 
+Applications are also available through the `nRF Connect SDK Add-ons`_, a curated collection of supplementary |NCS| components designed to extend the functionality of the |NCS| and provide specific application use cases.
+
 .. toctree::
    :maxdepth: 1
    :glob:
-   :caption: Subpages:
+   :caption: nRF Connect SDK add-on applications:
 
-   ../../applications/asset_tracker_v2/README
+   ../../applications/asset_tracker_template/README
+   ../../applications/serial_modem/README
+
+.. toctree::
+   :maxdepth: 1
+   :glob:
+   :caption: nRF Connect SDK applications:
+
    ../../applications/connectivity_bridge/README
    ../../applications/ipc_radio/README
    ../../applications/matter_bridge/README
    ../../applications/nrf5340_audio/index
    ../../applications/nrf_desktop/README
    ../../applications/machine_learning/README
-   ../../applications/serial_lte_modem/README
+   ../../applications/hpf/hpf
    ../../applications/matter_weather_station/README
-   ../../applications/zigbee_weather_station/README

@@ -7,7 +7,7 @@ Matter over Wi-Fi: Configuring CHIP Tool for Linux or macOS
    :local:
    :depth: 2
 
-In this setup, the Matter controller is installed on PC that is running either Linux or macOS, and a dedicated Wi-Fi Access Point is used.
+In this setup, the Matter controller is installed on PC that is running either Linux or macOS, and a dedicated Wi-Fi® Access Point is used.
 This is the recommended setup for Matter over Wi-Fi.
 
 .. figure:: images/matter_wifi_setup_pc.png
@@ -36,7 +36,7 @@ Program the sample
 ==================
 
 Program the development kit for the Matter accessory device with one of available :ref:`matter_samples`.
-We recommend using :ref:`Matter light bulb <matter_light_bulb_sample>`.
+It is recommended to use the :ref:`Matter light bulb <matter_light_bulb_sample>` sample.
 
 .. rst-class:: numbered-step
 
@@ -57,8 +57,8 @@ To use this controller type, complete the following steps:
 
 #. Configure the CHIP Tool for Linux or macOS by following the steps in the sections of the :doc:`matter:chip_tool_guide` in the Matter documentation:
 
-   a. Build and run the CHIP Tool by completing the steps listed in "Building and running CHIP Tool".
-   #. Prepare the environment for testing by completing the steps listed in "Using CHIP Tool for Matter device testing".
+   a. Build and run the CHIP Tool by completing the steps listed in "Building and running CHIP Tool."
+   #. Prepare the environment for testing by completing the steps listed in "Using CHIP Tool for Matter device testing."
 
 .. rst-class:: numbered-step
 

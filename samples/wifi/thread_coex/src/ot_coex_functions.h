@@ -29,14 +29,12 @@ LOG_MODULE_REGISTER(ot_coex_functions, CONFIG_LOG_DEFAULT_LEVEL);
 #include <zephyr/net/socket.h>
 #include <zephyr/net/wifi_utils.h>
 
-#include <net/wifi_mgmt_ext.h>
 
 /* For net_sprint_ll_addr_buf */
 #include "net_private.h"
 
 #include "coex.h"
 #include "coex_struct.h"
-#include "fmac_main.h"
 #include "ot_utils.h"
 
 #define DEMARCATE_TEST_START
@@ -220,7 +218,7 @@ static struct net_mgmt_event_callback net_addr_mgmt_cb;
  *
  * @return No return value.
  */
-void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 	struct net_if *iface);
 
 /**
@@ -228,7 +226,7 @@ void wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_e
  *
  * @return No return value.
  */
-void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+void net_mgmt_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 	struct net_if *iface);
 
 /**

@@ -25,20 +25,20 @@ The build targets of interest for Thingy:91 X in the |NCS| are as follows:
 +----------------------------------+---------------------------------+
 
 .. note::
-   LTE/GNSS features can only be used with :ref:`Cortex-M Security Extensions enabled <app_boards_spe_nspe_cpuapp_ns>` (nRF9151 ``ns`` build target).
+   LTE/GNSS features can only be used with :ref:`Cortex-M Security Extensions enabled <app_boards_spe_nspe_cpuapp_ns>` (``thingy91x/nrf9151/ns`` build target).
 
 The following table shows the different types of build files that are generated and the different scenarios in which they are used:
 
-+-----------------------+----------------------------------------+----------------------------------------------------------------+
-| File                  | File format                            | Programming scenario                                           |
-+=======================+========================================+================================================================+
-|:file:`merged.hex`     | Full image, HEX format                 | Using an external debug probe and nrfutil device.              |
-+-----------------------+----------------------------------------+----------------------------------------------------------------+
-|:file:`app_signed.hex` | MCUboot compatible image, HEX format   | Using the built-in bootloader and nrfutil device.              |
-+-----------------------+----------------------------------------+----------------------------------------------------------------+
-|:file:`app_update.bin` | MCUboot compatible image, binary format|* Using the built-in bootloader and mcumgr command-line tool.   |
-|                       |                                        |* For FOTA updates.                                             |
-+-----------------------+----------------------------------------+----------------------------------------------------------------+
++--------------------------+----------------------------------------+----------------------------------------------------------------+
+| File                     | File format                            | Programming scenario                                           |
++==========================+========================================+================================================================+
+|:file:`merged.hex`        | Full image, HEX format                 | Using an external debug probe and nrfutil device.              |
++--------------------------+----------------------------------------+----------------------------------------------------------------+
+|:file:`zephyr.signed.hex` | MCUboot compatible image, HEX format   | Using the built-in bootloader and nrfutil device.              |
++--------------------------+----------------------------------------+----------------------------------------------------------------+
+|:file:`app_update.bin`    | MCUboot compatible image, binary format|* Using the built-in bootloader and mcumgr command-line tool.   |
+|                          |                                        |* For FOTA updates.                                             |
++--------------------------+----------------------------------------+----------------------------------------------------------------+
 
 Programming onto Thingy:91 X
 ****************************

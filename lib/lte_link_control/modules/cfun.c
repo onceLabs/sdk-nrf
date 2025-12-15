@@ -19,6 +19,7 @@
 #include "modules/cscon.h"
 #include "modules/xmodemsleep.h"
 #include "modules/xt3412.h"
+#include "modules/mdmev.h"
 
 LOG_MODULE_DECLARE(lte_lc, CONFIG_LTE_LINK_CONTROL_LOG_LEVEL);
 
@@ -26,17 +27,21 @@ LOG_MODULE_DECLARE(lte_lc, CONFIG_LTE_LINK_CONTROL_LOG_LEVEL);
 
 static int enable_notifications(void)
 {
-	int err;
+	int err = 0;
 
+#if defined(CONFIG_LTE_LC_NETWORK_REGISTRATION_MODULE)
 	err = cereg_notifications_enable();
 	if (err) {
 		return err;
 	}
+#endif
 
+#if defined(CONFIG_LTE_LC_CONNECTION_STATUS_MODULE)
 	err = cscon_notifications_enable();
 	if (err) {
 		return err;
 	}
+#endif
 
 #if defined(CONFIG_LTE_LC_MODEM_SLEEP_MODULE)
 	err = xmodemsleep_notifications_enable();
@@ -51,6 +56,19 @@ static int enable_notifications(void)
 		return err;
 	}
 #endif
+
+#if defined(CONFIG_LTE_LC_MODEM_EVENTS_MODULE)
+	if (mdmev_enabled) {
+		/* Modem events have been enabled by the application, so the notifications need
+		 * to be subscribed to again. This is done using the same function which is used
+		 * to enable modem events through the library API.
+		 */
+		err = mdmev_enable();
+		if (err) {
+			return err;
+		}
+	}
+#endif /* CONFIG_LTE_LC_MODEM_EVENTS_MODULE */
 
 	return 0;
 }
@@ -89,7 +107,6 @@ int cfun_mode_set(enum lte_lc_func_mode mode)
 			LOG_ERR("Failed to enable notifications, error: %d", err);
 			return -EFAULT;
 		}
-
 		break;
 	case LTE_LC_FUNC_MODE_NORMAL:
 		LTE_LC_TRACE(LTE_LC_TRACE_FUNC_MODE_NORMAL);
@@ -99,13 +116,18 @@ int cfun_mode_set(enum lte_lc_func_mode mode)
 			LOG_ERR("Failed to enable notifications, error: %d", err);
 			return -EFAULT;
 		}
-
 		break;
 	case LTE_LC_FUNC_MODE_POWER_OFF:
 		LTE_LC_TRACE(LTE_LC_TRACE_FUNC_MODE_POWER_OFF);
 		break;
 	case LTE_LC_FUNC_MODE_RX_ONLY:
 		LTE_LC_TRACE(LTE_LC_TRACE_FUNC_MODE_RX_ONLY);
+
+		err = enable_notifications();
+		if (err) {
+			LOG_ERR("Failed to enable notifications, error: %d", err);
+			return -EFAULT;
+		}
 		break;
 	case LTE_LC_FUNC_MODE_OFFLINE:
 		LTE_LC_TRACE(LTE_LC_TRACE_FUNC_MODE_OFFLINE);
@@ -127,6 +149,12 @@ int cfun_mode_set(enum lte_lc_func_mode mode)
 		break;
 	case LTE_LC_FUNC_MODE_OFFLINE_UICC_ON:
 		LTE_LC_TRACE(LTE_LC_TRACE_FUNC_MODE_OFFLINE_UICC_ON);
+		break;
+	case LTE_LC_FUNC_MODE_OFFLINE_KEEP_REG:
+		LTE_LC_TRACE(LTE_LC_TRACE_FUNC_MODE_OFFLINE_KEEP_REG);
+		break;
+	case LTE_LC_FUNC_MODE_OFFLINE_KEEP_REG_UICC_ON:
+		LTE_LC_TRACE(LTE_LC_TRACE_FUNC_MODE_OFFLINE_KEEP_REG_UICC_ON);
 		break;
 	default:
 		LOG_ERR("Invalid functional mode: %d", mode);

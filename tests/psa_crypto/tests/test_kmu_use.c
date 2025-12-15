@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 #include <zephyr/ztest.h>
-#include <pm_config.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/logging/log.h>
@@ -102,7 +101,7 @@ int kmu_use(void)
 	return status;
 }
 
-ZTEST(test_suite_ikg, kmu_test_2_use)
+ZTEST(test_suite_ikg, test_kmu_2_use)
 {
 	kmu_use();
 }

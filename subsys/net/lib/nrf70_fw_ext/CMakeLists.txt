@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
 #
 
-if(CONFIG_NRF_WIFI_BUILD_ONLY_MODE)
+if(CONFIG_BUILD_ONLY_NO_BLOBS)
   return()
 endif()
 
@@ -19,19 +19,23 @@ else()
   endif()
 endif()
 
+zephyr_library_link_libraries(nrf70-buslib nrf-wifi-shim)
+
 if(DEFINED CONFIG_NRF_WIFI_PATCHES_EXT_FLASH_DISABLED OR
    DEFINED CONFIG_NRF_WIFI_PATCHES_EXT_FLASH_XIP)
   # NCS doesn't rely on hal_nordic blobs for nRF70 device driver
   set(FW_BINS_BASE ${ZEPHYR_NRFXLIB_MODULE_DIR}/nrf_wifi/bin/ncs)
   # RPU FW patch binaries based on the selected configuration
   if(CONFIG_NRF70_SYSTEM_MODE)
-    set(NRF70_PATCH ${FW_BINS_BASE}/default/nrf70.bin)
+    if(CONFIG_NRF70_SYSTEM_WITH_RAW_MODES)
+      set(NRF70_PATCH ${FW_BINS_BASE}/system_with_raw/nrf70.bin)
+    else()
+      set(NRF70_PATCH ${FW_BINS_BASE}/default/nrf70.bin)
+    endif()
   elseif(CONFIG_NRF70_RADIO_TEST)
     set(NRF70_PATCH ${FW_BINS_BASE}/radio_test/nrf70.bin)
   elseif(CONFIG_NRF70_SCAN_ONLY)
     set(NRF70_PATCH ${FW_BINS_BASE}/scan_only/nrf70.bin)
-  elseif (CONFIG_NRF70_SYSTEM_WITH_RAW_MODES)
-    set(NRF70_PATCH ${FW_BINS_BASE}/system_with_raw/nrf70.bin)
   elseif(CONFIG_NRF70_OFFLOADED_RAW_TX)
     set(NRF70_PATCH ${FW_BINS_BASE}/offloaded_raw_tx/nrf70.bin)
   else()

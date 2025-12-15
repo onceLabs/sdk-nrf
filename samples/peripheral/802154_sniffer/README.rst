@@ -90,6 +90,21 @@ The ``sleep`` command disables the radio and ends the receive process.
 
       sleep
 
+bootloader - reboot the device to the bootloader
+================================================
+
+The ``bootloader`` command reboots the device in bootloader mode.
+
+   .. parsed-literal::
+      :class: highlight
+
+      bootloader
+
+The device reboots into bootloader mode, and the red LED starts pulsing.
+
+.. note::
+   The ``bootloader`` command is available only for the ``nrf52840dongle/nrf52840`` board.
+
 Configuration
 *************
 
@@ -111,7 +126,8 @@ After programming the sample to your development kit, complete the following ste
 
 1. Connect the development kit to the computer using a USB cable.
    Use the development kit's nRF USB port (**J3**).
-   The kits are assigned a COM port (in Windows) or a ttyACM device (in Linux), visible in the Device Manager or in the :file:`/dev` directory.
+   The kits are assigned serial ports.
+   |serial_port_number_list|
 #. |connect_terminal|
 #. Switch to a radio channel with an ongoing radio traffic:
 

@@ -9,7 +9,6 @@ LOG_MODULE_REGISTER(l2_wifi_mgr_conn);
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/net_event.h>
-#include <net/wifi_mgmt_ext.h>
 #include <net/l2_wifi_connect.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <supp_events.h>
@@ -71,7 +70,7 @@ static void net_l2_wifi_connect_result(struct net_mgmt_event_callback *cb)
 }
 
 static void net_l2_wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
-				    uint32_t mgmt_event, struct net_if *iface)
+				    uint64_t mgmt_event, struct net_if *iface)
 {
 	if (iface != wifi_iface) {
 		return;
@@ -95,7 +94,7 @@ static void net_l2_wifi_mgmt_event_handler(struct net_mgmt_event_callback *cb,
 }
 
 static void wpa_supp_event_handler(struct net_mgmt_event_callback *cb,
-				    uint32_t mgmt_event, struct net_if *iface)
+				    uint64_t mgmt_event, struct net_if *iface)
 {
 	switch (mgmt_event) {
 	case NET_EVENT_SUPPLICANT_READY:

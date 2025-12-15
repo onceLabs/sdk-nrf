@@ -31,11 +31,11 @@ It provides an abstraction of the following modules:
   .. lwm2m_osal_mod_list_start
 
   * :ref:`at_monitor_readme`
-  * :ref:`lib_download_client`
+  * :ref:`lib_downloader`
   * :ref:`sms_readme`
-  * :ref:`pdn_readme`
   * :ref:`lib_dfu_target`
   * :ref:`lib_uicc_lwm2m`
+  * :ref:`lte_lc_readme` (optional, when the :kconfig:option:`CONFIG_LTE_LC_PDN_MODULE` Kconfig option is enabled)
 
   The inclusion of the :ref:`lib_uicc_lwm2m` library is optional and is added using the :kconfig:option:`CONFIG_UICC_LWM2M` Kconfig option.
   This module allows the LwM2M carrier library to use the bootstrap information stored on the SIM card.
@@ -80,15 +80,17 @@ Following are some of the general Kconfig options that you can configure:
     Upon timeout, the LwM2M carrier library disconnects from one or more device management servers.
   * The timeout closes the DTLS session.
     A new DTLS session will be created on the next activity (for example, lifetime trigger).
+
+    * If the DTLS session is using Connection ID, the session is *not* closed.
+
   * Leaving this configuration empty (``0``) sets it to a default of 60 seconds.
   * Setting this configuration to ``-1`` disables the session idle timeout.
-  * This configuration does not apply when the DTLS session is using Connection ID.
 
 * :kconfig:option:`CONFIG_LWM2M_CARRIER_COAP_CON_INTERVAL`:
 
   * This configuration specifies how often to send a Confirmable message instead of a Non-Confirmable message, according to RFC 7641 section 4.5.
   * Leaving this configuration empty (``0``) sets it to a default of 24 hours.
-  * Setting this to -1 will always use Confirmable notifications.
+  * Setting this to –1 will always use Confirmable notifications.
 
 * :kconfig:option:`CONFIG_LWM2M_CARRIER_CUSTOM_APN`:
 
@@ -153,7 +155,7 @@ Following are some of the server Kconfig options that you can configure.
 See the :ref:`enabled carriers <general_options_enabled_carriers>` under :ref:`general_options_lwm2m` for when the option is relevant.
 
 For :kconfig:option:`CONFIG_LWM2M_CARRIER_GENERIC`, no valid factory configuration has been set.
-At a minimum, a URI must be set, unless the :kconfig:option:`CONFIG_LWM2M_SERVER_BINDING_CHOICE` Kconfig option value is non-IP.
+At a minimum, a URI must be set, unless the :kconfig:option:`CONFIG_LWM2M_CARRIER_SERVER_BINDING_NONIP` Kconfig option value is set.
 
 .. note::
    Changing one or more server options will trigger a factory reset (resulting in a new bootstrap sequence).
@@ -187,15 +189,15 @@ At a minimum, a URI must be set, unless the :kconfig:option:`CONFIG_LWM2M_SERVER
     This can be different for each supported carrier.
     For generic operation (:kconfig:option:`CONFIG_LWM2M_CARRIER_GENERIC`), the default is 1 hour.
 
-* :kconfig:option:`CONFIG_LWM2M_SERVER_BINDING_CHOICE`:
+* :kconfig:option:`LWM2M_CARRIER_SERVER_BINDING_UDP`, :kconfig:option:`LWM2M_CARRIER_SERVER_BINDING_NONIP`:
 
-  * This configuration can be used to overwrite the factory default by selecting :c:macro:`LWM2M_CARRIER_SERVER_BINDING_UDP` or :c:macro:`LWM2M_CARRIER_SERVER_BINDING_NONIP`).
-  * This configuration is ignored if a bootstrap server is configured (either by our factory configuration, or by :kconfig:option:`CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER`).
+  * These configurations can be used to overwrite the factory default binding.
+    If these configurations are left empty (``=n``) the factory configuration is used.
+  * The factory default can be different for each supported carrier.
+    For generic operation (:kconfig:option:`CONFIG_LWM2M_CARRIER_GENERIC`), UDP (IP) binding is set as the default.
+  * These configurations are ignored if a bootstrap server is configured (either by the factory configuration, or by :kconfig:option:`CONFIG_LWM2M_CARRIER_IS_BOOTSTRAP_SERVER`).
   * If UDP binding is configured, a URI must also be set (:kconfig:option:`CONFIG_LWM2M_CARRIER_CUSTOM_URI`).
   * The APN (either network default, or the one set with :kconfig:option:`CONFIG_LWM2M_CARRIER_CUSTOM_APN`) must be UDP (IP) or non-IP respectively.
-  * If this configuration is left empty (``0``) the factory configuration is used.
-    This can be different for each supported carrier.
-    For generic operation (:kconfig:option:`CONFIG_LWM2M_CARRIER_GENERIC`), the default is :c:macro:`LWM2M_CARRIER_SERVER_BINDING_UDP`.
 
 .. _device_options_lwm2m:
 
@@ -233,7 +235,7 @@ For example:
 * :c:macro:`LWM2M_CARRIER_EVENT_LTE_LINK_DOWN`- This event indicates that the device must disconnect from the LTE network.
   Your application might want to do some bookkeeping before disconnecting.
 
-* :c:macro:`LWM2M_CARRIER_EVENT_ERROR_CODE_RESET`- This event indicates that the server has reset the "Error Code" resource (3/0/11) of the LwM2M carrier library.
+* :c:macro:`LWM2M_CARRIER_EVENT_ERROR_CODE_RESET`- This event indicates that the server has reset the "Error Code" resource (``3/0/11``) of the LwM2M carrier library.
   When received, the application should re-evaluate the errors and signal relevant errors again using the :c:func:`lwm2m_carrier_error_code_add` function.
   This is not handled in the ``__weak`` implementation since the applicable errors to report is application dependent.
 
@@ -417,4 +419,4 @@ A ``__weak`` implementation of the function is included, which checks if the cur
 
 The proprietary application upgrades over multiple files are currently only supported if the :kconfig:option:`CONFIG_LWM2M_CARRIER_SOFTBANK_DIVIDED_FOTA` Kconfig option is enabled.
 This allows the library to perform the non-standard divided FOTA procedure in the SoftBank network.
-The application update files required for this type of firmware upgrade can be generated during the building process by enabling the ``SB_CONFIG_LWM2M_CARRIER_DIVIDED_DFU`` sysbuild Kconfig option.
+The application update files required for this type of firmware upgrade can be generated during the building process by enabling the :kconfig:option:`SB_CONFIG_LWM2M_CARRIER_DIVIDED_DFU` sysbuild Kconfig option.

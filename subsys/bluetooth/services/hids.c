@@ -23,8 +23,6 @@
 
 #include <zephyr/logging/log.h>
 
-#define BOOT_MOUSE_INPUT_REPORT_MIN_SIZE 3
-
 #define GATT_PERM_READ_MASK     (BT_GATT_PERM_READ | \
 				 BT_GATT_PERM_READ_ENCRYPT | \
 				 BT_GATT_PERM_READ_AUTHEN)
@@ -289,6 +287,7 @@ static ssize_t hids_outp_rep_read(struct bt_conn *conn,
 
 	if (rep->handler) {
 		struct bt_hids_rep report = {
+		    .id = rep->id,
 		    .data = buf,
 		    .size = rep->size,
 		};
@@ -333,6 +332,7 @@ static ssize_t hids_outp_rep_write(struct bt_conn *conn,
 
 	if (rep->handler) {
 		struct bt_hids_rep report = {
+		    .id = rep->id,
 		    .data = rep_data,
 		    .size = rep->size,
 		};
@@ -388,6 +388,7 @@ static ssize_t hids_feat_rep_read(struct bt_conn *conn,
 
 	if (rep->handler) {
 		struct bt_hids_rep report = {
+		    .id = rep->id,
 		    .data = buf,
 		    .size = rep->size,
 		};
@@ -438,6 +439,7 @@ static ssize_t hids_feat_rep_write(struct bt_conn *conn,
 
 	if (rep->handler) {
 		struct bt_hids_rep report = {
+		    .id = rep->id,
 		    .data = rep_data,
 		    .size = rep->size,
 		};
@@ -470,19 +472,24 @@ static void hids_input_report_ccc_changed(struct bt_gatt_attr const *attr,
 	LOG_DBG("Input Report CCCD has changed.");
 
 	struct bt_hids_inp_rep *inp_rep =
-	    CONTAINER_OF((struct _bt_gatt_ccc *)attr->user_data,
+	    CONTAINER_OF((struct bt_gatt_ccc_managed_user_data *)attr->user_data,
 			 struct bt_hids_inp_rep, ccc);
+
+	uint8_t report_id = inp_rep->id;
+	enum bt_hids_notify_evt evt;
 
 	if (value == BT_GATT_CCC_NOTIFY) {
 		LOG_DBG("Notification has been turned on");
-		if (inp_rep->handler != NULL) {
-			inp_rep->handler(BT_HIDS_CCCD_EVT_NOTIFY_ENABLED);
-		}
+		evt = BT_HIDS_CCCD_EVT_NOTIFY_ENABLED;
 	} else {
 		LOG_DBG("Notification has been turned off");
-		if (inp_rep->handler != NULL) {
-			inp_rep->handler(BT_HIDS_CCCD_EVT_NOTIFY_DISABLED);
-		}
+		evt = BT_HIDS_CCCD_EVT_NOTIFY_DISABLED;
+	}
+
+	if (inp_rep->handler_ext != NULL) {
+		inp_rep->handler_ext(report_id, evt);
+	} else if (inp_rep->handler != NULL) {
+		inp_rep->handler(evt);
 	}
 }
 
@@ -524,7 +531,7 @@ static void hids_boot_mouse_inp_rep_ccc_changed(struct bt_gatt_attr const *attr,
 	LOG_DBG("Boot Mouse Input Report CCCD has changed.");
 
 	struct bt_hids_boot_mouse_inp_rep *boot_mouse_rep =
-		CONTAINER_OF((struct _bt_gatt_ccc *)attr->user_data,
+		CONTAINER_OF((struct bt_gatt_ccc_managed_user_data *)attr->user_data,
 			     struct bt_hids_boot_mouse_inp_rep, ccc);
 
 	if (value == BT_GATT_CCC_NOTIFY) {
@@ -579,7 +586,7 @@ static void hids_boot_kb_inp_rep_ccc_changed(struct bt_gatt_attr const *attr,
 	LOG_DBG("Boot Keyboard Input Report CCCD has changed.");
 
 	struct bt_hids_boot_kb_inp_rep *boot_kb_inp_rep =
-		CONTAINER_OF((struct _bt_gatt_ccc *)attr->user_data,
+		CONTAINER_OF((struct bt_gatt_ccc_managed_user_data *)attr->user_data,
 			     struct bt_hids_boot_kb_inp_rep, ccc);
 
 	if (value == BT_GATT_CCC_NOTIFY) {
@@ -628,6 +635,7 @@ static ssize_t hids_boot_kb_outp_report_read(struct bt_conn *conn,
 
 	if (rep->handler) {
 		struct bt_hids_rep report = {
+		    .id = 0,
 		    .data = buf,
 		    .size = sizeof(conn_data->hids_boot_kb_outp_rep_ctx),
 		};
@@ -670,6 +678,7 @@ static ssize_t hids_boot_kb_outp_report_write(struct bt_conn *conn,
 
 	if (rep->handler) {
 		struct bt_hids_rep report = {
+		    .id = 0,
 		    .data = rep_data,
 		    .size = sizeof(conn_data->hids_boot_kb_outp_rep_ctx),
 		};
@@ -1106,10 +1115,10 @@ static int inp_rep_notify_all(struct bt_hids *hids_obj,
 	}
 }
 
-int bt_hids_inp_rep_send(struct bt_hids *hids_obj,
-			 struct bt_conn *conn, uint8_t rep_index,
-			 uint8_t const *rep, uint8_t len,
-			 bt_gatt_complete_func_t cb)
+int bt_hids_inp_rep_send_userdata(struct bt_hids *hids_obj,
+				  struct bt_conn *conn, uint8_t rep_index,
+				  uint8_t const *rep, uint8_t len,
+				  bt_gatt_complete_func_t cb, void *userdata)
 {
 	struct bt_hids_inp_rep *hids_inp_rep =
 	    &hids_obj->inp_rep_group.reports[rep_index];
@@ -1147,6 +1156,7 @@ int bt_hids_inp_rep_send(struct bt_hids *hids_obj,
 	params.data = rep;
 	params.len = hids_inp_rep->size;
 	params.func = cb;
+	params.user_data = userdata;
 
 	int err = bt_gatt_notify_cb(conn, &params);
 
